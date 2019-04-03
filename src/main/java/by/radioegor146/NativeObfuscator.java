@@ -13,6 +13,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -63,6 +65,8 @@ public class NativeObfuscator {
         return value.replace("\\", "\\\\").replace("\b", "\\b").replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r").replace("\f", "\\f").replace("\"", "\\\"");
     }
     
+    private static StringBuilder nativeMethodsSb = new StringBuilder();
+    
     private static String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
         if (((methodNode.access & Opcodes.ACC_ABSTRACT) > 0) || ((methodNode.access & Opcodes.ACC_NATIVE) > 0))
             return "";
@@ -83,17 +87,29 @@ public class NativeObfuscator {
                 break;
         }
         methodName += index;
+        methodName = "__NGEN_" + methodName.replace("/", "_");
+        Matcher m = Pattern.compile("([^a-zA-Z_0-9])").matcher(methodName);
+        StringBuffer sb = new StringBuffer(methodName.length());
+        while (m.find()) 
+            m.appendReplacement(sb, String.valueOf((int) m.group(1).charAt(0)));
+        m.appendTail(sb);
+        methodName = sb.toString();
+        nativeMethodsSb
+                .append("    { \"")
+                .append(escapeString(methodNode.name))
+                .append("\", ").append("\"")
+                .append(escapeString(methodNode.desc))
+                .append("\", ")
+                .append("(void *)&")
+                .append(methodName)
+                .append(" },\n");
         int returnTypeSort = Type.getReturnType(methodNode.desc).getSort();
         outputSb
-                .append("extern \"C\"")
-                .append(" ")
-                .append("JNIEXPORT")
-                .append(" ")
                 .append(CPP_TYPES[returnTypeSort])
                 .append(" ")
                 .append("JNICALL")
                 .append(" ")
-                .append("Java_").append(methodName.replace("_", "_1").replace("/", "_").replace("$", "00024"))
+                .append(methodName)
                 .append("(")
                 .append("JNIEnv *env")
                 .append(", ")
@@ -104,8 +120,10 @@ public class NativeObfuscator {
         for (int i = 0; i < args.length; i++)
             outputSb.append(CPP_TYPES[args[i].getSort()]).append(" ").append("arg").append(i).append(i == args.length - 1 ? "" : ", ");
         outputSb.append(") {").append("\n");
-        outputSb.append("    ").append("jvm_stack<").append(methodNode.maxStack).append("> cstack;").append("\n");
-        outputSb.append("    ").append("local_vars<").append(methodNode.maxLocals).append("> clocals;").append("\n").append("\n");
+        if (methodNode.maxStack > 0)
+            outputSb.append("    ").append("jvm_stack<").append(methodNode.maxStack).append("> cstack;").append("\n");
+        if (methodNode.maxLocals > 0)
+            outputSb.append("    ").append("local_vars<").append(methodNode.maxLocals).append("> clocals;").append("\n").append("\n");
         int localIndex = 0;
         if (((methodNode.access & Opcodes.ACC_STATIC) == 0)) {
             outputSb.append("    ").append(CPP_SNIPPETS.getProperty("LOCAL_LOAD_ARG_" + 9).replace("$index", String.valueOf(localIndex)).replace("$arg", "obj")).append("\n");
@@ -306,6 +324,12 @@ public class NativeObfuscator {
         outputFile.append("// ").append(classNode.name).append("\n");
         for (int i = 0; i < classNode.methods.size(); i++)
             outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
+        outputFile.append("static JNINativeMethod __current_methods[] = {\n");
+        outputFile.append(nativeMethodsSb);
+        outputFile.append("};\n\n");
+        outputFile.append("void RegisterCurrentNatives(JNIEnv *env) {\n");
+        outputFile.append("    env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
+        outputFile.append("}\n");
         Files.write(Paths.get(args[1]), outputFile.toString().getBytes());
     }
     
