@@ -307,6 +307,12 @@ public class NativeObfuscator {
         switch (methodNode.name) {
             case "<init>":
                 methodNode.instructions.clear();
+                methodNode.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                int localVarsPosition = 1;
+                for (Type arg : args) {
+                    methodNode.instructions.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
+                    localVarsPosition += arg.getSize();
+                }
                 methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, classNode.name, "native_special_init" + index, methodNode.desc));
                 break;
             case "<clinit>":
