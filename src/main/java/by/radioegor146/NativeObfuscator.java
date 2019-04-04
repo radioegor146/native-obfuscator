@@ -16,6 +16,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -75,14 +76,20 @@ public class NativeObfuscator {
         StringBuilder outputSb = new StringBuilder();
         outputSb.append("// ").append(methodNode.name).append(methodNode.desc).append("\n");
         String methodName = classNode.name + "/";
+        String javaMethodName = methodNode.name;
         switch (methodNode.name) {
             case "<init>":
+                classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE, "native_special_init" + index, methodNode.desc, methodNode.signature, new String[0]));
+                javaMethodName = "native_special_init" + index;
                 methodName += "native_special_init";
                 break;
             case "<clinit>":
+                classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE, "native_special_clinit" + index, methodNode.desc, methodNode.signature, new String[0]));
+                javaMethodName = "native_special_clinit" + index;
                 methodName += "native_special_clinit";
                 break;
             default:
+                methodNode.access |= Opcodes.ACC_NATIVE;
                 methodName += "native_" + methodNode.name;
                 break;
         }
@@ -96,7 +103,7 @@ public class NativeObfuscator {
         methodName = sb.toString();
         nativeMethodsSb
                 .append("    { \"")
-                .append(escapeString(methodNode.name))
+                .append(escapeString(javaMethodName))
                 .append("\", ").append("\"")
                 .append(escapeString(methodNode.desc))
                 .append("\", ")
@@ -296,6 +303,21 @@ public class NativeObfuscator {
         }
         outputSb.append("    return (").append(CPP_TYPES[returnTypeSort]).append(") 0;").append("\n");
         outputSb.append("}").append("\n");
+        
+        switch (methodNode.name) {
+            case "<init>":
+                methodNode.instructions.clear();
+                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, classNode.name, "native_special_init" + index, methodNode.desc));
+                break;
+            case "<clinit>":
+                methodNode.instructions.clear();
+                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, classNode.name, "native_special_clinit" + index, methodNode.desc));
+                break;
+            default:
+                methodNode.instructions.clear();
+                break;
+        }
+        
         return outputSb.toString();
     }
     
@@ -324,6 +346,9 @@ public class NativeObfuscator {
         outputFile.append("// ").append(classNode.name).append("\n");
         for (int i = 0; i < classNode.methods.size(); i++)
             outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
+        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
+        classNode.accept(classWriter);
+        Files.write(Paths.get(args[2]), classWriter.toByteArray());
         outputFile.append("static JNINativeMethod __current_methods[] = {\n");
         outputFile.append(nativeMethodsSb);
         outputFile.append("};\n\n");
