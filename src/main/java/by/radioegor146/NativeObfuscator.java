@@ -55,8 +55,8 @@ public class NativeObfuscator {
         "jfloat", // 6
         "jlong", // 7
         "jdouble", // 8
-        "jobject", // 9
-        "jarray", // 10
+        "jarray", // 9
+        "jobject", // 10
         "jmethod" // 11
     };
     
