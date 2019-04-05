@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,6 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -62,8 +64,8 @@ public class NativeObfuscator {
     private static final Pattern PATTERN = Pattern.compile("([^a-zA-Z_0-9])");
     private static final Map<Integer, String> INSTRUCTIONS = new HashMap<>();
     private static final Properties CPP_SNIPPETS = new Properties();
-    private static final StringBuilder nativeMethodsSb = new StringBuilder();
-    private static final Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
+    private static StringBuilder nativeMethodsSb = new StringBuilder();
+    private static Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
     private static final String[] CPP_TYPES = {
         "void", // 0
         "jboolean", // 1
@@ -83,12 +85,46 @@ public class NativeObfuscator {
         return value.replace("\\", "\\\\").replace("\b", "\\b").replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r").replace("\f", "\\f").replace("\"", "\\\"");
     }
     
+    private static String escapeCppNameString(String value) {
+        Matcher m = PATTERN.matcher(value);
+        StringBuffer sb = new StringBuffer(value.length());
+        while (m.find()) 
+            m.appendReplacement(sb, String.valueOf((int) m.group(1).charAt(0)));
+        m.appendTail(sb);
+        String output = sb.toString();
+        if (output.length() > 0 && (output.charAt(0) >= '0' && output.charAt(0) <= '9'))
+            output = "_" + output;
+        return output;
+    }
+    
+    private static Map<String, String> createMap(Object... parts) {
+        HashMap<String, String> tokens = new HashMap<>();
+        for (int i = 0; i < parts.length; i += 2) {
+            tokens.put(parts[i].toString(), parts[i + 1].toString());
+        }
+        return tokens;
+    }
+    
+    private static String dynamicFormat(String string, Map<String, String> tokens) {
+        String patternString = "\\$(" + String.join("|", tokens.keySet()) + ")";
+        Pattern pattern = Pattern.compile(patternString);
+        Matcher matcher = pattern.matcher(string);
+
+        StringBuffer sb = new StringBuffer();
+        while(matcher.find()) {
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(tokens.get(matcher.group(1))));
+        }
+        matcher.appendTail(sb);
+
+        return sb.toString();
+    }
+    
     private static String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
         if (((methodNode.access & Opcodes.ACC_ABSTRACT) > 0) || ((methodNode.access & Opcodes.ACC_NATIVE) > 0))
             return "";
         StringBuilder outputSb = new StringBuilder("// ");
         outputSb.append(methodNode.name).append(methodNode.desc).append("\n");
-        String methodName = classNode.name + "/";
+        String methodName = "";
         String javaMethodName = methodNode.name;
         switch (methodNode.name) {
             case "<init>":
@@ -107,15 +143,10 @@ public class NativeObfuscator {
                 break;
         }
         methodName += index;
-        methodName = "__NGEN_" + methodName.replace("/", "_");
-        Matcher m = PATTERN.matcher(methodName);
-        StringBuffer sb = new StringBuffer(methodName.length());
-        while (m.find()) 
-            m.appendReplacement(sb, String.valueOf((int) m.group(1).charAt(0)));
-        m.appendTail(sb);
-        methodName = sb.toString();
+        methodName = "__ngen_" + methodName.replace("/", "_");
+        methodName = escapeCppNameString(methodName);
         nativeMethodsSb
-                .append("    { \"")
+                .append("        { \"")
                 .append(escapeString(javaMethodName))
                 .append("\", ").append("\"")
                 .append(escapeString(methodNode.desc))
@@ -141,16 +172,24 @@ public class NativeObfuscator {
             outputSb.append(CPP_TYPES[args[i].getSort()]).append(" ").append("arg").append(i).append(i == args.length - 1 ? "" : ", ");
         outputSb.append(") {").append("\n");
         if (methodNode.maxStack > 0)
-            outputSb.append("    ").append("jvm_stack<").append(methodNode.maxStack).append("> cstack;").append("\n");
+            outputSb.append("    ").append("native_jvm_utils::jvm_stack<").append(methodNode.maxStack).append("> cstack;").append("\n");
         if (methodNode.maxLocals > 0)
-            outputSb.append("    ").append("local_vars<").append(methodNode.maxLocals).append("> clocals;").append("\n").append("\n");
+            outputSb.append("    ").append("native_jvm_utils::local_vars<").append(methodNode.maxLocals).append("> clocals;").append("\n").append("\n");
         int localIndex = 0;
         if (((methodNode.access & Opcodes.ACC_STATIC) == 0)) {
-            outputSb.append("    ").append(CPP_SNIPPETS.getProperty("LOCAL_LOAD_ARG_" + 9).replace("$index", String.valueOf(localIndex)).replace("$arg", "obj")).append("\n");
+            outputSb.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("LOCAL_LOAD_ARG_" + 9), 
+                    createMap(
+                            "index", localIndex, 
+                            "arg", "obj"
+                    ))).append("\n");
             localIndex++;
         }   
         for (int i = 0; i < args.length; i++) {
-            outputSb.append("    ").append(CPP_SNIPPETS.getProperty("LOCAL_LOAD_ARG_" + args[i].getSort()).replace("$index", String.valueOf(localIndex)).replace("$arg", "arg" + i)).append("\n");
+            outputSb.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("LOCAL_LOAD_ARG_" + args[i].getSort()), 
+                    createMap(
+                            "index", localIndex, 
+                            "arg", "arg" + i
+                    ))).append("\n");
             localIndex++;
         }
         outputSb.append("\n");
@@ -170,22 +209,28 @@ public class NativeObfuscator {
                     break;
                 default:
                     StringBuilder tryCatch = new StringBuilder("\n");
-                    tryCatch.append("    ").append(CPP_SNIPPETS.getProperty("TRYCATCH_START").replace("$rettype", CPP_TYPES[returnTypeSort]).replace("$handle", String.valueOf(currentTryCatches.size() > 0))).append("\n");
+                    tryCatch.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("TRYCATCH_START"), 
+                            createMap(
+                                    "rettype", CPP_TYPES[returnTypeSort], 
+                                    "handle", String.valueOf(currentTryCatches.size() > 0)
+                            ))).append("\n");
                     for (TryCatchBlockNode tryCatchBlock : currentTryCatches) {
                         if (tryCatchBlock.type == null) {
-                            tryCatch.append("    ").append(CPP_SNIPPETS.getProperty("TRYCATCH_ANY_L")
-                                .replace("$rettype", CPP_TYPES[returnTypeSort])
-                                .replace("$handler_block", tryCatchBlock.handler.getLabel().toString())).append("\n");
+                            tryCatch.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("TRYCATCH_ANY_L"), createMap(
+                                    "rettype", CPP_TYPES[returnTypeSort],
+                                    "handler_block", tryCatchBlock.handler.getLabel().toString()
+                            ))).append("\n");
                             break;
                         } else {
-                            tryCatch.append("    ").append(CPP_SNIPPETS.getProperty("TRYCATCH_CHECK")
-                                .replace("$rettype", CPP_TYPES[returnTypeSort])
-                                .replace("$exception_class", escapeString(tryCatchBlock.type))
-                                .replace("$handler_block", tryCatchBlock.handler.getLabel().toString())).append("\n");
+                            tryCatch.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("TRYCATCH_CHECK"), createMap(
+                                    "rettype", CPP_TYPES[returnTypeSort],
+                                    "exception_class", escapeString(tryCatchBlock.type),
+                                    "handler_block", tryCatchBlock.handler.getLabel().toString()
+                            ))).append("\n");
                             break;
                         }
                     }
-                    tryCatch.append("    ").append(CPP_SNIPPETS.getProperty("TRYCATCH_END").replace("$rettype", CPP_TYPES[returnTypeSort]));
+                    tryCatch.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("TRYCATCH_END"), createMap("rettype", CPP_TYPES[returnTypeSort])));
                     outputSb.append("    ");
                     String insnName = INSTRUCTIONS.getOrDefault(insnNode.getOpcode(), "NOTFOUND");
                     HashMap<String, String> props = new HashMap<>();
@@ -225,8 +270,8 @@ public class NativeObfuscator {
                         }
                         Collections.reverse(argOffsets);
                         for (int i = 0; i < argOffsets.size(); i++)
-                            argsBuilder.append(", ").append(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)).replace("$index", String.valueOf(argOffsets.get(i) - stackOffset)));
-                        outputSb.append(CPP_SNIPPETS.getProperty("INVOKE_POPCNT").replace("$count", String.valueOf(stackOffset))).append(" ");
+                            argsBuilder.append(", ").append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)), createMap("index", String.valueOf(argOffsets.get(i) - stackOffset))));
+                        outputSb.append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_POPCNT"), createMap("count", String.valueOf(stackOffset)))).append(" ");
                         props.put("class", escapeString(classNode.name));
                         props.put("name", escapeString("invokedynamic$" + methodNode.name + "$" + invokeDynamics.size()));
                         props.put("desc", escapeString(((InvokeDynamicInsnNode) insnNode).desc));
@@ -259,9 +304,10 @@ public class NativeObfuscator {
                     if (insnNode instanceof LookupSwitchInsnNode) {
                         outputSb.append(CPP_SNIPPETS.getProperty("LOOKUPSWITCH_START")).append("\n");
                         for (int switchIndex = 0; switchIndex < ((LookupSwitchInsnNode) insnNode).labels.size(); switchIndex++)
-                            outputSb.append("    ").append("    ").append(CPP_SNIPPETS.getProperty("LOOKUPSWITCH_PART")
-                                    .replace("$key", String.valueOf(((LookupSwitchInsnNode) insnNode).keys.get(switchIndex)))
-                                    .replace("$label", String.valueOf(((LookupSwitchInsnNode) insnNode).labels.get(switchIndex).getLabel()))).append("\n");
+                            outputSb.append("    ").append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("LOOKUPSWITCH_PART"), createMap(
+                                    "key", String.valueOf(((LookupSwitchInsnNode) insnNode).keys.get(switchIndex)),
+                                    "label", String.valueOf(((LookupSwitchInsnNode) insnNode).labels.get(switchIndex).getLabel())
+                            ))).append("\n");
                         outputSb.append("    ").append(CPP_SNIPPETS.getProperty("LOOKUPSWITCH_END")).append("\n");
                         continue;
                     }
@@ -284,8 +330,8 @@ public class NativeObfuscator {
                             int objectOffset = (argOffsets.size() > 0 ? argOffsets.get(argOffsets.size() - 1) : -1) + 1;
                             stackOffset++;
                             for (int i = 0; i < argOffsets.size(); i++)
-                                argsBuilder.append(", ").append(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)).replace("$index", String.valueOf(argOffsets.get(i) - stackOffset)));
-                            outputSb.append(CPP_SNIPPETS.getProperty("INVOKE_POPCNT").replace("$count", String.valueOf(stackOffset))).append(" ");
+                                argsBuilder.append(", ").append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)), createMap("index", String.valueOf(argOffsets.get(i) - stackOffset))));
+                            outputSb.append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_POPCNT"), createMap("count", String.valueOf(stackOffset)))).append(" ");
                             props.put("class", escapeString(((MethodInsnNode) insnNode).owner));
                             props.put("object_offset", String.valueOf(objectOffset - stackOffset));
                             props.put("name", escapeString(((MethodInsnNode) insnNode).name));
@@ -293,8 +339,8 @@ public class NativeObfuscator {
                             props.put("args", argsBuilder.toString());
                         } else {
                             for (int i = 0; i < argOffsets.size(); i++)
-                                argsBuilder.append(", ").append(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)).replace("$index", String.valueOf(argOffsets.get(i) - stackOffset)));
-                            outputSb.append(CPP_SNIPPETS.getProperty("INVOKE_POPCNT").replace("$count", String.valueOf(stackOffset))).append(" ");
+                                argsBuilder.append(", ").append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)), createMap("index", String.valueOf(argOffsets.get(i) - stackOffset))));
+                            outputSb.append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_POPCNT"), createMap("count", String.valueOf(stackOffset)))).append(" ");
                             props.put("class", escapeString(((MethodInsnNode) insnNode).owner));
                             props.put("name", escapeString(((MethodInsnNode) insnNode).name));
                             props.put("desc", escapeString(((MethodInsnNode) insnNode).desc));
@@ -308,9 +354,10 @@ public class NativeObfuscator {
                     if (insnNode instanceof TableSwitchInsnNode) {
                         outputSb.append(CPP_SNIPPETS.getProperty("TABLESWITCH_START")).append("\n");
                         for (int switchIndex = 0; switchIndex < ((TableSwitchInsnNode) insnNode).labels.size(); switchIndex++)
-                            outputSb.append("    ").append("    ").append(CPP_SNIPPETS.getProperty("TABLESWITCH_PART")
-                                    .replace("$index", String.valueOf(((TableSwitchInsnNode) insnNode).min + switchIndex))
-                                    .replace("$label", String.valueOf(((TableSwitchInsnNode) insnNode).labels.get(switchIndex).getLabel()))).append("\n");
+                            outputSb.append("    ").append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("TABLESWITCH_PART"), createMap(
+                                    "index", String.valueOf(((TableSwitchInsnNode) insnNode).min + switchIndex),
+                                    "label", String.valueOf(((TableSwitchInsnNode) insnNode).labels.get(switchIndex).getLabel())
+                            ))).append("\n");
                         outputSb.append("    ").append(CPP_SNIPPETS.getProperty("TABLESWITCH_END")).append("\n");
                         continue;
                     }
@@ -324,8 +371,7 @@ public class NativeObfuscator {
                     if (cppCode == null) {
                         outputSb.append("// ").append("insn not found: ").append(insnName).append(" ").append(insnNode).append("\n");
                     } else {
-                        for (Map.Entry<String, String> prop : props.entrySet()) 
-                            cppCode = cppCode.replace("$" + prop.getKey(), prop.getValue());
+                        cppCode = dynamicFormat(cppCode, props);
                         outputSb.append(cppCode);
                     }
                     outputSb.append("\n");
@@ -333,7 +379,7 @@ public class NativeObfuscator {
             }
         }
         outputSb.append("    return (").append(CPP_TYPES[returnTypeSort]).append(") 0;\n");
-        outputSb.append("}\n");
+        outputSb.append("}\n\n");
         
         switch (methodNode.name) {
             case "<init>":
@@ -370,49 +416,108 @@ public class NativeObfuscator {
         classNode.methods.add(indyWrapper);
     }
 
+    private static String writeStreamToString(InputStream stream) throws IOException {
+        byte[] buffer = new byte[4096];
+        int bytesRead;
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            while ((bytesRead = stream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+    
+    private static void writeStreamToFile(InputStream stream, Path path) throws IOException {
+        byte[] buffer = new byte[4096];
+        int bytesRead;
+        try (OutputStream outputStream = Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            while ((bytesRead = stream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+        }
+    }
+    
     /**
      * @param args the command line arguments
      * @throws java.io.IOException
      * @throws java.lang.IllegalAccessException
      */
-    public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {        
+    public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {             
         for (Field f : Opcodes.class.getFields())
             INSTRUCTIONS.put((int) f.get(null), f.getName());
-        CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("cppsnippets.properties"));
+        CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/cppsnippets.properties"));
         final File jar = Paths.get(args[0]).normalize().toAbsolutePath().toFile();
         final Path outputDir = Paths.get(args[1]).normalize().toAbsolutePath();
         Files.createDirectories(outputDir);
-        try (final JarFile f = new JarFile(jar); final JarOutputStream out = new  JarOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING), f.getManifest())) {
-        f.stream().forEach(e -> {
-        	if (!e.getName().endsWith(".class")) return;
-        	try {
-        		ClassReader classReader = new ClassReader(f.getInputStream(e));
-		        ClassNode classNode = new ClassNode(Opcodes.ASM7);
-		        classReader.accept(classNode, 0);
-		        try (BufferedWriter outputFile = Files.newBufferedWriter(outputDir.resolve(classNode.name.replace('/', '_').concat(".cpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-    		        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
-    		            NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), StandardCharsets.UTF_8))) {
-    		            outputFile.append(bufferedReader.lines().collect(Collectors.joining("\n")));
-    		        }
-    		        outputFile.append("// ").append(classNode.name).append("\n");
-    		        for (int i = 0; i < classNode.methods.size(); i++)
-    		            outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
-    		        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
-    		        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
-    		        classNode.accept(classWriter);
-    		        out.putNextEntry(new ZipEntry(e.getName()));
-    		        out.write(classWriter.toByteArray());
-    		        outputFile.append("static JNINativeMethod __current_methods[] = {\n");
-    		        outputFile.append(nativeMethodsSb);
-    		        outputFile.append("};\n\n");
-    		        outputFile.append("void RegisterCurrentNatives(JNIEnv *env) {\n");
-    		        outputFile.append("    env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
-    		        outputFile.append("}\n");
-		        }
-			} catch (IOException e1) {
-				e1.printStackTrace(System.err);
-			}
-        });
+        Files.createDirectories(outputDir.resolve("cpp"));
+        Files.createDirectories(outputDir.resolve("cpp").resolve("output"));
+        writeStreamToFile(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm.cpp"), outputDir.resolve("cpp").resolve("native_jvm.cpp"));
+        writeStreamToFile(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm.hpp"), outputDir.resolve("cpp").resolve("native_jvm.hpp"));
+        writeStreamToFile(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.hpp"), outputDir.resolve("cpp").resolve("native_jvm_output.hpp"));
+        StringBuilder outputHeaderSb = new StringBuilder();
+        StringBuilder outputHeaderIncludesSb = new StringBuilder();
+        try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
+            f.stream().forEach(e -> {
+                try {
+                    if (!e.getName().endsWith(".class")) {
+                        out.putNextEntry(new ZipEntry(e.getName()));
+                        InputStream stream = f.getInputStream(e);
+                        byte[] buffer = new byte[4096];
+                        int len = stream.read(buffer);
+                        while (len != -1) {
+                            out.write(buffer, 0, len);
+                            len = stream.read(buffer);
+                        }
+                        return;
+                    }
+                    nativeMethodsSb = new StringBuilder();
+                    invokeDynamics = new HashMap<>();
+                    ClassReader classReader = new ClassReader(f.getInputStream(e));
+                    ClassNode classNode = new ClassNode(Opcodes.ASM7);
+                    classReader.accept(classNode, 0);
+                    if ((classNode.access & Opcodes.ACC_INTERFACE) > 0 || classNode.methods.stream().filter(x -> (x.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0).count() == 0) {
+                        System.out.println("Skipping " + classNode.name);
+                        return;
+                    }
+                    System.out.println("Processing " + classNode.name);
+                    try (BufferedWriter outputCppFile = Files.newBufferedWriter(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".cpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                            BufferedWriter outputHppFile = Files.newBufferedWriter(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                        outputCppFile.append("#include \"../native_jvm.hpp\"\n");
+                        outputHppFile.append("#include \"../native_jvm.hpp\"\n");
+                        outputCppFile.append("#include \"").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
+                        outputHeaderIncludesSb.append("#include \"output/").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
+                        outputCppFile.append("\n");
+                        outputCppFile.append("// ").append(classNode.name).append("\n");
+                        outputCppFile.append("namespace native_jvm::classes::" + escapeCppNameString(classNode.name.replace("/", "_")) + " {\n\n");
+                        outputHppFile.append("\n");
+                        outputHppFile.append("// ").append(classNode.name).append("\n");
+                        outputHppFile.append("namespace native_jvm::classes::" + escapeCppNameString(classNode.name.replace("/", "_")) + " {\n\n");
+                        for (int i = 0; i < classNode.methods.size(); i++)
+                            outputCppFile.append("    ").append(visitMethod(classNode, classNode.methods.get(i), i).replace("\n", "\n    "));
+                        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
+                        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
+                        classNode.accept(classWriter);
+                        out.putNextEntry(new ZipEntry(e.getName()));
+                        out.write(classWriter.toByteArray());
+                        outputCppFile.append("\n");
+                        outputCppFile.append("    static JNINativeMethod __ngen_methods[] = {\n");
+                        outputCppFile.append(nativeMethodsSb);
+                        outputCppFile.append("    };\n\n");
+                        outputCppFile.append("    void __ngen_register_methods(JNIEnv *env) {\n");
+                        outputHppFile.append("    void __ngen_register_methods(JNIEnv *env);\n");
+                        outputCppFile.append("        env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
+                        outputCppFile.append("    }\n");
+                        outputCppFile.append("}");
+                        outputHppFile.append("}");
+                        outputHeaderSb.append("        native_jvm::classes::").append(escapeCppNameString(classNode.name.replace("/", "_"))).append(".__ngen_register_methods();\n");
+                    }
+                } catch (IOException e1) {
+                    e1.printStackTrace(System.err);
+                }
+            });
         }
+        String outputHeader = writeStreamToString(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.cpp"));
+        outputHeader = dynamicFormat(outputHeader, createMap("register_code", outputHeaderSb, "includes", outputHeaderIncludesSb));
+        Files.write(outputDir.resolve("cpp").resolve("native_jvm_output.cpp"), outputHeader.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 }
