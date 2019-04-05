@@ -4,8 +4,10 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -13,8 +15,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -45,8 +49,13 @@ import org.objectweb.asm.tree.VarInsnNode;
  */
 
 public class NativeObfuscator {
-    
-    private static final String[] CPP_TYPES = new String[] {
+
+    private static final Pattern PATTERN = Pattern.compile("([^a-zA-Z_0-9])");
+    private static final Map<Integer, String> INSTRUCTIONS = new HashMap<>();
+    private static final Properties CPP_SNIPPETS = new Properties();
+    private static final StringBuilder nativeMethodsSb = new StringBuilder();
+    private static final Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
+    private static final String[] CPP_TYPES = {
         "void", // 0
         "jboolean", // 1
         "jchar", // 2
@@ -60,23 +69,16 @@ public class NativeObfuscator {
         "jobject", // 10
         "jmethod" // 11
     };
-    
-    private static final Properties CPP_SNIPPETS = new Properties();
-    
+
     private static String escapeString(String value) {
         return value.replace("\\", "\\\\").replace("\b", "\\b").replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r").replace("\f", "\\f").replace("\"", "\\\"");
     }
     
-    private static StringBuilder nativeMethodsSb = new StringBuilder();
-    private static HashMap<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
-    
     private static String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
         if (((methodNode.access & Opcodes.ACC_ABSTRACT) > 0) || ((methodNode.access & Opcodes.ACC_NATIVE) > 0))
             return "";
-        if (methodNode.tryCatchBlocks.size() > 0)
-            Type.getArgumentTypes(methodNode.desc);
-        StringBuilder outputSb = new StringBuilder();
-        outputSb.append("// ").append(methodNode.name).append(methodNode.desc).append("\n");
+        StringBuilder outputSb = new StringBuilder("// ");
+        outputSb.append(methodNode.name).append(methodNode.desc).append("\n");
         String methodName = classNode.name + "/";
         String javaMethodName = methodNode.name;
         switch (methodNode.name) {
@@ -97,7 +99,7 @@ public class NativeObfuscator {
         }
         methodName += index;
         methodName = "__NGEN_" + methodName.replace("/", "_");
-        Matcher m = Pattern.compile("([^a-zA-Z_0-9])").matcher(methodName);
+        Matcher m = PATTERN.matcher(methodName);
         StringBuffer sb = new StringBuffer(methodName.length());
         while (m.find()) 
             m.appendReplacement(sb, String.valueOf((int) m.group(1).charAt(0)));
@@ -143,18 +145,16 @@ public class NativeObfuscator {
             localIndex++;
         }
         outputSb.append("\n");
-        HashSet<TryCatchBlockNode> currentTryCatches = new HashSet<>(); 
+        Set<TryCatchBlockNode> currentTryCatches = new HashSet<>();
         for (int insnIndex = 0; insnIndex < methodNode.instructions.size(); insnIndex++) {
             AbstractInsnNode insnNode = methodNode.instructions.get(insnIndex);
             switch (insnNode.getType()) {
                 case AbstractInsnNode.LABEL:
                     outputSb.append(((LabelNode)insnNode).getLabel()).append(": ;").append("\n");
-                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.start.equals(insnNode))).forEachOrdered((node) -> {
-                        currentTryCatches.add(node);
-                    });
-                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.end.equals(insnNode))).forEachOrdered((node) -> {
-                        currentTryCatches.remove(node);
-                    });
+                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.start.equals(insnNode))).forEachOrdered(
+                        currentTryCatches::add);
+                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.end.equals(insnNode))).forEachOrdered(
+                        currentTryCatches::remove);
                     break;
                 case AbstractInsnNode.LINE:
                     outputSb.append("    ").append("// Line ").append(((LineNumberNode)insnNode).line).append(":").append("\n");
@@ -162,7 +162,7 @@ public class NativeObfuscator {
                 case AbstractInsnNode.FRAME:
                     break;
                 default:
-                    StringBuilder tryCatch = new StringBuilder().append("\n");
+                    StringBuilder tryCatch = new StringBuilder("\n");
                     tryCatch.append("    ").append(CPP_SNIPPETS.getProperty("TRYCATCH_START").replace("$rettype", CPP_TYPES[returnTypeSort]).replace("$handle", String.valueOf(currentTryCatches.size() > 0))).append("\n");
                     for (TryCatchBlockNode tryCatchBlock : currentTryCatches) {
                         if (tryCatchBlock.type == null) {
@@ -325,8 +325,8 @@ public class NativeObfuscator {
                     break;
             }
         }
-        outputSb.append("    return (").append(CPP_TYPES[returnTypeSort]).append(") 0;").append("\n");
-        outputSb.append("}").append("\n");
+        outputSb.append("    return (").append(CPP_TYPES[returnTypeSort]).append(") 0;\n");
+        outputSb.append("}\n");
         
         switch (methodNode.name) {
             case "<init>":
@@ -362,9 +362,7 @@ public class NativeObfuscator {
         indyWrapper.instructions.add(new InsnNode(Opcodes.ARETURN));
         classNode.methods.add(indyWrapper);
     }
-    
-    private static final HashMap<Integer, String> INSTRUCTIONS = new HashMap<>();
-    
+
     /**
      * @param args the command line arguments
      * @throws java.io.IOException
@@ -379,18 +377,14 @@ public class NativeObfuscator {
         ClassNode classNode = new ClassNode(Opcodes.ASM7);
         classReader.accept(classNode, 0);
         StringBuilder outputFile = new StringBuilder();
-        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), "UTF-8"))) {	
-            String line;
-            while ((line = bufferedReader.readLine()) != null) {
-                outputFile.append(line).append("\n");
-            }
-	}
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
+            NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), StandardCharsets.UTF_8))) {
+            outputFile.append(bufferedReader.lines().collect(Collectors.joining("\n")));
+        }
         outputFile.append("// ").append(classNode.name).append("\n");
         for (int i = 0; i < classNode.methods.size(); i++)
             outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
-        invokeDynamics.entrySet().forEach((indy) -> { 
-            processIndy(classNode, indy.getKey(), indy.getValue());
-        });
+        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
         ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
         classNode.accept(classWriter);
         Files.write(Paths.get(args[2]), classWriter.toByteArray());
@@ -400,7 +394,7 @@ public class NativeObfuscator {
         outputFile.append("void RegisterCurrentNatives(JNIEnv *env) {\n");
         outputFile.append("    env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
         outputFile.append("}\n");
-        Files.write(Paths.get(args[1]), outputFile.toString().getBytes());
+        Files.write(Paths.get(args[1]), outputFile.toString().getBytes(), StandardOpenOption.CREATE);
     }
     
 }
