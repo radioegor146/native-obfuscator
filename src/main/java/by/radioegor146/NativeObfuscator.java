@@ -390,27 +390,27 @@ public class NativeObfuscator {
 		        ClassNode classNode = new ClassNode(Opcodes.ASM7);
 		        classReader.accept(classNode, 0);
 		        try (BufferedWriter outputFile = Files.newBufferedWriter(outputDir.resolve(classNode.name.replace('/', '_').concat(".cpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-		        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
-		            NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), StandardCharsets.UTF_8))) {
-		            outputFile.append(bufferedReader.lines().collect(Collectors.joining("\n")));
-		        }
-		        outputFile.append("// ").append(classNode.name).append("\n");
-		        for (int i = 0; i < classNode.methods.size(); i++)
-		            outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
-		        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
-		        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
-		        classNode.accept(classWriter);
-		        out.putNextEntry(new ZipEntry(e.getName()));
-		        out.write(classWriter.toByteArray());
-		        outputFile.append("static JNINativeMethod __current_methods[] = {\n");
-		        outputFile.append(nativeMethodsSb);
-		        outputFile.append("};\n\n");
-		        outputFile.append("void RegisterCurrentNatives(JNIEnv *env) {\n");
-		        outputFile.append("    env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
-		        outputFile.append("}\n");
+    		        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
+    		            NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), StandardCharsets.UTF_8))) {
+    		            outputFile.append(bufferedReader.lines().collect(Collectors.joining("\n")));
+    		        }
+    		        outputFile.append("// ").append(classNode.name).append("\n");
+    		        for (int i = 0; i < classNode.methods.size(); i++)
+    		            outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
+    		        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
+    		        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
+    		        classNode.accept(classWriter);
+    		        out.putNextEntry(new ZipEntry(e.getName()));
+    		        out.write(classWriter.toByteArray());
+    		        outputFile.append("static JNINativeMethod __current_methods[] = {\n");
+    		        outputFile.append(nativeMethodsSb);
+    		        outputFile.append("};\n\n");
+    		        outputFile.append("void RegisterCurrentNatives(JNIEnv *env) {\n");
+    		        outputFile.append("    env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
+    		        outputFile.append("}\n");
 		        }
 			} catch (IOException e1) {
-				e1.printStackTrace();
+				e1.printStackTrace(System.err);
 			}
         });
         }
