@@ -171,10 +171,8 @@ public class NativeObfuscator {
         for (int i = 0; i < args.length; i++)
             outputSb.append(CPP_TYPES[args[i].getSort()]).append(" ").append("arg").append(i).append(i == args.length - 1 ? "" : ", ");
         outputSb.append(") {").append("\n");
-        if (methodNode.maxStack > 0)
-            outputSb.append("    ").append("native_jvm_utils::jvm_stack<").append(methodNode.maxStack).append("> cstack;").append("\n");
-        if (methodNode.maxLocals > 0)
-            outputSb.append("    ").append("native_jvm_utils::local_vars<").append(methodNode.maxLocals).append("> clocals;").append("\n").append("\n");
+        outputSb.append("    ").append("utils::jvm_stack<").append(Math.max(1, methodNode.maxStack)).append("> cstack;").append("\n");
+        outputSb.append("    ").append("utils::local_vars<").append(Math.max(1, methodNode.maxLocals)).append("> clocals;").append("\n").append("\n");
         int localIndex = 0;
         if (((methodNode.access & Opcodes.ACC_STATIC) == 0)) {
             outputSb.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("LOCAL_LOAD_ARG_" + 9), 
@@ -456,6 +454,12 @@ public class NativeObfuscator {
         writeStreamToFile(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.hpp"), outputDir.resolve("cpp").resolve("native_jvm_output.hpp"));
         StringBuilder outputHeaderSb = new StringBuilder();
         StringBuilder outputHeaderIncludesSb = new StringBuilder();
+        List<String> cmakeClassFiles = new ArrayList<>();
+        List<String> cmakeMainFiles = new ArrayList<>();
+        cmakeMainFiles.add("native_jvm.hpp");
+        cmakeMainFiles.add("native_jvm.cpp");
+        cmakeMainFiles.add("native_jvm_output.hpp");
+        cmakeMainFiles.add("native_jvm_output.cpp");
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             f.stream().forEach(e -> {
                 try {
@@ -485,10 +489,16 @@ public class NativeObfuscator {
                         outputCppFile.append("#include \"../native_jvm.hpp\"\n");
                         outputHppFile.append("#include \"../native_jvm.hpp\"\n");
                         outputCppFile.append("#include \"").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
+                        cmakeClassFiles.add("output/" + escapeCppNameString(classNode.name.replace('/', '_')) + ".hpp");
+                        cmakeClassFiles.add("output/" + escapeCppNameString(classNode.name.replace('/', '_')) + ".cpp");
                         outputHeaderIncludesSb.append("#include \"output/").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
                         outputCppFile.append("\n");
                         outputCppFile.append("// ").append(classNode.name).append("\n");
                         outputCppFile.append("namespace native_jvm::classes::" + escapeCppNameString(classNode.name.replace("/", "_")) + " {\n\n");
+                        outputHppFile.append("\n");
+                        outputHppFile.append("#ifndef ").append(escapeCppNameString(classNode.name.replace('/', '_')).concat("_hpp").toUpperCase()).append("_GUARD\n");
+                        outputHppFile.append("\n");
+                        outputHppFile.append("#define ").append(escapeCppNameString(classNode.name.replace('/', '_')).concat("_hpp").toUpperCase()).append("_GUARD\n");
                         outputHppFile.append("\n");
                         outputHppFile.append("// ").append(classNode.name).append("\n");
                         outputHppFile.append("namespace native_jvm::classes::" + escapeCppNameString(classNode.name.replace("/", "_")) + " {\n\n");
@@ -505,19 +515,38 @@ public class NativeObfuscator {
                         outputCppFile.append("    };\n\n");
                         outputCppFile.append("    void __ngen_register_methods(JNIEnv *env) {\n");
                         outputHppFile.append("    void __ngen_register_methods(JNIEnv *env);\n");
-                        outputCppFile.append("        env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
+                        outputCppFile.append("        env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
-                        outputHppFile.append("}");
-                        outputHeaderSb.append("        native_jvm::classes::").append(escapeCppNameString(classNode.name.replace("/", "_"))).append(".__ngen_register_methods();\n");
+                        outputHppFile.append("}\n\n#endif");
+                        outputHeaderSb.append("        native_jvm::classes::").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env);\n");
                     }
                 } catch (IOException e1) {
                     e1.printStackTrace(System.err);
                 }
             });
         }
-        String outputHeader = writeStreamToString(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.cpp"));
-        outputHeader = dynamicFormat(outputHeader, createMap("register_code", outputHeaderSb, "includes", outputHeaderIncludesSb));
-        Files.write(outputDir.resolve("cpp").resolve("native_jvm_output.cpp"), outputHeader.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        
+        Files.write(
+                outputDir.resolve("cpp").resolve("native_jvm_output.cpp"), 
+                dynamicFormat(
+                        writeStreamToString(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.cpp")), 
+                        createMap(
+                                "register_code", outputHeaderSb, 
+                                "includes", outputHeaderIncludesSb
+                        )).getBytes(), 
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
+        );
+        
+        Files.write(
+                outputDir.resolve("cpp").resolve("CMakeLists.txt"), 
+                dynamicFormat(
+                        writeStreamToString(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/CMakeLists.txt")), 
+                        createMap(
+                                "classfiles", String.join(" ", cmakeClassFiles), 
+                                "mainfiles", String.join(" ", cmakeMainFiles)
+                        )).getBytes(), 
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
+        );
     }
 }

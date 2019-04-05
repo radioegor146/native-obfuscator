@@ -3,6 +3,10 @@
 #include <cstring>
 #include <string>
 
+#ifndef NATIVE_JVM_HPP_GUARD
+
+#define NATIVE_JVM_HPP_GUARD
+
 namespace native_jvm::utils {
 	
 	template <std::size_t N>
@@ -61,3 +65,5 @@ namespace native_jvm::utils {
 
 	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, std::string clazz);
 }
+
+#endif
