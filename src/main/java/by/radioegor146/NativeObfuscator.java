@@ -23,6 +23,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.IincInsnNode;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.JumpInsnNode;
@@ -67,6 +68,7 @@ public class NativeObfuscator {
     }
     
     private static StringBuilder nativeMethodsSb = new StringBuilder();
+    private static HashMap<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
     
     private static String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
         if (((methodNode.access & Opcodes.ACC_ABSTRACT) > 0) || ((methodNode.access & Opcodes.ACC_NATIVE) > 0))
@@ -79,12 +81,12 @@ public class NativeObfuscator {
         String javaMethodName = methodNode.name;
         switch (methodNode.name) {
             case "<init>":
-                classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE, "native_special_init" + index, methodNode.desc, methodNode.signature, new String[0]));
+                classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, "native_special_init" + index, methodNode.desc, methodNode.signature, new String[0]));
                 javaMethodName = "native_special_init" + index;
                 methodName += "native_special_init";
                 break;
             case "<clinit>":
-                classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE, "native_special_clinit" + index, methodNode.desc, methodNode.signature, new String[0]));
+                classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, "native_special_clinit" + index, methodNode.desc, methodNode.signature, new String[0]));
                 javaMethodName = "native_special_clinit" + index;
                 methodName += "native_special_clinit";
                 break;
@@ -199,7 +201,29 @@ public class NativeObfuscator {
                         }
                     }
                     if (insnNode instanceof InvokeDynamicInsnNode) {
-                        //throw new UnsupportedOperationException("insn not found: " + insnName + " " + insnNode);
+                        String indyMethodName = "invokedynamic$" + methodNode.name + "$" + invokeDynamics.size();
+                        invokeDynamics.put(indyMethodName, (InvokeDynamicInsnNode) insnNode);
+                        Type returnType = Type.getReturnType(((InvokeDynamicInsnNode) insnNode).desc);
+                        Type[] argTypes = Type.getArgumentTypes(((InvokeDynamicInsnNode) insnNode).desc);
+                        insnName = "INVOKESTATIC_" + returnType.getSort();
+                        StringBuilder argsBuilder = new StringBuilder();
+                        List<Integer> argOffsets = new ArrayList<>();
+                        List<Integer> argSorts = new ArrayList<>();
+                        int stackOffset = 0;
+                        for (int argIndex = argTypes.length - 1; argIndex >= 0; argIndex--) {
+                            int currentOffset = stackOffset + argTypes[argIndex].getSize() - 1;
+                            stackOffset += argTypes[argIndex].getSize();
+                            argOffsets.add(currentOffset);
+                            argSorts.add(argTypes[argIndex].getSort());
+                        }
+                        Collections.reverse(argOffsets);
+                        for (int i = 0; i < argOffsets.size(); i++)
+                            argsBuilder.append(", ").append(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)).replace("$index", String.valueOf(argOffsets.get(i) - stackOffset)));
+                        outputSb.append(CPP_SNIPPETS.getProperty("INVOKE_POPCNT").replace("$count", String.valueOf(stackOffset))).append(" ");
+                        props.put("class", escapeString(classNode.name));
+                        props.put("name", escapeString("invokedynamic$" + methodNode.name + "$" + invokeDynamics.size()));
+                        props.put("desc", escapeString(((InvokeDynamicInsnNode) insnNode).desc));
+                        props.put("args", argsBuilder.toString());
                     }
                     if (insnNode instanceof JumpInsnNode) {
                         props.put("label", String.valueOf(((JumpInsnNode) insnNode).label.getLabel()));
@@ -327,6 +351,18 @@ public class NativeObfuscator {
         return outputSb.toString();
     }
     
+    private static void processIndy(ClassNode classNode, String methodName, InvokeDynamicInsnNode indy) {
+        MethodNode indyWrapper = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC, methodName, indy.desc, null, new String[0]);
+        int localVarsPosition = 0;
+        for (Type arg : Type.getArgumentTypes(indy.desc)) {
+            indyWrapper.instructions.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
+            localVarsPosition += arg.getSize();
+        }
+        indyWrapper.instructions.add(new InvokeDynamicInsnNode(indy.name, indy.desc, indy.bsm, indy.bsmArgs));
+        indyWrapper.instructions.add(new InsnNode(Opcodes.ARETURN));
+        classNode.methods.add(indyWrapper);
+    }
+    
     private static final HashMap<Integer, String> INSTRUCTIONS = new HashMap<>();
     
     /**
@@ -352,6 +388,9 @@ public class NativeObfuscator {
         outputFile.append("// ").append(classNode.name).append("\n");
         for (int i = 0; i < classNode.methods.size(); i++)
             outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
+        invokeDynamics.entrySet().forEach((indy) -> { 
+            processIndy(classNode, indy.getKey(), indy.getValue());
+        });
         ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
         classNode.accept(classWriter);
         Files.write(Paths.get(args[2]), classWriter.toByteArray());
