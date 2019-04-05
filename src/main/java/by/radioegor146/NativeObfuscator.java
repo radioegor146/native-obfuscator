@@ -50,7 +50,7 @@ import org.objectweb.asm.tree.VarInsnNode;
 
 public class NativeObfuscator {
 
-    private static final Pattern PATTERN =Pattern.compile("([^a-zA-Z_0-9])");
+    private static final Pattern PATTERN = Pattern.compile("([^a-zA-Z_0-9])");
     private static final Map<Integer, String> INSTRUCTIONS = new HashMap<>();
     private static final Properties CPP_SNIPPETS = new Properties();
     private static final StringBuilder nativeMethodsSb = new StringBuilder();
@@ -369,7 +369,7 @@ public class NativeObfuscator {
      * @throws java.lang.IllegalAccessException
      */
     public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {        
-        for (Field f : Opcodes.class.getDeclaredFields())
+        for (Field f : Opcodes.class.getFields())
             INSTRUCTIONS.put((int) f.get(null), f.getName());
         CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("cppsnippets.properties"));
         byte[] bytes = Files.readAllBytes(Paths.get(args[0]));
