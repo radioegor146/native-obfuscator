@@ -151,10 +151,8 @@ public class NativeObfuscator {
             switch (insnNode.getType()) {
                 case AbstractInsnNode.LABEL:
                     outputSb.append(((LabelNode)insnNode).getLabel()).append(": ;").append("\n");
-                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.start.equals(insnNode))).forEachOrdered(
-                        currentTryCatches::add);
-                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.end.equals(insnNode))).forEachOrdered(
-                        currentTryCatches::remove);
+                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.start.equals(insnNode))).forEachOrdered(currentTryCatches::add);
+                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.end.equals(insnNode))).forEachOrdered(currentTryCatches::remove);
                     break;
                 case AbstractInsnNode.LINE:
                     outputSb.append("    ").append("// Line ").append(((LineNumberNode)insnNode).line).append(":").append("\n");
