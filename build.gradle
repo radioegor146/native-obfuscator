@@ -12,6 +12,7 @@ if (!hasProperty('mainClass')) {
 }
 
 repositories {
+	mavenLocal()
 	mavenCentral()
 }
 
