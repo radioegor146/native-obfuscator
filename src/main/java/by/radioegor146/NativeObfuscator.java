@@ -1,11 +1,14 @@
 package by.radioegor146;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
@@ -16,9 +19,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -370,29 +377,40 @@ public class NativeObfuscator {
         for (Field f : Opcodes.class.getFields())
             INSTRUCTIONS.put((int) f.get(null), f.getName());
         CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("cppsnippets.properties"));
-        byte[] bytes = Files.readAllBytes(Paths.get(args[0]));
-        ClassReader classReader = new ClassReader(bytes);
-        ClassNode classNode = new ClassNode(Opcodes.ASM7);
-        classReader.accept(classNode, 0);
-        StringBuilder outputFile = new StringBuilder();
-        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
-            NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), StandardCharsets.UTF_8))) {
-            outputFile.append(bufferedReader.lines().collect(Collectors.joining("\n")));
+        final File jar = Paths.get(args[0]).normalize().toAbsolutePath().toFile();
+        final Path outputDir = Paths.get(args[1]).normalize().toAbsolutePath();
+        Files.createDirectories(outputDir);
+        try (final JarFile f = new JarFile(jar); final JarOutputStream out = new  JarOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING), f.getManifest())) {
+        f.stream().forEach(e -> {
+        	try {
+				ClassReader classReader = new ClassReader(f.getInputStream(e));
+		        ClassNode classNode = new ClassNode(Opcodes.ASM7);
+		        classReader.accept(classNode, 0);
+		        try (BufferedWriter outputFile = Files.newBufferedWriter(outputDir.resolve(classNode.name.replace('/', '_').concat(".cpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+		        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
+		            NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), StandardCharsets.UTF_8))) {
+		            outputFile.append(bufferedReader.lines().collect(Collectors.joining("\n")));
+		        }
+		        outputFile.append("// ").append(classNode.name).append("\n");
+		        for (int i = 0; i < classNode.methods.size(); i++)
+		            outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
+		        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
+		        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
+		        classNode.accept(classWriter);
+		        out.putNextEntry(new ZipEntry(e.getName()));
+		        out.write(classWriter.toByteArray());
+		        outputFile.append("static JNINativeMethod __current_methods[] = {\n");
+		        outputFile.append(nativeMethodsSb);
+		        outputFile.append("};\n\n");
+		        outputFile.append("void RegisterCurrentNatives(JNIEnv *env) {\n");
+		        outputFile.append("    env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
+		        outputFile.append("}\n");
+		        }
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+        });
         }
-        outputFile.append("// ").append(classNode.name).append("\n");
-        for (int i = 0; i < classNode.methods.size(); i++)
-            outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
-        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
-        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7);
-        classNode.accept(classWriter);
-        Files.write(Paths.get(args[2]), classWriter.toByteArray());
-        outputFile.append("static JNINativeMethod __current_methods[] = {\n");
-        outputFile.append(nativeMethodsSb);
-        outputFile.append("};\n\n");
-        outputFile.append("void RegisterCurrentNatives(JNIEnv *env) {\n");
-        outputFile.append("    env->RegisterNatives(env->FindClass(\"").append(escapeString(classNode.name)).append("\"), __current_methods, sizeof(__current_methods) / sizeof(__current_methods[0]));\n");
-        outputFile.append("}\n");
-        Files.write(Paths.get(args[1]), outputFile.toString().getBytes(), StandardOpenOption.CREATE);
     }
     
 }
