@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
@@ -17,6 +18,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -49,6 +51,10 @@ import org.objectweb.asm.tree.VarInsnNode;
 public class NativeObfuscator {
 
     private static final Pattern PATTERN =Pattern.compile("([^a-zA-Z_0-9])");
+    private static final Map<Integer, String> INSTRUCTIONS = new HashMap<>();
+    private static final Properties CPP_SNIPPETS = new Properties();
+    private static final StringBuilder nativeMethodsSb = new StringBuilder();
+    private static final Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
     private static final String[] CPP_TYPES = {
         "void", // 0
         "jboolean", // 1
@@ -63,15 +69,10 @@ public class NativeObfuscator {
         "jobject", // 10
         "jmethod" // 11
     };
-    
-    private static final Properties CPP_SNIPPETS = new Properties();
-    
+
     private static String escapeString(String value) {
         return value.replace("\\", "\\\\").replace("\b", "\\b").replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r").replace("\f", "\\f").replace("\"", "\\\"");
     }
-    
-    private static StringBuilder nativeMethodsSb = new StringBuilder();
-    private static HashMap<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
     
     private static String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
         if (((methodNode.access & Opcodes.ACC_ABSTRACT) > 0) || ((methodNode.access & Opcodes.ACC_NATIVE) > 0))
@@ -324,8 +325,8 @@ public class NativeObfuscator {
                     break;
             }
         }
-        outputSb.append("    return (").append(CPP_TYPES[returnTypeSort]).append(") 0;").append("\n");
-        outputSb.append("}").append("\n");
+        outputSb.append("    return (").append(CPP_TYPES[returnTypeSort]).append(") 0;\n");
+        outputSb.append("}\n");
         
         switch (methodNode.name) {
             case "<init>":
@@ -361,16 +362,14 @@ public class NativeObfuscator {
         indyWrapper.instructions.add(new InsnNode(Opcodes.ARETURN));
         classNode.methods.add(indyWrapper);
     }
-    
-    private static final HashMap<Integer, String> INSTRUCTIONS = new HashMap<>();
-    
+
     /**
      * @param args the command line arguments
      * @throws java.io.IOException
      * @throws java.lang.IllegalAccessException
      */
     public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {        
-        for (Field f : Opcodes.class.getFields())
+        for (Field f : Opcodes.class.getDeclaredFields())
             INSTRUCTIONS.put((int) f.get(null), f.getName());
         CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("cppsnippets.properties"));
         byte[] bytes = Files.readAllBytes(Paths.get(args[0]));
@@ -378,12 +377,10 @@ public class NativeObfuscator {
         ClassNode classNode = new ClassNode(Opcodes.ASM7);
         classReader.accept(classNode, 0);
         StringBuilder outputFile = new StringBuilder();
-        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), "UTF-8"))) {	
-            String line;
-            while ((line = bufferedReader.readLine()) != null) {
-                outputFile.append(line).append("\n");
-            }
-	}
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(
+            NativeObfuscator.class.getClassLoader().getResourceAsStream("header.h"), StandardCharsets.UTF_8))) {
+            outputFile.append(bufferedReader.lines().collect(Collectors.joining("\n")));
+        }
         outputFile.append("// ").append(classNode.name).append("\n");
         for (int i = 0; i < classNode.methods.size(); i++)
             outputFile.append(visitMethod(classNode, classNode.methods.get(i), i)).append("\n");
