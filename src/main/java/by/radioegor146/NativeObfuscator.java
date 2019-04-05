@@ -386,7 +386,7 @@ public class NativeObfuscator {
         f.stream().forEach(e -> {
         	if (!e.getName().endsWith(".class")) return;
         	try {
-        		ClassReader classReader = new ClassReader(readStream(f.getInputStream(e), true));
+        		ClassReader classReader = new ClassReader(f.getInputStream(e));
 		        ClassNode classNode = new ClassNode(Opcodes.ASM7);
 		        classReader.accept(classNode, 0);
 		        try (BufferedWriter outputFile = Files.newBufferedWriter(outputDir.resolve(classNode.name.replace('/', '_').concat(".cpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -415,25 +415,4 @@ public class NativeObfuscator {
         });
         }
     }
-    
-    
-    private static byte[] readStream(final InputStream inputStream, final boolean close)
-    	      throws IOException {
-    	    if (inputStream == null) {
-    	      throw new IOException("Class not found");
-    	    }
-    	    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-    	      byte[] data = new byte[8192];
-    	      int bytesRead;
-    	      while ((bytesRead = inputStream.read(data, 0, data.length)) != -1) {
-    	        outputStream.write(data, 0, bytesRead);
-    	      }
-    	      outputStream.flush();
-    	      return outputStream.toByteArray();
-    	    } finally {
-    	      if (close) {
-    	        inputStream.close();
-    	      }
-    	    }
-    	  }
 }
