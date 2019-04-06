@@ -46,4 +46,19 @@ namespace native_jvm::utils {
 			env->SetObjectArrayElement(resultArray, i, create_multidim_array(env, count - 1, sizes + 1, clazz));
 		return resultArray;
 	}
+
+	jclass find_class_wo_static(JNIEnv *env, std::string class_name) {
+		jclass threadClass = env->FindClass("java/lang/Thread");
+		return (jclass) env->CallObjectMethod(
+			env->CallObjectMethod(
+				env->CallStaticObjectMethod(
+					threadClass, 
+					env->GetStaticMethodID(threadClass, "currentThread", "()Ljava/lang/Thread;")
+				), 
+				env->GetMethodID(threadClass, "getContextClassLoader", "()Ljava/lang/ClassLoader;")
+			),
+			env->GetMethodID(env->FindClass("java/lang/ClassLoader"), "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;"),
+			env->NewStringUTF(class_name.c_str())
+		);
+	}
 }

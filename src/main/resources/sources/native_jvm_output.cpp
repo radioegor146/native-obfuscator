@@ -12,7 +12,7 @@ $register_code
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	JNIEnv *env = NULL;
-	vm->GetEnv((void **)&env, JNI_VERSION_1_4);
+	vm->GetEnv((void **)&env, JNI_VERSION_1_8);
 	native_jvm::register_all_classes(env);
-	return JNI_TRUE;
+	return JNI_VERSION_1_8;
 }
