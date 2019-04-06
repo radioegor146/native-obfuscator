@@ -290,8 +290,22 @@ public class NativeObfuscator {
                             insnName += "_LONG";
                         } else if (cst instanceof java.lang.Float) {
                             insnName += "_FLOAT";
+                            float cstVal = (float) cst;
+                            if (cst.toString().equals("NaN"))
+                                props.put("cst", "NAN");
+                            else if (cstVal == Float.POSITIVE_INFINITY)
+                                props.put("cst", "HUGE_VALF");
+                            else if (cstVal == Float.NEGATIVE_INFINITY)
+                                props.put("cst", "-HUGE_VALF");
                         } else if (cst instanceof java.lang.Double) {
                             insnName += "_DOUBLE";
+                            double cstVal = (double) cst;
+                            if (cst.toString().equals("NaN"))
+                                props.put("cst", "NAN");
+                            else if (cstVal == Double.POSITIVE_INFINITY)
+                                props.put("cst", "HUGE_VAL");
+                            else if (cstVal == Double.NEGATIVE_INFINITY)
+                                props.put("cst", "-HUGE_VAL");
                         } else if (cst instanceof org.objectweb.asm.Type) {
                             insnName += "_CLASS";
                             props.put("cst", escapeString(String.valueOf(((LdcInsnNode) insnNode).cst)));

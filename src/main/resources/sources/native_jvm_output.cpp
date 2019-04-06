@@ -9,3 +9,10 @@ namespace native_jvm {
 $register_code
 	}
 }
+
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+	JNIEnv *env = NULL;
+	vm->GetEnv((void **)&env, JNI_VERSION_1_4);
+	native_jvm::register_all_classes(env);
+	return JNI_TRUE;
+}
