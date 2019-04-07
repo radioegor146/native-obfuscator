@@ -1,12 +1,11 @@
 package by.radioegor146;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,14 +23,12 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.jar.Attributes.Name;
+import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import org.objectweb.asm.ClassReader;
@@ -339,11 +337,11 @@ public class NativeObfuscator {
                         List<Integer> argOffsets = new ArrayList<>();
                         List<Integer> argSorts = new ArrayList<>();
                         int stackOffset = -1;
-                        for (int argIndex = 0; argIndex < argTypes.length; argIndex++) {
-                            int currentOffset = stackOffset + argTypes[argIndex].getSize() - 1;
-                            stackOffset -= argTypes[argIndex].getSize();
+                        for (Type argType : argTypes) {
+                            int currentOffset = stackOffset + argType.getSize() - 1;
+                            stackOffset -= argType.getSize();
                             argOffsets.add(currentOffset);
-                            argSorts.add(argTypes[argIndex].getSort());
+                            argSorts.add(argType.getSort());
                         }
                         if (insnNode.getOpcode() == Opcodes.INVOKEINTERFACE || insnNode.getOpcode() == Opcodes.INVOKESPECIAL || insnNode.getOpcode() == Opcodes.INVOKEVIRTUAL) {
                             for (int i = 0; i < argOffsets.size(); i++)
@@ -443,14 +441,9 @@ public class NativeObfuscator {
     }
 
     private static String writeStreamToString(InputStream stream) throws IOException {
-        byte[] buffer = new byte[4096];
-        int bytesRead;
-        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            while ((bytesRead = stream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
-            }
-            return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
-        }
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        transfer(stream,baos);
+        return new String(baos.toByteArray(), StandardCharsets.UTF_8);
     }
     
     private static void writeStreamToFile(InputStream stream, Path path) throws IOException {
@@ -476,13 +469,11 @@ public class NativeObfuscator {
     
     /**
      * @param args the command line arguments
-     * @throws java.io.IOException
-     * @throws java.lang.IllegalAccessException
      */
     public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {    
         System.out.println("native-obfuscator v" + VERSION);
         if (args.length < 2) {
-            System.out.println("java -jar native-obfuscator.jar <jar file> <output directory>");
+            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory>");
             return;
         }
         for (Field f : Opcodes.class.getFields())
@@ -493,9 +484,15 @@ public class NativeObfuscator {
         Files.createDirectories(outputDir);
         Files.createDirectories(outputDir.resolve("cpp"));
         Files.createDirectories(outputDir.resolve("cpp").resolve("output"));
-        writeStreamToFile(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm.cpp"), outputDir.resolve("cpp").resolve("native_jvm.cpp"));
-        writeStreamToFile(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm.hpp"), outputDir.resolve("cpp").resolve("native_jvm.hpp"));
-        writeStreamToFile(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.hpp"), outputDir.resolve("cpp").resolve("native_jvm_output.hpp"));
+        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm.cpp")) {
+            writeStreamToFile(in, outputDir.resolve("cpp").resolve("native_jvm.cpp"));
+        }
+        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm.hpp")) {
+            writeStreamToFile(in, outputDir.resolve("cpp").resolve("native_jvm.hpp"));
+        }
+        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.hpp")) {
+            writeStreamToFile(in, outputDir.resolve("cpp").resolve("native_jvm_output.hpp"));
+        }
         StringBuilder outputHeaderSb = new StringBuilder();
         StringBuilder outputHeaderIncludesSb = new StringBuilder();
         List<String> cmakeClassFiles = new ArrayList<>();
@@ -509,36 +506,33 @@ public class NativeObfuscator {
             f.stream().forEach(e -> {
                 try {
                     if (!e.getName().endsWith(".class")) {
-                        out.putNextEntry(new ZipEntry(e.getName()));
-                        InputStream stream = f.getInputStream(e);
-                        byte[] buffer = new byte[4096];
-                        int len = stream.read(buffer);
-                        while (len != -1) {
-                            out.write(buffer, 0, len);
-                            len = stream.read(buffer);
-                        }
+                        writeEntry(f, out, e);
                         return;
                     }
+                    // Ignore entries with invalid magic
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();;
+                    try (InputStream in = f.getInputStream(e)) {
+                        transfer(in,baos);
+                    }
+                    byte[] src = baos.toByteArray();
+                    if (byteArrayToInt(Arrays.copyOfRange(src, 0, 4)) != 0xCAFEBABE) {
+                        writeEntry(f, out, e.getName(), src);
+                        return;
+                    }
+
                     nativeMethodsSb = new StringBuilder();
                     invokeDynamics = new HashMap<>();
-                    ClassReader classReader = new ClassReader(f.getInputStream(e));
+                    ClassReader classReader = new ClassReader(src);
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
                     if ((classNode.access & Opcodes.ACC_INTERFACE) > 0 || classNode.methods.stream().filter(x -> (x.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0 && !x.name.equals("<init>")).count() == 0) {
                         System.out.println("Skipping " + classNode.name);
-                        out.putNextEntry(new ZipEntry(e.getName()));
-                        InputStream stream = f.getInputStream(e);
-                        byte[] buffer = new byte[4096];
-                        int len = stream.read(buffer);
-                        while (len != -1) {
-                            out.write(buffer, 0, len);
-                            len = stream.read(buffer);
-                        }
+                        writeEntry(f, out, e.getName(), src);
                         return;
                     }
                     System.out.println("Processing " + classNode.name);
-                    try (BufferedWriter outputCppFile = Files.newBufferedWriter(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".cpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                            BufferedWriter outputHppFile = Files.newBufferedWriter(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                    try (BufferedWriter outputCppFile = new BufferedWriter(new FileWriter((outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".cpp")).toFile())));
+                            BufferedWriter outputHppFile = new BufferedWriter(new FileWriter(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).toFile()))) {
                         outputCppFile.append("#include \"../native_jvm.hpp\"\n");
                         outputHppFile.append("#include \"../native_jvm.hpp\"\n");
                         outputCppFile.append("#include \"").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
@@ -547,18 +541,22 @@ public class NativeObfuscator {
                         outputHeaderIncludesSb.append("#include \"output/").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
                         outputCppFile.append("\n");
                         outputCppFile.append("// ").append(classNode.name).append("\n");
-                        outputCppFile.append("namespace native_jvm::classes::" + escapeCppNameString(classNode.name.replace("/", "_")) + " {\n\n");
+                        outputCppFile.append("namespace native_jvm::classes::")
+                            .append(escapeCppNameString(classNode.name.replace("/", "_")))
+                            .append(" {\n\n");
                         outputHppFile.append("\n");
                         outputHppFile.append("#ifndef ").append(escapeCppNameString(classNode.name.replace('/', '_')).concat("_hpp").toUpperCase()).append("_GUARD\n");
                         outputHppFile.append("\n");
                         outputHppFile.append("#define ").append(escapeCppNameString(classNode.name.replace('/', '_')).concat("_hpp").toUpperCase()).append("_GUARD\n");
                         outputHppFile.append("\n");
                         outputHppFile.append("// ").append(classNode.name).append("\n");
-                        outputHppFile.append("namespace native_jvm::classes::" + escapeCppNameString(classNode.name.replace("/", "_")) + " {\n\n");
+                        outputHppFile.append("namespace native_jvm::classes::")
+                            .append(escapeCppNameString(classNode.name.replace("/", "_")))
+                            .append(" {\n\n");
                         for (int i = 0; i < classNode.methods.size(); i++)
                             outputCppFile.append("    ").append(visitMethod(classNode, classNode.methods.get(i), i).replace("\n", "\n    "));
                         invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
-                        ClassWriter classWriter = new ClassWriter(Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
                         classNode.accept(classWriter);
                         out.putNextEntry(new ZipEntry(e.getName()));
                         out.write(classWriter.toByteArray());
@@ -576,7 +574,7 @@ public class NativeObfuscator {
                         outputHeaderSb.append("        native_jvm::classes::").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env);\n");
                     }
                 } catch (IOException e1) {
-                    e1.printStackTrace(System.err);
+                    e1.printStackTrace();
                 }
             });
             System.out.println("Jar file ready!");
@@ -605,7 +603,7 @@ public class NativeObfuscator {
                     bsc.methods.add(mainMethod);
                     ClassWriter classWriter = new ClassWriter(Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     bsc.accept(classWriter);
-                    bsJar.putNextEntry(new ZipEntry("NativeBootstrap.class"));
+                    bsJar.putNextEntry(new JarEntry("NativeBootstrap.class"));
                     bsJar.write(classWriter.toByteArray());
                 }
                 System.out.println("Created!");
@@ -613,27 +611,61 @@ public class NativeObfuscator {
                 System.out.println("Main-Class not found - no bootstrapped jar");
             }
         }
-        
-        Files.write(
-                outputDir.resolve("cpp").resolve("native_jvm_output.cpp"), 
+
+        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.cpp")) {
+            Files.write(
+                outputDir.resolve("cpp").resolve("native_jvm_output.cpp"),
                 dynamicFormat(
-                        writeStreamToString(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.cpp")), 
-                        createMap(
-                                "register_code", outputHeaderSb, 
-                                "includes", outputHeaderIncludesSb
-                        )).getBytes(), 
+                    writeStreamToString(in),
+                    createMap(
+                        "register_code", outputHeaderSb,
+                        "includes", outputHeaderIncludesSb
+                    )).getBytes(),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
-        );
-        
-        Files.write(
-                outputDir.resolve("cpp").resolve("CMakeLists.txt"), 
+            );
+        }
+
+        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/CMakeLists.txt")) {
+            Files.write(
+                outputDir.resolve("cpp").resolve("CMakeLists.txt"),
                 dynamicFormat(
-                        writeStreamToString(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/CMakeLists.txt")), 
-                        createMap(
-                                "classfiles", String.join(" ", cmakeClassFiles), 
-                                "mainfiles", String.join(" ", cmakeMainFiles)
-                        )).getBytes(), 
+                    writeStreamToString(in),
+                    createMap(
+                        "classfiles", String.join(" ", cmakeClassFiles),
+                        "mainfiles", String.join(" ", cmakeMainFiles)
+                    )).getBytes(),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
-        );
+            );
+        }
+    }
+
+    private static void writeEntry(JarFile f, ZipOutputStream out, JarEntry e) throws IOException {
+        out.putNextEntry(new JarEntry(e.getName()));
+        try (InputStream in = f.getInputStream(e)) {
+            transfer(in, out);
+        }
+    }
+
+    private static void writeEntry(JarFile f, ZipOutputStream out, String entryName, byte[] data) throws IOException {
+        out.putNextEntry(new JarEntry(entryName));
+        out.write(data, 0, data.length);
+    }
+
+    private static void transfer(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[4096];
+        for (int r = in.read(buffer, 0, 4096); r != -1; r = in.read(buffer, 0, 4096)) {
+            out.write(buffer, 0, r);
+        }
+    }
+
+    private static int byteArrayToInt(byte[] b) {
+        if (b.length == 4) {
+            return b[0] << 24 | (b[1] & 0xff) << 16 | (b[2] & 0xff) << 8
+                | (b[3] & 0xff);
+        } else if (b.length == 2) {
+            return (b[0] & 0xff) << 8 | (b[1] & 0xff);
+        }
+
+        return 0;
     }
 }
