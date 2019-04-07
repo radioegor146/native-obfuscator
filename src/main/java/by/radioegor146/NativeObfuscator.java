@@ -3,10 +3,11 @@ package by.radioegor146;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,7 +16,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +30,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -473,6 +472,8 @@ public class NativeObfuscator {
     
     /**
      * @param args the command line arguments
+     * @throws java.io.IOException
+     * @throws java.lang.IllegalAccessException
      */
     public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {    
         System.out.println("native-obfuscator v" + VERSION);
@@ -516,7 +517,7 @@ public class NativeObfuscator {
                         return;
                     }
                     // Ignore entries with invalid magic
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();;
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     try (InputStream in = f.getInputStream(e)) {
                         transfer(in,baos);
                     }
@@ -537,8 +538,8 @@ public class NativeObfuscator {
                         return;
                     }
                     System.out.println("Processing " + classNode.name);
-                    try (BufferedWriter outputCppFile = new BufferedWriter(new FileWriter((outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".cpp")).toFile())));
-                            BufferedWriter outputHppFile = new BufferedWriter(new FileWriter(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).toFile()))) {
+                    try (BufferedWriter outputCppFile = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".cpp")).toFile()), StandardCharsets.UTF_8));
+                            BufferedWriter outputHppFile = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).toFile()), StandardCharsets.UTF_8))) {
                         outputCppFile.append("#include \"../native_jvm.hpp\"\n");
                         outputHppFile.append("#include \"../native_jvm.hpp\"\n");
                         outputCppFile.append("#include \"").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
@@ -580,7 +581,7 @@ public class NativeObfuscator {
                         outputHeaderSb.append("        native_jvm::classes::").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env);\n");
                     }
                 } catch (IOException e1) {
-                    e1.printStackTrace();
+                    e1.printStackTrace(System.err);
                 }
             });
             System.out.println("Jar file ready!");
@@ -626,7 +627,7 @@ public class NativeObfuscator {
                     createMap(
                         "register_code", outputHeaderSb,
                         "includes", outputHeaderIncludesSb
-                    )).getBytes(),
+                    )).getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             );
         }
@@ -639,7 +640,7 @@ public class NativeObfuscator {
                     createMap(
                         "classfiles", String.join(" ", cmakeClassFiles),
                         "mainfiles", String.join(" ", cmakeMainFiles)
-                    )).getBytes(),
+                    )).getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             );
         }
