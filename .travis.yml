@@ -1,3 +1,10 @@
 language: java
 jdk:
   - oraclejdk8
+deploy:
+  provider: releases
+  api_key: 
+    secure: "deB4c2LDyFBk3MLVHVYDVfcyfKh6jPN7C2HLjKgBP+1JRe+Vta8JbIVBXeIphXLKhHiwZ4iHdstj+cj/t90GwGh9WddgIngbdwoxtdAkaMHVakwZInU26SXHdhtVthfGLmlltYQbgLLgaLD2t4oJ1Kf7rrC1wIiN6S8CR1Ois9/bQ0IsKXpXrJxtNnQQ+fyxAMwIiMBbHe4rhDxcHSNpMOmN3K7eN35pbchcHK6uw8JilFNbH/dDOn+t5uPpI5TZvWJWhEFbEXthpm/ULe+AoGF3N4+UfAJLP36ve5OWLQif4BAMBh8oPwLuGPZ+IhMYDeJmhXF4Kv4HGPRlIPKghrz3VjaV+cjt7TmEm+eqUkOiu5k0KK7+85tj9e7O/eZjbLARTvBs5WjIytNITvniFyidPastHvNJncnC90JW4zY2nnCCExs+sAIeZEQs6V5WWchDTQxDsDs+v110VayPItZJVIUfx24qJDfz1NzASVf8pbZOiOc6qjQ3tEipWsbUIJvLA83Seu0sEBbzlIticcselSKTukPrMPuzrlu5CKfWBm3lCfGph4NkHvSrRK09+KYhhkkVcm/KSqrHRkCcJr5GKEbayhfN1OeNPEg1NlCnWo5H7KJTfkkjNuVt0d45MsH0sPqrlafwleZJUcRJeCHjHtbqRtyYz+nJbLQdPcA="
+  file: "build/libs/native-obfuscator.jar"
+  skip_cleanup: true
+  draft: true
