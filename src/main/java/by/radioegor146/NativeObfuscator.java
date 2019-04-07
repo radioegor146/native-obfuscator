@@ -22,12 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.jar.Attributes.Name;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import org.objectweb.asm.ClassReader;
@@ -121,6 +124,8 @@ public class NativeObfuscator {
     
     private static String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
         if (((methodNode.access & Opcodes.ACC_ABSTRACT) > 0) || ((methodNode.access & Opcodes.ACC_NATIVE) > 0))
+            return "";
+        if (methodNode.name.equals("<init>"))
             return "";
         StringBuilder outputSb = new StringBuilder("// ");
         outputSb.append(methodNode.name).append(methodNode.desc).append("\n");
@@ -396,18 +401,20 @@ public class NativeObfuscator {
         outputSb.append("    return (").append(CPP_TYPES[returnTypeSort]).append(") 0;\n");
         outputSb.append("}\n\n");
         
+        methodNode.localVariables.clear();
+        
         switch (methodNode.name) {
             case "<init>":
                 methodNode.instructions.clear();
                 methodNode.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                methodNode.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V"));
+                /*methodNode.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 int localVarsPosition = 1;
                 for (Type arg : args) {
                     methodNode.instructions.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
                     localVarsPosition += arg.getSize();
                 }
-                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, classNode.name, "native_special_init" + index, methodNode.desc));
+                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, classNode.name, "native_special_init" + index, methodNode.desc));*/
                 methodNode.instructions.add(new InsnNode(Opcodes.RETURN));
                 break;
             case "<clinit>":
@@ -456,12 +463,28 @@ public class NativeObfuscator {
         }
     }
     
+    private static final String VERSION = "1.2b";
+    
+    static String stripExtension(String str) {
+        if (str == null) 
+            return null;
+        int pos = str.lastIndexOf(".");
+        if (pos == -1) 
+            return str;
+        return str.substring(0, pos);
+    }
+    
     /**
      * @param args the command line arguments
      * @throws java.io.IOException
      * @throws java.lang.IllegalAccessException
      */
-    public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {             
+    public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {    
+        System.out.println("native-obfuscator v" + VERSION);
+        if (args.length < 2) {
+            System.out.println("java -jar native-obfuscator.jar <jar file> <output directory>");
+            return;
+        }
         for (Field f : Opcodes.class.getFields())
             INSTRUCTIONS.put((int) f.get(null), f.getName());
         CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/cppsnippets.properties"));
@@ -482,6 +505,7 @@ public class NativeObfuscator {
         cmakeMainFiles.add("native_jvm_output.hpp");
         cmakeMainFiles.add("native_jvm_output.cpp");
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
+            System.out.println("Processing " + jar + "...");
             f.stream().forEach(e -> {
                 try {
                     if (!e.getName().endsWith(".class")) {
@@ -500,8 +524,16 @@ public class NativeObfuscator {
                     ClassReader classReader = new ClassReader(f.getInputStream(e));
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
-                    if ((classNode.access & Opcodes.ACC_INTERFACE) > 0 || classNode.methods.stream().filter(x -> (x.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0).count() == 0) {
+                    if ((classNode.access & Opcodes.ACC_INTERFACE) > 0 || classNode.methods.stream().filter(x -> (x.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0 && !x.name.equals("<init>")).count() == 0) {
                         System.out.println("Skipping " + classNode.name);
+                        out.putNextEntry(new ZipEntry(e.getName()));
+                        InputStream stream = f.getInputStream(e);
+                        byte[] buffer = new byte[4096];
+                        int len = stream.read(buffer);
+                        while (len != -1) {
+                            out.write(buffer, 0, len);
+                            len = stream.read(buffer);
+                        }
                         return;
                     }
                     System.out.println("Processing " + classNode.name);
@@ -536,7 +568,8 @@ public class NativeObfuscator {
                         outputCppFile.append("    };\n\n");
                         outputCppFile.append("    void __ngen_register_methods(JNIEnv *env) {\n");
                         outputHppFile.append("    void __ngen_register_methods(JNIEnv *env);\n");
-                        outputCppFile.append("        env->RegisterNatives(utils::find_class_wo_static(env, \"").append(escapeString(classNode.name.replace("/", "."))).append("\"), __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
+                        outputCppFile.append("        jclass clazz = utils::find_class_wo_static(env, \"").append(escapeString(classNode.name.replace("/", "."))).append("\");\n");
+                        outputCppFile.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
                         outputHppFile.append("}\n\n#endif");
@@ -546,6 +579,39 @@ public class NativeObfuscator {
                     e1.printStackTrace(System.err);
                 }
             });
+            System.out.println("Jar file ready!");
+            Manifest mf = f.getManifest();
+            String mainClass = (String) mf.getMainAttributes().get(Name.MAIN_CLASS);
+            if (mainClass != null) {
+                System.out.println("Creating bootstrapped jar...");
+                try (ZipOutputStream bsJar = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(stripExtension(jar.getName()) + "-bootstrap.jar"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
+                    Manifest newMf = new Manifest();
+                    newMf.getMainAttributes().put(Name.MANIFEST_VERSION, "1.0");
+                    newMf.getMainAttributes().put(Name.MAIN_CLASS, "NativeBootstrap");
+                    newMf.getMainAttributes().put(Name.CLASS_PATH, jar.getName());
+                    bsJar.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
+                    newMf.write(bsJar);
+                    ClassNode bsc = new ClassNode(Opcodes.ASM7);
+                    bsc.name = "NativeBootstrap";
+                    bsc.version = 52;
+                    bsc.superName = "java/lang/Object";
+                    bsc.access = Opcodes.ACC_PUBLIC;
+                    MethodNode mainMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, new String[0]);
+                    mainMethod.instructions.add(new LdcInsnNode("native_jvm"));
+                    mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System", "loadLibrary", "(Ljava/lang/String;)V"));
+                    mainMethod.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, mainClass.replace(".", "/"), "main", "([Ljava/lang/String;)V"));
+                    mainMethod.instructions.add(new InsnNode(Opcodes.RETURN));
+                    bsc.methods.add(mainMethod);
+                    ClassWriter classWriter = new ClassWriter(Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                    bsc.accept(classWriter);
+                    bsJar.putNextEntry(new ZipEntry("NativeBootstrap.class"));
+                    bsJar.write(classWriter.toByteArray());
+                }
+                System.out.println("Created!");
+            } else {
+                System.out.println("Main-Class not found - no bootstrapped jar");
+            }
         }
         
         Files.write(
