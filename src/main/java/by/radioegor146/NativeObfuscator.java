@@ -54,6 +54,8 @@ import org.objectweb.asm.tree.TableSwitchInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
+import ru.gravit.launchserver.asm.ClassMetadataReader;
+import ru.gravit.launchserver.asm.SafeClassWriter;
 
 /**
  *
@@ -195,6 +197,7 @@ public class NativeObfuscator {
         }
         outputSb.append("\n");
         Set<TryCatchBlockNode> currentTryCatches = new HashSet<>();
+        int currentLine = -1;
         for (int insnIndex = 0; insnIndex < methodNode.instructions.size(); insnIndex++) {
             AbstractInsnNode insnNode = methodNode.instructions.get(insnIndex);
             switch (insnNode.getType()) {
@@ -205,6 +208,7 @@ public class NativeObfuscator {
                     break;
                 case AbstractInsnNode.LINE:
                     outputSb.append("    ").append("// Line ").append(((LineNumberNode)insnNode).line).append(":").append("\n");
+                    currentLine = ((LineNumberNode)insnNode).line;
                     break;
                 case AbstractInsnNode.FRAME:
                     break;
@@ -235,6 +239,7 @@ public class NativeObfuscator {
                     outputSb.append("    ");
                     String insnName = INSTRUCTIONS.getOrDefault(insnNode.getOpcode(), "NOTFOUND");
                     HashMap<String, String> props = new HashMap<>();
+                    props.put("line", String.valueOf(currentLine));
                     props.put("trycatchhandler", tryCatch.toString());
                     props.put("rettype", CPP_TYPES[returnTypeSort]);
                     if (insnNode instanceof FieldInsnNode) {
@@ -503,6 +508,8 @@ public class NativeObfuscator {
         cmakeMainFiles.add("native_jvm_output.cpp");
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             System.out.println("Processing " + jar + "...");
+            List<JarFile> libs = new ArrayList<>();
+            libs.add(f);
             f.stream().forEach(e -> {
                 try {
                     if (!e.getName().endsWith(".class")) {
@@ -556,7 +563,7 @@ public class NativeObfuscator {
                         for (int i = 0; i < classNode.methods.size(); i++)
                             outputCppFile.append("    ").append(visitMethod(classNode, classNode.methods.get(i), i).replace("\n", "\n    "));
                         invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
-                        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                        ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                         classNode.accept(classWriter);
                         out.putNextEntry(new ZipEntry(e.getName()));
                         out.write(classWriter.toByteArray());
@@ -601,7 +608,7 @@ public class NativeObfuscator {
                     mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, mainClass.replace(".", "/"), "main", "([Ljava/lang/String;)V"));
                     mainMethod.instructions.add(new InsnNode(Opcodes.RETURN));
                     bsc.methods.add(mainMethod);
-                    ClassWriter classWriter = new ClassWriter(Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                    ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     bsc.accept(classWriter);
                     bsJar.putNextEntry(new JarEntry("NativeBootstrap.class"));
                     bsJar.write(classWriter.toByteArray());
