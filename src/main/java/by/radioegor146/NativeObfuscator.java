@@ -192,7 +192,7 @@ public class NativeObfuscator {
                             "index", localIndex, 
                             "arg", "arg" + i
                     ))).append("\n");
-            localIndex++;
+            localIndex += args[i].getSize();
         }
         outputSb.append("\n");
         Set<TryCatchBlockNode> currentTryCatches = new HashSet<>();
