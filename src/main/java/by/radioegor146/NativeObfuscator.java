@@ -560,6 +560,7 @@ public class NativeObfuscator {
                         outputHppFile.append("namespace native_jvm::classes::")
                             .append(escapeCppNameString(classNode.name.replace("/", "_")))
                             .append(" {\n\n");
+                        outputCppFile.append("    ");
                         for (int i = 0; i < classNode.methods.size(); i++)
                             outputCppFile.append(visitMethod(classNode, classNode.methods.get(i), i).replace("\n", "\n    "));
                         invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
