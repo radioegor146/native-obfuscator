@@ -61,4 +61,8 @@ namespace native_jvm::utils {
 			env->NewStringUTF(class_name.c_str())
 		);
 	}
+
+	void throw_re(JNIEnv *env, std::string exception_class, std::string error, int line) {
+		env->ThrowNew(env->FindClass(exception_class.c_str()), ("\"" + error + "\" on " + std::to_string(line)).c_str());
+	}
 }

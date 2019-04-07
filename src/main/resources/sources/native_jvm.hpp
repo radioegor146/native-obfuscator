@@ -132,6 +132,8 @@ namespace native_jvm::utils {
 	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, std::string clazz);
 
 	jclass find_class_wo_static(JNIEnv *env, std::string class_name);
+
+	void throw_re(JNIEnv *env, std::string exception_class, std::string error, int line);
 }
 
 #endif
