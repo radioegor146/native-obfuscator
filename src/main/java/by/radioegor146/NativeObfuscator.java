@@ -267,17 +267,16 @@ public class NativeObfuscator {
                         StringBuilder argsBuilder = new StringBuilder();
                         List<Integer> argOffsets = new ArrayList<>();
                         List<Integer> argSorts = new ArrayList<>();
-                        int stackOffset = 0;
-                        for (int argIndex = argTypes.length - 1; argIndex >= 0; argIndex--) {
-                            int currentOffset = stackOffset + argTypes[argIndex].getSize() - 1;
-                            stackOffset += argTypes[argIndex].getSize();
+                        int stackOffset = -1;
+                        for (Type argType : argTypes) {
+                            int currentOffset = stackOffset;
+                            stackOffset -= argType.getSize();
                             argOffsets.add(currentOffset);
-                            argSorts.add(argTypes[argIndex].getSort());
+                            argSorts.add(argType.getSort());
                         }
-                        Collections.reverse(argOffsets);
                         for (int i = 0; i < argOffsets.size(); i++)
-                            argsBuilder.append(", ").append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)), createMap("index", String.valueOf(argOffsets.get(i) - stackOffset))));
-                        outputSb.append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_POPCNT"), createMap("count", String.valueOf(stackOffset)))).append(" ");
+                            argsBuilder.append(", ").append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_ARG_" + argSorts.get(i)), createMap("index", String.valueOf(argOffsets.get(i)))));
+                        outputSb.append(dynamicFormat(CPP_SNIPPETS.getProperty("INVOKE_POPCNT"), createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
                         props.put("class", escapeString(classNode.name));
                         props.put("name", escapeString(indyMethodName));
                         props.put("desc", escapeString(((InvokeDynamicInsnNode) insnNode).desc));
@@ -343,7 +342,7 @@ public class NativeObfuscator {
                         List<Integer> argSorts = new ArrayList<>();
                         int stackOffset = -1;
                         for (Type argType : argTypes) {
-                            int currentOffset = stackOffset + argType.getSize() - 1;
+                            int currentOffset = stackOffset;
                             stackOffset -= argType.getSize();
                             argOffsets.add(currentOffset);
                             argSorts.add(argType.getSort());
@@ -561,7 +560,7 @@ public class NativeObfuscator {
                             .append(escapeCppNameString(classNode.name.replace("/", "_")))
                             .append(" {\n\n");
                         for (int i = 0; i < classNode.methods.size(); i++)
-                            outputCppFile.append("    ").append(visitMethod(classNode, classNode.methods.get(i), i).replace("\n", "\n    "));
+                            outputCppFile.append(visitMethod(classNode, classNode.methods.get(i), i).replace("\n", "\n    "));
                         invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
                         ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                         classNode.accept(classWriter);
