@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 #include <string>
+#include <cstdio>
 
 #ifndef NATIVE_JVM_HPP_GUARD
 

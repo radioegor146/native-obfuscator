@@ -604,6 +604,7 @@ public class NativeObfuscator {
                         outputHppFile.append("    void __ngen_register_methods(JNIEnv *env);\n");
                         outputCppFile.append("        jclass clazz = utils::find_class_wo_static(env, ").append(getCppString(classNode.name.replace("/", "."))).append(");\n");
                         outputCppFile.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
+                        outputCppFile.append("        if (env->ExceptionCheck()) { env->ExceptionClear(); fprintf(stderr, \"Exception occured while registering native_jvm for %s\n\", ").append(getCppString(classNode.name.replace("/", "."))).append("); fflush(stderr); }\n");
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
                         outputHppFile.append("}\n\n#endif");
