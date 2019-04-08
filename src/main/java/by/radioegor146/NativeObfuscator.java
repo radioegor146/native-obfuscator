@@ -85,18 +85,41 @@ public class NativeObfuscator {
     };
 
     private static String escapeString(String value) {
-        return value.replace("\\", "\\\\").replace("\b", "\\b").replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r").replace("\f", "\\f").replace("\"", "\\\"");
+        return bytesToCString(value.getBytes(StandardCharsets.UTF_8));
+    }
+    
+    private static String bytesToCString(byte[] data) {
+        StringBuilder sb = new StringBuilder();
+        Map<Byte, String> specificChanges = new HashMap<>();
+        specificChanges.put((byte) '\\', "\\\\");
+        specificChanges.put((byte) '\b', "\\b");
+        specificChanges.put((byte) '\n', "\\n");
+        specificChanges.put((byte) '\t', "\\t");
+        specificChanges.put((byte) '\r', "\\r");
+        specificChanges.put((byte) '\f', "\\f");
+        specificChanges.put((byte) '"', "\\\"");
+        for (byte b : data) {
+            if (specificChanges.containsKey(b)) {
+                sb.append(specificChanges.get(b));
+                continue;
+            }
+            if (b >= 32 && b < 127)
+                sb.append((char) b);
+            else
+                sb.append("\\x").append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
     
     private static String getCppString(String value) {
-        if (value.length() > 128) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > 128) {
             StringBuilder result = new StringBuilder("((const char *)(std::initializer_list<char>({ ");
-            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
             for (int i = 0; i < bytes.length; i++)
                 result.append(bytes[i]).append(i == bytes.length - 1 ? "" : ", ");
             return result.append(", 0 }).begin()))").toString();
         } else 
-            return "\"" + escapeString(value) + "\"";
+            return "\"" + bytesToCString(bytes) + "\"";
     }
     
     private static String escapeCppNameString(String value) {
