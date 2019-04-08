@@ -129,7 +129,7 @@ namespace native_jvm::utils {
 	jlong cdl(jdouble f);
 	jdouble cld(jlong f);
 
-	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, std::string clazz);
+	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, std::string className, int line);
 
 	jclass find_class_wo_static(JNIEnv *env, std::string class_name);
 
