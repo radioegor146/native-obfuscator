@@ -90,11 +90,11 @@ public class NativeObfuscator {
     
     private static String getCppString(String value) {
         if (value.length() > 128) {
-            StringBuilder result = new StringBuilder("((const char *)((std::initializer_list<char>){ ");
+            StringBuilder result = new StringBuilder("((const char *)(std::initializer_list<char>({ ");
             byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
             for (int i = 0; i < bytes.length; i++)
                 result.append(bytes[i]).append(i == bytes.length - 1 ? "" : ", ");
-            return result.append(" }.begin()))").toString();
+            return result.append(", 0 }).begin()))").toString();
         } else 
             return "\"" + escapeString(value) + "\"";
     }
