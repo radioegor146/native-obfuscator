@@ -88,6 +88,17 @@ public class NativeObfuscator {
         return value.replace("\\", "\\\\").replace("\b", "\\b").replace("\n", "\\n").replace("\t", "\\t").replace("\r", "\\r").replace("\f", "\\f").replace("\"", "\\\"");
     }
     
+    private static String getCppString(String value) {
+        if (value.length() > 128) {
+            StringBuilder result = new StringBuilder("((const char *)((std::initializer_list<char>){ ");
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            for (int i = 0; i < bytes.length; i++)
+                result.append(bytes[i]).append(i == bytes.length - 1 ? "" : ", ");
+            return result.append(" }.begin()))").toString();
+        } else 
+            return "\"" + escapeString(value) + "\"";
+    }
+    
     private static String escapeCppNameString(String value) {
         Matcher m = PATTERN.matcher(value);
         StringBuffer sb = new StringBuffer(value.length());
@@ -151,11 +162,11 @@ public class NativeObfuscator {
         methodName = "__ngen_" + methodName.replace("/", "_");
         methodName = escapeCppNameString(methodName);
         nativeMethodsSb
-                .append("        { \"")
-                .append(escapeString(javaMethodName))
-                .append("\", ").append("\"")
-                .append(escapeString(methodNode.desc))
-                .append("\", ")
+                .append("        { ")
+                .append(getCppString(javaMethodName))
+                .append(", ")
+                .append(getCppString(methodNode.desc))
+                .append(", ")
                 .append("(void *)&")
                 .append(methodName)
                 .append(" },\n");
@@ -396,6 +407,13 @@ public class NativeObfuscator {
                     if (insnNode instanceof VarInsnNode) {
                         props.put("var", String.valueOf(((VarInsnNode) insnNode).var));
                     }
+                    Map<String, String> cstrProps = new HashMap<>();
+                    props.entrySet().forEach((entry) -> { 
+                        cstrProps.put(entry.getKey(), getCppString(entry.getValue()));
+                    });
+                    cstrProps.entrySet().forEach((entry) -> {
+                        props.put("_cstr_" + entry.getKey(), entry.getValue());
+                    });
                     String cppCode = CPP_SNIPPETS.getProperty(insnName);
                     if (cppCode == null) {
                         outputSb.append("// ").append("insn not found: ").append(insnName).append(" ").append(insnNode).append("\n");
@@ -584,7 +602,7 @@ public class NativeObfuscator {
                         outputCppFile.append("    };\n\n");
                         outputCppFile.append("    void __ngen_register_methods(JNIEnv *env) {\n");
                         outputHppFile.append("    void __ngen_register_methods(JNIEnv *env);\n");
-                        outputCppFile.append("        jclass clazz = utils::find_class_wo_static(env, \"").append(escapeString(classNode.name.replace("/", "."))).append("\");\n");
+                        outputCppFile.append("        jclass clazz = utils::find_class_wo_static(env, ").append(getCppString(classNode.name.replace("/", "."))).append(");\n");
                         outputCppFile.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
