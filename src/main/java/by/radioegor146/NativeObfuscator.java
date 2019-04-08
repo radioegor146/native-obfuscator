@@ -38,6 +38,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.IincInsnNode;
+import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
@@ -80,7 +81,7 @@ public class NativeObfuscator {
         "jdouble", // 8
         "jarray", // 9
         "jobject", // 10
-        "jmethod" // 11
+        "jobject" // 11
     };
 
     private static String escapeString(String value) {
@@ -197,7 +198,14 @@ public class NativeObfuscator {
         outputSb.append("\n");
         Set<TryCatchBlockNode> currentTryCatches = new HashSet<>();
         int currentLine = -1;
+        int invokeSpecialId = -1;
         for (int insnIndex = 0; insnIndex < methodNode.instructions.size(); insnIndex++) {
+            if (methodNode.name.equals("<init>") && invokeSpecialId < 0) {
+                if (methodNode.instructions.get(insnIndex).getOpcode() == Opcodes.INVOKESPECIAL) {
+                    invokeSpecialId = insnIndex;
+                }
+                continue;
+            }
             AbstractInsnNode insnNode = methodNode.instructions.get(insnIndex);
             switch (insnNode.getType()) {
                 case AbstractInsnNode.LABEL:
@@ -403,20 +411,22 @@ public class NativeObfuscator {
         outputSb.append("}\n\n");
         
         methodNode.localVariables.clear();
+        methodNode.tryCatchBlocks.clear();
         
         switch (methodNode.name) {
             case "<init>":
-                methodNode.instructions.clear();
-                methodNode.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V"));
-                /*methodNode.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                InsnList list = new InsnList();
+                for (int i = 0; i <= invokeSpecialId; i++) 
+                    list.add(methodNode.instructions.get(i));
+                list.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 int localVarsPosition = 1;
                 for (Type arg : args) {
-                    methodNode.instructions.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
+                    list.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
                     localVarsPosition += arg.getSize();
                 }
-                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, classNode.name, "native_special_init" + index, methodNode.desc));*/
-                methodNode.instructions.add(new InsnNode(Opcodes.RETURN));
+                list.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, classNode.name, "native_special_init" + index, methodNode.desc));
+                list.add(new InsnNode(Opcodes.RETURN));
+                methodNode.instructions = list;
                 break;
             case "<clinit>":
                 methodNode.instructions.clear();
@@ -459,7 +469,7 @@ public class NativeObfuscator {
         }
     }
     
-    private static final String VERSION = "1.2b";
+    private static final String VERSION = "1.3b";
     
     static String stripExtension(String str) {
         if (str == null) 
@@ -548,7 +558,7 @@ public class NativeObfuscator {
                         outputHeaderIncludesSb.append("#include \"output/").append(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).append("\"\n");
                         outputCppFile.append("\n");
                         outputCppFile.append("// ").append(classNode.name).append("\n");
-                        outputCppFile.append("namespace native_jvm::classes::")
+                        outputCppFile.append("namespace native_jvm::classes::__ngen_")
                             .append(escapeCppNameString(classNode.name.replace("/", "_")))
                             .append(" {\n\n");
                         outputHppFile.append("\n");
@@ -557,7 +567,7 @@ public class NativeObfuscator {
                         outputHppFile.append("#define ").append(escapeCppNameString(classNode.name.replace('/', '_')).concat("_hpp").toUpperCase()).append("_GUARD\n");
                         outputHppFile.append("\n");
                         outputHppFile.append("// ").append(classNode.name).append("\n");
-                        outputHppFile.append("namespace native_jvm::classes::")
+                        outputHppFile.append("namespace native_jvm::classes::__ngen_")
                             .append(escapeCppNameString(classNode.name.replace("/", "_")))
                             .append(" {\n\n");
                         outputCppFile.append("    ");
@@ -579,7 +589,7 @@ public class NativeObfuscator {
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
                         outputHppFile.append("}\n\n#endif");
-                        outputHeaderSb.append("        native_jvm::classes::").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env);\n");
+                        outputHeaderSb.append("        native_jvm::classes::__ngen_").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env);\n");
                     }
                 } catch (IOException e1) {
                     e1.printStackTrace(System.err);

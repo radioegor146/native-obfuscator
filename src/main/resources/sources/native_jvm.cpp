@@ -38,12 +38,23 @@ namespace native_jvm::utils {
 	}
 
 
-	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, std::string clazz) {
+	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, std::string className, int line) {
 		if (count == 0)
 			return (jobjectArray) nullptr;
-		jobjectArray resultArray = env->NewObjectArray(*sizes, env->FindClass((std::string(count, '[') + clazz).c_str()), nullptr);
-		for (jint i = 0; i < *sizes; i++)
-			env->SetObjectArrayElement(resultArray, i, create_multidim_array(env, count - 1, sizes + 1, clazz));
+		if (*sizes < 0) {
+			throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
+			return (jobjectArray) nullptr;
+		}
+		jobjectArray resultArray = nullptr;
+		if (jclass clazz = env->FindClass((std::string(count, '[') + className).c_str()))
+			resultArray = env->NewObjectArray(*sizes, clazz, nullptr);
+		else
+			return (jobjectArray) nullptr;
+		for (jint i = 0; i < *sizes; i++) {
+			env->SetObjectArrayElement(resultArray, i, create_multidim_array(env, count - 1, sizes + 1, className, line));
+			if (env->ExceptionCheck())
+				return (jobjectArray) nullptr;
+		}
 		return resultArray;
 	}
 
