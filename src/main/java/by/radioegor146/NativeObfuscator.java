@@ -162,12 +162,11 @@ public class NativeObfuscator {
         methodName = "__ngen_" + methodName.replace("/", "_");
         methodName = escapeCppNameString(methodName);
         nativeMethodsSb
-                .append("        { ")
+                .append("        { (char *)")
                 .append(getCppString(javaMethodName))
-                .append(", ")
+                .append(", (char *)")
                 .append(getCppString(methodNode.desc))
-                .append(", ")
-                .append("(void *)&")
+                .append(", (void *)&")
                 .append(methodName)
                 .append(" },\n");
         int returnTypeSort = Type.getReturnType(methodNode.desc).getSort();
@@ -247,7 +246,7 @@ public class NativeObfuscator {
                         } else {
                             tryCatch.append("    ").append(dynamicFormat(CPP_SNIPPETS.getProperty("TRYCATCH_CHECK"), createMap(
                                     "rettype", CPP_TYPES[returnTypeSort],
-                                    "exception_class", escapeString(tryCatchBlock.type),
+                                    "_cstr_exception_class", getCppString(tryCatchBlock.type),
                                     "handler_block", tryCatchBlock.handler.getLabel().toString()
                             ))).append("\n");
                             break;
@@ -604,7 +603,7 @@ public class NativeObfuscator {
                         outputHppFile.append("    void __ngen_register_methods(JNIEnv *env);\n");
                         outputCppFile.append("        jclass clazz = utils::find_class_wo_static(env, ").append(getCppString(classNode.name.replace("/", "."))).append(");\n");
                         outputCppFile.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
-                        outputCppFile.append("        if (env->ExceptionCheck()) { env->ExceptionClear(); fprintf(stderr, \"Exception occured while registering native_jvm for %s\n\", ").append(getCppString(classNode.name.replace("/", "."))).append("); fflush(stderr); }\n");
+                        outputCppFile.append("        if (env->ExceptionCheck()) { env->ExceptionClear(); fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ").append(getCppString(classNode.name.replace("/", "."))).append("); fflush(stderr); }\n");
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
                         outputHppFile.append("}\n\n#endif");
