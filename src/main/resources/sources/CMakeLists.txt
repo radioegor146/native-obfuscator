@@ -8,6 +8,9 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	set(CMAKE_CXX_FLAGS /EHsc)    #exception handling
 endif()
 
+find_package(JNI REQUIRED)
+include_directories(${JNI_INCLUDE_DIRS})
+
 set(CLASS_FILES $classfiles)
 set(MAIN_FILES $mainfiles)
 add_library(native_jvm SHARED ${CLASS_FILES} ${MAIN_FILES})
