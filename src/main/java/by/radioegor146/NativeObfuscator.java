@@ -579,7 +579,7 @@ public class NativeObfuscator {
         }
     }
     
-    private static final String VERSION = "1.3b";
+    private static final String VERSION = "1.5r";
     
     static String stripExtension(String str) {
         if (str == null) 
