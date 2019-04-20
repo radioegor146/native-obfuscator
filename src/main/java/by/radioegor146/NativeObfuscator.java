@@ -551,27 +551,29 @@ public class NativeObfuscator {
                         if (insnNode.getOpcode() == Opcodes.INVOKEINTERFACE || insnNode.getOpcode() == Opcodes.INVOKESPECIAL || insnNode.getOpcode() == Opcodes.INVOKEVIRTUAL) {
                             for (int i = 0; i < argOffsets.size(); i++)
                                 argsBuilder.append(", ").append(dynamicStringPoolFormat("INVOKE_ARG_" + argSorts.get(i), createMap("index", String.valueOf(argOffsets.get(i) - 1))));
-                            outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", createMap("count", String.valueOf(-stackOffset)))).append(" ");
+                            if (stackOffset != 0)
+                                outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", createMap("count", String.valueOf(-stackOffset)))).append(" ");
                             if (insnNode.getOpcode() == Opcodes.INVOKESPECIAL)
                                 props.put("class_ptr", getCachedClassPointer(((MethodInsnNode) insnNode).owner));
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
                                     ((MethodInsnNode) insnNode).desc, 
-                                    true
+                                    false
                             ));
                             props.put("object_offset", "-1");
                             props.put("args", argsBuilder.toString());
                         } else {
                             for (int i = 0; i < argOffsets.size(); i++)
                                 argsBuilder.append(", ").append(dynamicStringPoolFormat("INVOKE_ARG_" + argSorts.get(i), createMap("index", String.valueOf(argOffsets.get(i)))));
-                            outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
+                            if (-stackOffset - 1 != 0)
+                                outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
                             props.put("class_ptr", getCachedClassPointer(((MethodInsnNode) insnNode).owner));
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
                                     ((MethodInsnNode) insnNode).desc, 
-                                    false
+                                    true
                             ));
                             props.put("args", argsBuilder.toString());
                         }
@@ -769,7 +771,6 @@ public class NativeObfuscator {
                         writeEntry(f, out, e.getName(), src);
                         return;
                     }
-
                     nativeMethodsSb = new StringBuilder();
                     ifaceStaticNativeMethodsSb = new StringBuilder();
                     invokeDynamics = new HashMap<>();
@@ -835,9 +836,27 @@ public class NativeObfuscator {
                         outputCppFile.append("    ");
                         outputCppFile.append(insnsSb);
                         outputCppFile.append("\n");
-                        outputCppFile.append("    void __ngen_register_methods(JNIEnv *env) {\n");
-                        outputHppFile.append("    void __ngen_register_methods(JNIEnv *env);\n");
+                        outputCppFile.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env) {\n");
+                        outputHppFile.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env);\n");
                         outputCppFile.append("        string_pool = string_pool::get_pool();\n\n");
+                        
+                        for (Map.Entry<String, Integer> clazz : cachedClasses.entrySet()) 
+                            outputCppFile.append("        if (jclass clazz = utils::find_class_wo_static(env, " + getStringPooledString(clazz.getKey().replace("/", ".")) + ")) { cclasses[" + clazz.getValue() + "] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); }\n");
+                        if (!cachedClasses.isEmpty())
+                            outputCppFile.append("\n");
+                        
+                        for (Map.Entry<CachedMethodInfo, Integer> method : cachedMethods.entrySet()) 
+                            outputCppFile.append("        if (jclass clazz = utils::find_class_wo_static(env, " + getStringPooledString(method.getKey().clazz.replace("/", ".")) + ")) { if (jmethodID method = utils::find_method_wo_static(env, jvmti_env, clazz, " + 
+                                    getStringPooledString(method.getKey().name) + ", " + getStringPooledString(method.getKey().desc) + ", " + (method.getKey().isStatic ? "true" : "false") + ")) cmethods[" + method.getValue() + "] = method; env->DeleteLocalRef(clazz); }\n");
+                        if (!cachedMethods.isEmpty())
+                            outputCppFile.append("\n");
+                        
+                        for (Map.Entry<CachedFieldInfo, Integer> field : cachedFields.entrySet()) 
+                            outputCppFile.append("        if (jclass clazz = utils::find_class_wo_static(env, " + getStringPooledString(field.getKey().clazz.replace("/", ".")) + ")) { if (jfieldID field = utils::find_field_wo_static(env, jvmti_env, clazz, " + 
+                                    getStringPooledString(field.getKey().name) + ", " + getStringPooledString(field.getKey().desc) + ", " + (field.getKey().isStatic ? "true" : "false") + ")) cfields[" + field.getValue() + "] = field; env->DeleteLocalRef(clazz); }\n");
+                        if (!cachedFields.isEmpty())
+                            outputCppFile.append("\n");
+                        
                         if (nativeMethodsSb.length() > 0) {
                             outputCppFile.append("        JNINativeMethod __ngen_methods[] = {\n");
                             outputCppFile.append(nativeMethodsSb);
@@ -858,7 +877,7 @@ public class NativeObfuscator {
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
                         outputHppFile.append("}\n\n#endif");
-                        outputHeaderSb.append("        native_jvm::classes::__ngen_").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env);\n");
+                        outputHeaderSb.append("        native_jvm::classes::__ngen_").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env, jvmti_env);\n");
                     }
                     currentClassId++;
                 } catch (IOException e1) {

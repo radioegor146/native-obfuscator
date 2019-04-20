@@ -5,7 +5,7 @@
 #define NATIVE_JVM_OUTPUT_HPP_GUARD
 
 namespace native_jvm {
-	void register_all_classes(JNIEnv *env);
+	void register_all_classes(JNIEnv *env, jvmtiEnv *jvmti_env);
 }
 
 #endif

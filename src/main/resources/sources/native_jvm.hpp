@@ -1,4 +1,5 @@
 #include "jni.h"
+#include "jvmti.h"
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -130,11 +131,13 @@ namespace native_jvm::utils {
 	jlong cdl(jdouble f);
 	jdouble cld(jlong f);
 
-	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, std::string className, int line);
+	jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, const char *class_name, int line);
 
-	jclass find_class_wo_static(JNIEnv *env, std::string class_name);
+	jclass find_class_wo_static(JNIEnv *env, const char *class_name);
+	jmethodID find_method_wo_static(JNIEnv *env, jvmtiEnv *jvmti_env, jclass clazz, const char *name, const char *signature, bool is_static);
+	jfieldID find_field_wo_static(JNIEnv *env, jvmtiEnv *jvmti_env, jclass clazz, const char *name, const char *signature, bool is_static);
 
-	void throw_re(JNIEnv *env, std::string exception_class, std::string error, int line);
+	void throw_re(JNIEnv *env, const char *exception_class, const char *error, int line);
 }
 
 #endif
