@@ -842,8 +842,12 @@ public class NativeObfuscator {
             System.out.println("Processing " + jar + "...");
             List<JarFile> libs = new ArrayList<>();
             libs.add(f);
-            while (f.getEntry("native" + nativeDirId) != null)
+            while (true) {
+                final int currentNativeDirId = nativeDirId;
+                if (!f.stream().anyMatch(x -> x.getName().startsWith("native" + currentNativeDirId)))
+                    break;
                 nativeDirId++;
+            }
             
             f.stream().forEach(e -> {
                 try {
@@ -860,7 +864,7 @@ public class NativeObfuscator {
                     }
                     byte[] src = baos.toByteArray();
                     if (byteArrayToInt(Arrays.copyOfRange(src, 0, 4)) != 0xCAFEBABE) {
-                        writeEntry(f, out, e.getName(), src);
+                        writeEntry(out, e.getName(), src);
                         return;
                     }
                     nativeMethodsSb = new StringBuilder();
@@ -871,7 +875,7 @@ public class NativeObfuscator {
                     classReader.accept(classNode, 0);
                     if (classNode.methods.stream().filter(x -> (x.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0 && !x.name.equals("<init>")).count() == 0) {
                         System.out.println("Skipping " + classNode.name);
-                        writeEntry(f, out, e.getName(), src);
+                        writeEntry(out, e.getName(), src);
                         return;
                     }
                     System.out.println("Processing " + classNode.name);
@@ -894,9 +898,7 @@ public class NativeObfuscator {
                         classNode.version = 52;
                         ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                         classNode.accept(classWriter);
-                        out.putNextEntry(new ZipEntry(e.getName()));
-                        out.write(classWriter.toByteArray());
-                        out.closeEntry();
+                        writeEntry(out, e.getName(), classWriter.toByteArray());
                         
                         outputCppFile.append("#include \"../native_jvm.hpp\"\n");
                         outputHppFile.append("#include \"../native_jvm.hpp\"\n");
@@ -966,16 +968,12 @@ public class NativeObfuscator {
                     e1.printStackTrace(System.err);
                 }
             });
-            System.out.println("Jar file ready!");
             Manifest mf = f.getManifest();
-            String mainClass = (String) mf.getMainAttributes().get(Name.MAIN_CLASS);
             setupNewIfaceStaticClass();
             for (ClassNode ifaceStaticClass : readyIfaceStaticClasses) {
                 ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 ifaceStaticClass.accept(classWriter);
-                out.putNextEntry(new ZipEntry(ifaceStaticClass.name + ".class"));
-                out.write(classWriter.toByteArray());
-                out.closeEntry();
+                writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
             }
             ClassNode loaderClass = new ClassNode();
             loaderClass.name = "native" + nativeDirId + "/Loader";
@@ -986,9 +984,9 @@ public class NativeObfuscator {
             loaderClass.methods.add(registerNativesForClassMethod);
             ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             loaderClass.accept(classWriter);
-            out.putNextEntry(new ZipEntry("native" + nativeDirId + "/Loader.class"));
-            out.write(classWriter.toByteArray());
-            out.closeEntry();
+            writeEntry(out, "native" + nativeDirId + "/Loader.class", classWriter.toByteArray());
+            System.out.println("Jar file ready!");
+            String mainClass = (String) mf.getMainAttributes().get(Name.MAIN_CLASS);
             if (mainClass != null) {
                 System.out.println("Creating bootstrap classes...");
                 mf.getMainAttributes().put(Name.MAIN_CLASS, "native" + nativeDirId + "/Bootstrap");
@@ -1005,9 +1003,7 @@ public class NativeObfuscator {
                 mainMethod.instructions.add(new InsnNode(Opcodes.RETURN));
                 bootstrapClass.methods.add(mainMethod);
                 bootstrapClass.accept(classWriter);
-                out.putNextEntry(new ZipEntry("native" + nativeDirId + "/Bootstrap.class"));
-                out.write(classWriter.toByteArray());
-                out.closeEntry();
+                writeEntry(out, "native" + nativeDirId + "/Bootstrap.class", classWriter.toByteArray());
                 System.out.println("Created!");
             } else {
                 System.out.println("Main-Class not found - no bootstrap classes!");
@@ -1078,11 +1074,13 @@ public class NativeObfuscator {
         try (InputStream in = f.getInputStream(e)) {
             transfer(in, out);
         }
+        out.closeEntry();
     }
 
-    private static void writeEntry(JarFile f, ZipOutputStream out, String entryName, byte[] data) throws IOException {
+    private static void writeEntry(ZipOutputStream out, String entryName, byte[] data) throws IOException {
         out.putNextEntry(new JarEntry(entryName));
         out.write(data, 0, data.length);
+        out.closeEntry();
     }
 
     private static void transfer(InputStream in, OutputStream out) throws IOException {
