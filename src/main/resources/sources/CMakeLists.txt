@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.6)
-project(native_jvm)
+cmake_minimum_required(VERSION 3.5)
+project($nameproj)
 set(CMAKE_CXX_STANDARD 17)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")

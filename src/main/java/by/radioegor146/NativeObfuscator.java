@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.jar.Attributes.Name;
@@ -1045,7 +1046,8 @@ public class NativeObfuscator {
                     writeStreamToString(in),
                     createMap(
                         "classfiles", String.join(" ", cmakeClassFiles),
-                        "mainfiles", String.join(" ", cmakeMainFiles)
+                        "mainfiles", String.join(" ", cmakeMainFiles),
+                        "nameproj", "natived_jvm_classes_" + new Random().nextLong()
                     )).getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             );
