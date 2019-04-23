@@ -769,10 +769,11 @@ public class NativeObfuscator {
      */
     public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {
         System.out.println("native-obfuscator v" + VERSION);
-        if (args.length < 3) {
-            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory> <libraries dir>");
+        if (args.length < 2) {
+            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory> [libraries dir]");
             return;
         }
+        String libsDir = args.length > 2 ? args[2] : null;
         for (Field f : Opcodes.class.getFields())
             INSTRUCTIONS.put((int) f.get(null), f.getName());
         CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/cppsnippets.properties"));
@@ -806,18 +807,19 @@ public class NativeObfuscator {
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             System.out.println("Processing " + jar + "...");
             List<JarFile> libs = new ArrayList<>();
-            Files.walkFileTree(Paths.get(args[2]), Collections.singleton(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                    throws IOException
-                {
-                    Objects.requireNonNull(file);
-                    Objects.requireNonNull(attrs);
-                    if (file.toString().endsWith(".jar") || file.toString().endsWith(".zip"))
-                    	libs.add(new JarFile(file.toFile()));
-                    return super.visitFile(file, attrs);
-                }
-            });
+            if (libsDir != null)
+                Files.walkFileTree(Paths.get(libsDir), Collections.singleton(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                        throws IOException
+                    {
+                        Objects.requireNonNull(file);
+                        Objects.requireNonNull(attrs);
+                        if (file.toString().endsWith(".jar") || file.toString().endsWith(".zip"))
+                            libs.add(new JarFile(file.toFile()));
+                        return super.visitFile(file, attrs);
+                    }
+                });
             libs.add(f);
             while (true) {
                 final int currentNativeDirId = nativeDirId;
