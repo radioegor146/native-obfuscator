@@ -10,16 +10,22 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
@@ -102,48 +108,6 @@ public class NativeObfuscator {
         "Ljava/lang/Object;", // 10
         "Ljava/lang/Object;" // 11
     };
-
-    private static String escapeString(String value) {
-        return bytesToCString(value.getBytes(StandardCharsets.UTF_8));
-    }
-    
-    private static String bytesToCString(byte[] data) {
-        StringBuilder sb = new StringBuilder();
-        Map<Byte, String> specificChanges = new HashMap<>();
-        specificChanges.put((byte) '\\', "\\\\");
-        specificChanges.put((byte) '\b', "\\b");
-        specificChanges.put((byte) '\n', "\\n");
-        specificChanges.put((byte) '\t', "\\t");
-        specificChanges.put((byte) '\r', "\\r");
-        specificChanges.put((byte) '\f', "\\f");
-        specificChanges.put((byte) '"', "\\\"");
-        for (byte b : data) {
-            if (specificChanges.containsKey(b)) {
-                sb.append(specificChanges.get(b));
-                continue;
-            }
-            if (b >= 32 && b < 127)
-                sb.append((char) b);
-            else
-                sb.append("\\x").append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
-    
-    private static String getCppString(String value) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        StringBuilder result = new StringBuilder("new char[" + (bytes.length + 1) + "] { ");
-        for (int i = 0; i < bytes.length; i++)
-            result.append(bytes[i]).append(", ");
-        return result.append("0 }").toString();
-//        if (bytes.length > 128) {
-//            StringBuilder result = new StringBuilder("((const char *)(std::initializer_list<char>({ ");
-//            for (int i = 0; i < bytes.length; i++)
-//                result.append(bytes[i]).append(i == bytes.length - 1 ? "" : ", ");
-//            return result.append(", 0 }).begin()))").toString();
-//        } else 
-//            return "\"" + bytesToCString(bytes) + "\"";
-    }
     
     private static String escapeCppNameString(String value) {
         Matcher m = PATTERN.matcher(value);
@@ -804,8 +768,8 @@ public class NativeObfuscator {
      */
     public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {
         System.out.println("native-obfuscator v" + VERSION);
-        if (args.length < 2) {
-            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory>");
+        if (args.length < 3) {
+            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory> <libraries dir>");
             return;
         }
         for (Field f : Opcodes.class.getFields())
@@ -841,6 +805,18 @@ public class NativeObfuscator {
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             System.out.println("Processing " + jar + "...");
             List<JarFile> libs = new ArrayList<>();
+            Files.walkFileTree(Paths.get(args[3]), Collections.singleton(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                    throws IOException
+                {
+                    Objects.requireNonNull(file);
+                    Objects.requireNonNull(attrs);
+                    if (file.toString().endsWith(".jar") || file.toString().endsWith(".zip"))
+                    	libs.add(new JarFile(file.toFile()));
+                    return super.visitFile(file, attrs);
+                }
+            });
             libs.add(f);
             while (f.getEntry("native" + nativeDirId) != null)
                 nativeDirId++;
@@ -1015,6 +991,9 @@ public class NativeObfuscator {
             out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
             mf.write(out);
             out.closeEntry();
+            libs.stream().forEach(f1 -> {
+            	if (f != f1) ClassMetadataReader.close(f1);
+            });
         }
 
         TreeMap<Integer, String> stringPoolSorted = new TreeMap<>();

@@ -106,7 +106,7 @@ public class ClassMetadataReader implements Closeable {
         return superclasses;
     }
 
-    private static void close(AutoCloseable closable) {
+    public static void close(AutoCloseable closable) {
         try {
             closable.close();
         } catch (Exception ignored) {
