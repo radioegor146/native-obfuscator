@@ -383,7 +383,6 @@ public class NativeObfuscator {
                     StringBuilder tryCatch = new StringBuilder("\n");
                     if (currentTryCatches.size() > 0) {
                         tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_START", createMap())).append("\n");
-                        //outputSb.append(" /* ctcs: ").append(currentTryCatches.size()).append(" */ ");
                         for (TryCatchBlockNode tryCatchBlock : currentTryCatches) {
                             if (tryCatchBlock.type == null) {
                                 tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_ANY_L", createMap(
@@ -397,7 +396,6 @@ public class NativeObfuscator {
                                         "exception_class_ptr", getCachedClassPointer(tryCatchBlock.type),
                                         "handler_block", tryCatchBlock.handler.getLabel().toString()
                                 ))).append("\n");
-                                break;
                             }
                         }
                         tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_END", createMap("rettype", CPP_TYPES[returnTypeSort])));
