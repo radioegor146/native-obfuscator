@@ -228,6 +228,18 @@ public class NativeObfuscator {
         return "(cfields[" + cachedFields.get(new CachedFieldInfo(clazz, name, desc, isStatic)) + "])";
     }
     
+    private static int getCachedMethodId(String clazz, String name, String desc, boolean isStatic) {
+        if (!cachedMethods.containsKey(new CachedMethodInfo(clazz, name, desc, isStatic))) 
+            cachedMethods.put(new CachedMethodInfo(clazz, name, desc, isStatic), cachedMethods.size());
+        return cachedMethods.get(new CachedMethodInfo(clazz, name, desc, isStatic));
+    }
+    
+     private static int getCachedFieldId(String clazz, String name, String desc, boolean isStatic) {
+        if (!cachedFields.containsKey(new CachedFieldInfo(clazz, name, desc, isStatic))) 
+            cachedFields.put(new CachedFieldInfo(clazz, name, desc, isStatic), cachedFields.size());
+        return cachedFields.get(new CachedFieldInfo(clazz, name, desc, isStatic));
+    }
+    
     private static String unicodify(String string) {
         StringBuilder result = new StringBuilder();
         for (char c : string.toCharArray()) {
@@ -435,6 +447,24 @@ public class NativeObfuscator {
                         insnName += "_" + Type.getType(((FieldInsnNode) insnNode).desc).getSort();
                         if (insnNode.getOpcode() == Opcodes.GETSTATIC || insnNode.getOpcode() == Opcodes.PUTSTATIC)
                             props.put("class_ptr", getCachedClassPointer(((FieldInsnNode) insnNode).owner));
+                        int fieldId = getCachedFieldId(
+                                ((FieldInsnNode) insnNode).owner, 
+                                ((FieldInsnNode) insnNode).name, 
+                                ((FieldInsnNode) insnNode).desc, 
+                                insnNode.getOpcode() == Opcodes.GETSTATIC || insnNode.getOpcode() == Opcodes.PUTSTATIC);
+                        outputSb.append("if (!cfields[")
+                                .append(fieldId)
+                                .append("]) { cfields[")
+                                .append(fieldId)
+                                .append("] = env->Get")
+                                .append((insnNode.getOpcode() == Opcodes.GETSTATIC || insnNode.getOpcode() == Opcodes.PUTSTATIC) ? "Static" : "")
+                                .append("FieldID(")
+                                .append(getCachedClassPointer(((FieldInsnNode) insnNode).owner))
+                                .append(", ")
+                                .append(getStringPooledString(((FieldInsnNode) insnNode).name))
+                                .append(", ")
+                                .append(getStringPooledString(((FieldInsnNode) insnNode).desc))
+                                .append("); } ");
                         props.put("fieldid", getCachedFieldPointer(
                                 ((FieldInsnNode) insnNode).owner, 
                                 ((FieldInsnNode) insnNode).name, 
@@ -472,11 +502,28 @@ public class NativeObfuscator {
                             argsBuilder.append(", ").append(dynamicStringPoolFormat("INVOKE_ARG_" + argSorts.get(i), createMap("index", String.valueOf(argOffsets.get(i)))));
                         outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
                         props.put("class_ptr", getCachedClassPointer(classNode.name));
+                        int methodId = getCachedMethodId(
+                                classNode.name, 
+                                indyMethodName, 
+                                ((InvokeDynamicInsnNode) insnNode).desc, 
+                                true
+                        );
+                        outputSb.append("if (!cmethods[")
+                                .append(methodId)
+                                .append("]) { cmethods[")
+                                .append(methodId)
+                                .append("] = env->GetStaticMethodID(")
+                                .append(getCachedClassPointer(classNode.name))
+                                .append(", ")
+                                .append(getStringPooledString(indyMethodName))
+                                .append(", ")
+                                .append(getStringPooledString(((InvokeDynamicInsnNode) insnNode).desc))
+                                .append("); } ");
                         props.put("methodid", getCachedMethodPointer(
                                 classNode.name, 
                                 indyMethodName, 
                                 ((InvokeDynamicInsnNode) insnNode).desc, 
-                                insnNode.getOpcode() == Opcodes.GETSTATIC || insnNode.getOpcode() == Opcodes.PUTSTATIC
+                                true
                         ));
                         props.put("args", argsBuilder.toString());
                     }
@@ -555,6 +602,23 @@ public class NativeObfuscator {
                                 outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", createMap("count", String.valueOf(-stackOffset)))).append(" ");
                             if (insnNode.getOpcode() == Opcodes.INVOKESPECIAL)
                                 props.put("class_ptr", getCachedClassPointer(((MethodInsnNode) insnNode).owner));
+                            int methodId = getCachedMethodId(
+                                ((MethodInsnNode) insnNode).owner, 
+                                ((MethodInsnNode) insnNode).name, 
+                                ((MethodInsnNode) insnNode).desc, 
+                                false
+                            );
+                            outputSb.append("if (!cmethods[")
+                                    .append(methodId)
+                                    .append("]) { cmethods[")
+                                    .append(methodId)
+                                    .append("] = env->GetMethodID(")
+                                    .append(getCachedClassPointer(((MethodInsnNode) insnNode).owner))
+                                    .append(", ")
+                                    .append(getStringPooledString(((MethodInsnNode) insnNode).name))
+                                    .append(", ")
+                                    .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
+                                    .append("); } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
@@ -569,6 +633,23 @@ public class NativeObfuscator {
                             if (-stackOffset - 1 != 0)
                                 outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
                             props.put("class_ptr", getCachedClassPointer(((MethodInsnNode) insnNode).owner));
+                            int methodId = getCachedMethodId(
+                                ((MethodInsnNode) insnNode).owner, 
+                                ((MethodInsnNode) insnNode).name, 
+                                ((MethodInsnNode) insnNode).desc, 
+                                true
+                            );
+                            outputSb.append("if (!cmethods[")
+                                    .append(methodId)
+                                    .append("]) { cmethods[")
+                                    .append(methodId)
+                                    .append("] = env->GetStaticMethodID(")
+                                    .append(getCachedClassPointer(((MethodInsnNode) insnNode).owner))
+                                    .append(", ")
+                                    .append(getStringPooledString(((MethodInsnNode) insnNode).name))
+                                    .append(", ")
+                                    .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
+                                    .append("); } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
@@ -637,6 +718,8 @@ public class NativeObfuscator {
                 break;
             case "<clinit>":
                 methodNode.instructions.clear();
+                methodNode.instructions.add(new LdcInsnNode((int) currentClassId));
+                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "native" + nativeDirId + "/Loader", "registerNativesForClass", "(I)V"));
                 methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, classNode.name, "native_special_clinit" + index, methodNode.desc));
                 if ((classNode.access & Opcodes.ACC_INTERFACE) > 0) {
                     proxifiedResult.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, currentIfaceStaticClass.name, nativeMethod.name, nativeMethod.desc));
@@ -703,14 +786,23 @@ public class NativeObfuscator {
         return str.substring(0, pos);
     }
     
+    private static String getGetterForType(String desc) {
+        if (desc.startsWith("["))
+            return "env->FindClass(" + getStringPooledString(desc) + ")";
+        if (desc.endsWith(";"))
+            desc = desc.substring(1, desc.length() - 1);
+        return "utils::find_class_wo_static(env, " + getStringPooledString(desc.replace("/", ".")) + ")";
+    }
+    
     private static int currentClassId;
     private static int nativeDirId = 0;
+    
     /**
      * @param args the command line arguments
      * @throws java.io.IOException
      * @throws java.lang.IllegalAccessException
      */
-    public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {    
+    public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {
         System.out.println("native-obfuscator v" + VERSION);
         if (args.length < 2) {
             System.err.println("java -jar native-obfuscator.jar <jar file> <output directory>");
@@ -783,6 +875,8 @@ public class NativeObfuscator {
                         return;
                     }
                     System.out.println("Processing " + classNode.name);
+                    if (!classNode.methods.stream().anyMatch(x -> x.name.equals("<clinit>")))
+                        classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC, "<clinit>", "()V", null, new String[0]));
                     setupNewIfaceStaticClass();
                     cachedClasses.clear();
                     cachedMethods.clear();
@@ -841,27 +935,15 @@ public class NativeObfuscator {
                         outputCppFile.append("        string_pool = string_pool::get_pool();\n\n");
                         
                         for (Map.Entry<String, Integer> clazz : cachedClasses.entrySet()) 
-                            outputCppFile.append("        if (jclass clazz = utils::find_class_wo_static(env, " + getStringPooledString(clazz.getKey().replace("/", ".")) + ")) { cclasses[" + clazz.getValue() + "] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); }\n");
-                        if (!cachedClasses.isEmpty())
-                            outputCppFile.append("\n");
-                        
-                        for (Map.Entry<CachedMethodInfo, Integer> method : cachedMethods.entrySet()) 
-                            outputCppFile.append("        if (jclass clazz = utils::find_class_wo_static(env, " + getStringPooledString(method.getKey().clazz.replace("/", ".")) + ")) { if (jmethodID method = utils::find_method_wo_static(env, jvmti_env, clazz, " + 
-                                    getStringPooledString(method.getKey().name) + ", " + getStringPooledString(method.getKey().desc) + ", " + (method.getKey().isStatic ? "true" : "false") + ")) cmethods[" + method.getValue() + "] = method; env->DeleteLocalRef(clazz); }\n");
-                        if (!cachedMethods.isEmpty())
-                            outputCppFile.append("\n");
-                        
-                        for (Map.Entry<CachedFieldInfo, Integer> field : cachedFields.entrySet()) 
-                            outputCppFile.append("        if (jclass clazz = utils::find_class_wo_static(env, " + getStringPooledString(field.getKey().clazz.replace("/", ".")) + ")) { if (jfieldID field = utils::find_field_wo_static(env, jvmti_env, clazz, " + 
-                                    getStringPooledString(field.getKey().name) + ", " + getStringPooledString(field.getKey().desc) + ", " + (field.getKey().isStatic ? "true" : "false") + ")) cfields[" + field.getValue() + "] = field; env->DeleteLocalRef(clazz); }\n");
-                        if (!cachedFields.isEmpty())
+                            outputCppFile.append("        if (jclass clazz = ").append(getGetterForType(clazz.getKey())).append(") { cclasses[" + clazz.getValue() + "] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); }\n");
+                        if (!cachedClasses.isEmpty())   
                             outputCppFile.append("\n");
                         
                         if (nativeMethodsSb.length() > 0) {
                             outputCppFile.append("        JNINativeMethod __ngen_methods[] = {\n");
                             outputCppFile.append(nativeMethodsSb);
                             outputCppFile.append("        };\n\n");
-                            outputCppFile.append("        jclass clazz = utils::find_class_wo_static(env, ").append(getStringPooledString(classNode.name.replace("/", "."))).append(");\n");
+                            outputCppFile.append("        jclass clazz = ").append(getGetterForType(classNode.name)).append(";\n");
                             outputCppFile.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
                             outputCppFile.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ").append(getStringPooledString(classNode.name.replace("/", "."))).append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
                             outputCppFile.append("\n");
@@ -877,7 +959,7 @@ public class NativeObfuscator {
                         outputCppFile.append("    }\n");
                         outputCppFile.append("}");
                         outputHppFile.append("}\n\n#endif");
-                        outputHeaderSb.append("        native_jvm::classes::__ngen_").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods(env, jvmti_env);\n");
+                        outputHeaderSb.append("        reg_methods[").append(currentClassId).append("] = &(native_jvm::classes::__ngen_").append(escapeCppNameString(classNode.name.replace("/", "_"))).append("::__ngen_register_methods);\n");
                     }
                     currentClassId++;
                 } catch (IOException e1) {
@@ -969,7 +1051,9 @@ public class NativeObfuscator {
                     writeStreamToString(in),
                     createMap(
                         "register_code", outputHeaderSb,
-                        "includes", outputHeaderIncludesSb
+                        "includes", outputHeaderIncludesSb,
+                        "native_dir_id", nativeDirId,
+                        "class_count", currentClassId
                     )).getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             );
