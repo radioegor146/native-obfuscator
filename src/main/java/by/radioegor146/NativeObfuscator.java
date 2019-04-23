@@ -806,7 +806,7 @@ public class NativeObfuscator {
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             System.out.println("Processing " + jar + "...");
             List<JarFile> libs = new ArrayList<>();
-            Files.walkFileTree(Paths.get(args[3]), Collections.singleton(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
+            Files.walkFileTree(Paths.get(args[2]), Collections.singleton(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
                     throws IOException
@@ -1047,7 +1047,7 @@ public class NativeObfuscator {
                     createMap(
                         "classfiles", String.join(" ", cmakeClassFiles),
                         "mainfiles", String.join(" ", cmakeMainFiles),
-                        "nameproj", "natived_jvm_classes_" + new Random().nextLong()
+                        "projectname", "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s]", "_"); + "_" + new Random().nextLong()
                     )).getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             );
