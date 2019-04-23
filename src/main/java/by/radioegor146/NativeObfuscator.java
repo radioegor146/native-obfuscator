@@ -1047,7 +1047,7 @@ public class NativeObfuscator {
                     createMap(
                         "classfiles", String.join(" ", cmakeClassFiles),
                         "mainfiles", String.join(" ", cmakeMainFiles),
-                        "projectname", "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s]", "_"); + "_" + new Random().nextLong()
+                        "projectname", "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s]", "_") + "_" + new Random().nextLong()
                     )).getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             );
