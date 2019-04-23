@@ -5,7 +5,6 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -17,7 +16,7 @@ import java.util.jar.JarFile;
  * Позволяет искать методы внутри незагруженных классов и общие суперклассы для
  * чего угодно. Работает через поиск class-файлов в classpath.
  */
-public class ClassMetadataReader implements Closeable {
+public class ClassMetadataReader {
     private class CheckSuperClassVisitor extends ClassVisitor {
 
         String superClassName;
@@ -112,11 +111,4 @@ public class ClassMetadataReader implements Closeable {
         } catch (Exception ignored) {
         }
     }
-    
-    @Override
-    public void close() {
-        cp.stream().forEach(ClassMetadataReader::close);
-        cp.clear();
-    }
-
 }
