@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.6)
-project(native_jvm)
+cmake_minimum_required(VERSION 3.5)
+project($projectname)
 set(CMAKE_CXX_STANDARD 17)
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -13,4 +13,4 @@ include_directories(${JNI_INCLUDE_DIRS})
 
 set(CLASS_FILES $classfiles)
 set(MAIN_FILES $mainfiles)
-add_library(native_jvm SHARED ${CLASS_FILES} ${MAIN_FILES})
+add_library($projectname SHARED ${CLASS_FILES} ${MAIN_FILES})
