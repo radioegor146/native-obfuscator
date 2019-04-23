@@ -354,7 +354,7 @@ public class NativeObfuscator {
             localIndex += args[i].getSize();
         }
         outputSb.append("\n");
-        Set<TryCatchBlockNode> currentTryCatches = new HashSet<>();
+        List<TryCatchBlockNode> currentTryCatches = new ArrayList<>();
         int currentLine = -1;
         int invokeSpecialId = -1;
         for (int insnIndex = 0; insnIndex < methodNode.instructions.size(); insnIndex++) {
@@ -383,6 +383,7 @@ public class NativeObfuscator {
                     StringBuilder tryCatch = new StringBuilder("\n");
                     if (currentTryCatches.size() > 0) {
                         tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_START", createMap())).append("\n");
+                        //outputSb.append(" /* ctcs: ").append(currentTryCatches.size()).append(" */ ");
                         for (TryCatchBlockNode tryCatchBlock : currentTryCatches) {
                             if (tryCatchBlock.type == null) {
                                 tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_ANY_L", createMap(
@@ -804,6 +805,7 @@ public class NativeObfuscator {
         cmakeMainFiles.add("native_jvm_output.cpp");
         cmakeMainFiles.add("string_pool.hpp");
         cmakeMainFiles.add("string_pool.cpp");
+        String projectName = "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s]", "_") + "_" + Math.abs(new Random().nextLong());
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             System.out.println("Processing " + jar + "...");
             List<JarFile> libs = new ArrayList<>();
@@ -975,7 +977,7 @@ public class NativeObfuscator {
                 bootstrapClass.superName = "java/lang/Object";
                 bootstrapClass.access = Opcodes.ACC_PUBLIC;
                 MethodNode mainMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, new String[0]);
-                mainMethod.instructions.add(new LdcInsnNode("native_jvm"));
+                mainMethod.instructions.add(new LdcInsnNode(projectName));
                 mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System", "loadLibrary", "(Ljava/lang/String;)V"));
                 mainMethod.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, mainClass.replace(".", "/"), "main", "([Ljava/lang/String;)V"));
@@ -1045,7 +1047,7 @@ public class NativeObfuscator {
                     createMap(
                         "classfiles", String.join(" ", cmakeClassFiles),
                         "mainfiles", String.join(" ", cmakeMainFiles),
-                        "projectname", "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s]", "_") + "_" + new Random().nextLong()
+                        "projectname", projectName
                     )).getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             );
