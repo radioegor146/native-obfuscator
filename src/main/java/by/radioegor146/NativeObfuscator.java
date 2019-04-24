@@ -22,13 +22,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.jar.Attributes.Name;
 import java.util.jar.JarEntry;
@@ -184,13 +182,13 @@ public class NativeObfuscator {
     private static String getCachedMethodPointer(String clazz, String name, String desc, boolean isStatic) {
         if (!cachedMethods.containsKey(new CachedMethodInfo(clazz, name, desc, isStatic))) 
             cachedMethods.put(new CachedMethodInfo(clazz, name, desc, isStatic), cachedMethods.size());
-        return "(cmethods[" + cachedMethods.get(new CachedMethodInfo(clazz, name, desc, isStatic)) + "])";
+        return "(cmethods[" + cachedMethods.get(new CachedMethodInfo(clazz, name, desc, isStatic)) + "].load())";
     }
     
     private static String getCachedFieldPointer(String clazz, String name, String desc, boolean isStatic) {
         if (!cachedFields.containsKey(new CachedFieldInfo(clazz, name, desc, isStatic))) 
             cachedFields.put(new CachedFieldInfo(clazz, name, desc, isStatic), cachedFields.size());
-        return "(cfields[" + cachedFields.get(new CachedFieldInfo(clazz, name, desc, isStatic)) + "])";
+        return "(cfields[" + cachedFields.get(new CachedFieldInfo(clazz, name, desc, isStatic)) + "].load())";
     }
     
     private static int getCachedMethodId(String clazz, String name, String desc, boolean isStatic) {
@@ -249,6 +247,7 @@ public class NativeObfuscator {
         if (currentIfaceStaticClass != null && currentIfaceStaticClass.methods.size() > 0)
             readyIfaceStaticClasses.add(currentIfaceStaticClass);
         currentIfaceStaticClass = new ClassNode();
+        currentIfaceStaticClass.sourceFile = "synthetic";
         currentIfaceStaticClass.name = "native" + nativeDirId + "/interfacestatic/Methods" + readyIfaceStaticClasses.size();
         currentIfaceStaticClass.version = 52;
         currentIfaceStaticClass.superName = "java/lang/Object";
@@ -418,9 +417,9 @@ public class NativeObfuscator {
                                 insnNode.getOpcode() == Opcodes.GETSTATIC || insnNode.getOpcode() == Opcodes.PUTSTATIC);
                         outputSb.append("if (!cfields[")
                                 .append(fieldId)
-                                .append("]) { cfields[")
+                                .append("].load()) { cfields[")
                                 .append(fieldId)
-                                .append("] = env->Get")
+                                .append("].store(env->Get")
                                 .append((insnNode.getOpcode() == Opcodes.GETSTATIC || insnNode.getOpcode() == Opcodes.PUTSTATIC) ? "Static" : "")
                                 .append("FieldID(")
                                 .append(getCachedClassPointer(((FieldInsnNode) insnNode).owner))
@@ -428,7 +427,7 @@ public class NativeObfuscator {
                                 .append(getStringPooledString(((FieldInsnNode) insnNode).name))
                                 .append(", ")
                                 .append(getStringPooledString(((FieldInsnNode) insnNode).desc))
-                                .append("); } ");
+                                .append(")); } ");
                         props.put("fieldid", getCachedFieldPointer(
                                 ((FieldInsnNode) insnNode).owner, 
                                 ((FieldInsnNode) insnNode).name, 
@@ -474,15 +473,15 @@ public class NativeObfuscator {
                         );
                         outputSb.append("if (!cmethods[")
                                 .append(methodId)
-                                .append("]) { cmethods[")
+                                .append("].load()) { cmethods[")
                                 .append(methodId)
-                                .append("] = env->GetStaticMethodID(")
+                                .append("].store(env->GetStaticMethodID(")
                                 .append(getCachedClassPointer(classNode.name))
                                 .append(", ")
                                 .append(getStringPooledString(indyMethodName))
                                 .append(", ")
                                 .append(getStringPooledString(((InvokeDynamicInsnNode) insnNode).desc))
-                                .append("); } ");
+                                .append(")); } ");
                         props.put("methodid", getCachedMethodPointer(
                                 classNode.name, 
                                 indyMethodName, 
@@ -574,15 +573,15 @@ public class NativeObfuscator {
                             );
                             outputSb.append("if (!cmethods[")
                                     .append(methodId)
-                                    .append("]) { cmethods[")
+                                    .append("].load()) { cmethods[")
                                     .append(methodId)
-                                    .append("] = env->GetMethodID(")
+                                    .append("].store(env->GetMethodID(")
                                     .append(getCachedClassPointer(((MethodInsnNode) insnNode).owner))
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).name))
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
-                                    .append("); } ");
+                                    .append(")); } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
@@ -605,15 +604,15 @@ public class NativeObfuscator {
                             );
                             outputSb.append("if (!cmethods[")
                                     .append(methodId)
-                                    .append("]) { cmethods[")
+                                    .append("].load()) { cmethods[")
                                     .append(methodId)
-                                    .append("] = env->GetStaticMethodID(")
+                                    .append("].store(env->GetStaticMethodID(")
                                     .append(getCachedClassPointer(((MethodInsnNode) insnNode).owner))
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).name))
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
-                                    .append("); } ");
+                                    .append(")); } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
@@ -867,7 +866,7 @@ public class NativeObfuscator {
                     try (BufferedWriter outputCppFile = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".cpp")).toFile()), StandardCharsets.UTF_8));
                             BufferedWriter outputHppFile = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputDir.resolve("cpp").resolve("output").resolve(escapeCppNameString(classNode.name.replace('/', '_')).concat(".hpp")).toFile()), StandardCharsets.UTF_8))) {
                         StringBuilder insnsSb = new StringBuilder();
-                        
+                        classNode.sourceFile = escapeCppNameString(classNode.name.replace('/', '_')) + ".cpp";
                         for (int i = 0; i < classNode.methods.size(); i++)
                             insnsSb.append(visitMethod(classNode, classNode.methods.get(i), i).replace("\n", "\n    "));
                         if ((classNode.access & Opcodes.ACC_INTERFACE) > 0)
@@ -895,9 +894,9 @@ public class NativeObfuscator {
                         if (cachedClasses.size() > 0)
                             outputCppFile.append("    jclass cclasses[" + cachedClasses.size() + "];\n");
                         if (cachedMethods.size() > 0)
-                            outputCppFile.append("    jmethodID cmethods[" + cachedMethods.size() + "];\n");
+                            outputCppFile.append("    std::atomic<jmethodID> cmethods[" + cachedMethods.size() + "];\n");
                         if (cachedFields.size() > 0)
-                            outputCppFile.append("    jfieldID cfields[" + cachedFields.size() + "];\n");
+                            outputCppFile.append("    std::atomic<jfieldID> cfields[" + cachedFields.size() + "];\n");
                         outputCppFile.append("\n");
                         outputHppFile.append("\n");
                         outputHppFile.append("#ifndef ").append(escapeCppNameString(classNode.name.replace('/', '_')).concat("_hpp").toUpperCase()).append("_GUARD\n");
@@ -955,6 +954,7 @@ public class NativeObfuscator {
                 writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
             }
             ClassNode loaderClass = new ClassNode();
+            loaderClass.sourceFile = "synthetic";
             loaderClass.name = "native" + nativeDirId + "/Loader";
             loaderClass.version = 52;
             loaderClass.superName = "java/lang/Object";
@@ -970,6 +970,7 @@ public class NativeObfuscator {
                 System.out.println("Creating bootstrap classes...");
                 mf.getMainAttributes().put(Name.MAIN_CLASS, "native" + nativeDirId + "/Bootstrap");
                 ClassNode bootstrapClass = new ClassNode(Opcodes.ASM7);
+                bootstrapClass.sourceFile = "synthetic";
                 bootstrapClass.name = "native" + nativeDirId + "/Bootstrap";
                 bootstrapClass.version = 52;
                 bootstrapClass.superName = "java/lang/Object";
