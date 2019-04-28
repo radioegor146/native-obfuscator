@@ -2,38 +2,38 @@
 cd test
 rm native-obfuscator.jar
 cp ../build/libs/native-obfuscator.jar native-obfuscator.jar
-mkdir current
-mkdir test_build
+mkdir temp/current
+mkdir temp/test_build
 for test_dir in `find tests -mindepth 1 -type d`
 do
     test_id=`basename $test_dir`
 
     echo -e "\e[93mTest #"$test_id"\e[0m"
     # cleanup
-    rm -rf current/*
-    rm -rf test_build/*
-    rm test_build.jar
+    rm -rf temp/current/*
+    rm -rf temp/test_build/*
+    rm temp/test_build.jar
 
     # compiling
-    javac -d test_build $test_dir/*.java 
+    javac -d temp/test_build $test_dir/*.java 
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
-    jar cvfe test_build.jar Test -C test_build/ .
+    jar cvfe temp/test_build.jar Test -C temp/test_build/ .
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 
     # making test
-    java -jar native-obfuscator.jar test_build.jar current
+    java -jar native-obfuscator.jar temp/test_build.jar temp/current
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
-    cd current/cpp
+    cd temp/current/cpp
     cmake .
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cmake --build . --config Release
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
-    cd ../..
-    cp current/cpp/Release/* current/*
+    cd ../../..
+    cp temp/current/cpp/Release/* temp/current/*
 
     # testing
-    cd current
+    cd temp/current
     java -jar test.jar
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
-    cd ..
+    cd ../..
 done

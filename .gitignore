@@ -113,3 +113,5 @@ cmd.sh
 hs_err_pid*
 
 .nb-gradle/
+
+/test/temp/
