@@ -1,7 +1,8 @@
 #!/bin/bash
+cd test
 cp ../build/libs/native-obfuscator.jar native-obfuscator.jar
 mkdir current
-for test_dir in tests/*/ ;
+for test_dir in `find tests -mindepth 1 -type d`
 do
     test_id=`basename $test_dir`
     echo "Test #"$test_id
