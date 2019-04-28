@@ -132,11 +132,16 @@ namespace native_jvm::utils {
     jlong cdl(jdouble f);
     jdouble cld(jlong f);
 
+    void init_utils(JNIEnv *env);
+
     jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, const char *class_name, int line);
 
     jclass find_class_wo_static(JNIEnv *env, const char *class_name);
 
     void throw_re(JNIEnv *env, const char *exception_class, const char *error, int line);
+
+    void bastore(JNIEnv *env, jarray array, jint index, jint value);
+    jbyte baload(JNIEnv *env, jarray array, jint index);
 }
 
 #endif

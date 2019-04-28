@@ -428,6 +428,8 @@ public class NativeObfuscator {
                                 .append(", ")
                                 .append(getStringPooledString(((FieldInsnNode) insnNode).desc))
                                 .append(")); } ");
+//                                .append(tryCatch.toString().trim().replace("\n", " "))
+//                                .append("  } ");
                         props.put("fieldid", getCachedFieldPointer(
                                 ((FieldInsnNode) insnNode).owner, 
                                 ((FieldInsnNode) insnNode).name, 
@@ -482,6 +484,8 @@ public class NativeObfuscator {
                                 .append(", ")
                                 .append(getStringPooledString(((InvokeDynamicInsnNode) insnNode).desc))
                                 .append(")); } ");
+//                                .append(tryCatch.toString().trim().replace("\n", " "))
+//                                .append("  } ");
                         props.put("methodid", getCachedMethodPointer(
                                 classNode.name, 
                                 indyMethodName, 
@@ -582,6 +586,8 @@ public class NativeObfuscator {
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
                                     .append(")); } ");
+//                                    .append(tryCatch.toString().trim().replace("\n", " "))
+//                                    .append("  } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
@@ -613,6 +619,8 @@ public class NativeObfuscator {
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
                                     .append(")); } ");
+//                                    .append(tryCatch.toString().trim().replace("\n", " "))
+//                                    .append("  } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 

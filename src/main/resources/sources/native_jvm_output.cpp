@@ -19,6 +19,10 @@ namespace native_jvm {
     }
 
     void prepare_lib(JNIEnv *env, jvmtiEnv *jvmti_env) {
+        utils::init_utils(env);
+        if (env->ExceptionCheck())
+            return;
+
 $register_code
 
         JNINativeMethod loader_methods[] = {
