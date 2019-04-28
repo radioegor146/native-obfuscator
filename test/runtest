@@ -2,15 +2,28 @@
 cd test
 cp ../build/libs/native-obfuscator.jar native-obfuscator.jar
 mkdir current
+mkdir test_build
 for test_dir in `find tests -mindepth 1 -type d`
 do
     test_id=`basename $test_dir`
+
     echo "Test #"$test_id
+    # cleanup
     rm -rf current/*
-    java -jar native-obfuscator.jar $test_dir/test.jar current
+    rm -rf test_build/*
+    rm test_build.jar
+
+    # compiling
+    javac -d test_build $test_dir/*.java
+    jar cvf test_build.jar test_build/*
+
+    # making test
+    java -jar native-obfuscator.jar test_build/test.jar current
     cmake current/cpp
     cmake --build current/cpp --config Release
     cp current/cpp/Release/* current/*
+
+    # testing
     cd current
     java -jar test.jar
     cd ..
