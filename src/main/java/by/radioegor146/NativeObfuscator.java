@@ -810,7 +810,7 @@ public class NativeObfuscator {
         cmakeMainFiles.add("native_jvm_output.cpp");
         cmakeMainFiles.add("string_pool.hpp");
         cmakeMainFiles.add("string_pool.cpp");
-        String projectName = "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s]", "_") + "_" + Math.abs(new Random().nextLong());
+        String projectName = "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s\\/]", "_") + "_" + Math.abs(new Random().nextLong());
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             System.out.println("Processing " + jar + "...");
             List<JarFile> libs = new ArrayList<>();
