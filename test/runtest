@@ -1,5 +1,6 @@
 #!/bin/bash
 cd test
+rm native-obfuscator.jar
 cp ../build/libs/native-obfuscator.jar native-obfuscator.jar
 mkdir current
 mkdir test_build
@@ -16,7 +17,7 @@ do
     # compiling
     javac -d test_build $test_dir/*.java 
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
-    jar cvfm test_build.jar DEFAULT.MF test_build/*
+    jar cvfe test_build.jar Test -C test_build/ .
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 
     # making test
