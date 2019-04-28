@@ -5,7 +5,7 @@ $includes
 
 namespace native_jvm {
 
-    typedef void (__cdecl * reg_method)(JNIEnv *,jvmtiEnv *);
+    typedef void (* reg_method)(JNIEnv *,jvmtiEnv *);
 
     reg_method reg_methods[$class_count];
 
@@ -25,8 +25,10 @@ namespace native_jvm {
 
 $register_code
 
+        char method_name[] = "registerNativesForClass";
+        char method_desc[] = "(I)V";
         JNINativeMethod loader_methods[] = {
-            { "registerNativesForClass", "(I)V", &register_for_class }
+            { (char *) method_name, (char *) method_desc, (void *)&register_for_class }
         };
         env->RegisterNatives(env->FindClass("native$native_dir_id/Loader"), loader_methods, 1);
     }
