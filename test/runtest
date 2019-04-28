@@ -1,9 +1,9 @@
 #!/bin/bash
 cd test
-rm native-obfuscator.jar
+rm -f native-obfuscator.jar
 cp ../build/libs/native-obfuscator.jar native-obfuscator.jar
-mkdir temp/current
-mkdir temp/test_build
+mkdir -p temp/current
+mkdir -p temp/test_build
 for test_dir in `find tests -mindepth 1 -type d`
 do
     test_id=`basename $test_dir`
@@ -12,7 +12,7 @@ do
     # cleanup
     rm -rf temp/current/*
     rm -rf temp/test_build/*
-    rm temp/test_build.jar
+    rm -f temp/test_build.jar
 
     # compiling
     javac -d temp/test_build $test_dir/*.java 
