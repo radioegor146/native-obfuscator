@@ -14,17 +14,23 @@ do
     rm test_build.jar
 
     # compiling
-    javac -d test_build $test_dir/*.java
-    jar cvf test_build.jar test_build/*
+    javac -d test_build $test_dir/*.java 
+    rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
+    jar cvfm test_build.jar DEFAULT.MF test_build/*
+    rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 
     # making test
-    java -jar native-obfuscator.jar test_build/test.jar current
+    java -jar native-obfuscator.jar test_build.jar current
+    rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cmake current/cpp
+    rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cmake --build current/cpp --config Release
+    rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cp current/cpp/Release/* current/*
 
     # testing
     cd current
     java -jar test.jar
+    rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cd ..
 done
