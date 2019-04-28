@@ -8,7 +8,7 @@ for test_dir in `find tests -mindepth 1 -type d`
 do
     test_id=`basename $test_dir`
 
-    echo "\e[93mTest #"$test_id
+    echo -e "\e[93mTest #"$test_id
     # cleanup
     rm -rf current/*
     rm -rf test_build/*
