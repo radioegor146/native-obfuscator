@@ -10,21 +10,14 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileVisitOption;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.Random;
 import java.util.TreeMap;
@@ -65,19 +58,11 @@ import org.objectweb.asm.tree.VarInsnNode;
 import ru.gravit.launchserver.asm.ClassMetadataReader;
 import ru.gravit.launchserver.asm.SafeClassWriter;
 
-/**
- *
- * @author radioegor146
- */
-
 public class NativeObfuscator {
 
     private static final Pattern PATTERN = Pattern.compile("([^a-zA-Z_0-9])");
     private static final Map<Integer, String> INSTRUCTIONS = new HashMap<>();
     private static final Properties CPP_SNIPPETS = new Properties();
-    private static StringBuilder ifaceStaticNativeMethodsSb = new StringBuilder();
-    private static StringBuilder nativeMethodsSb = new StringBuilder();
-    private static Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
     private static final String[] CPP_TYPES = {
         "void", // 0
         "jboolean", // 1
@@ -108,7 +93,17 @@ public class NativeObfuscator {
         "Ljava/lang/Object;" // 11
     };
     
-    private static String escapeCppNameString(String value) {
+    static {
+        try {
+            for (Field f : Opcodes.class.getFields())
+                INSTRUCTIONS.put((int) f.get(null), f.getName());
+            CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/cppsnippets.properties"));
+        } catch (IllegalArgumentException | IllegalAccessException | IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+    
+    private String escapeCppNameString(String value) {
         Matcher m = PATTERN.matcher(value);
         StringBuffer sb = new StringBuffer(value.length());
         while (m.find()) 
@@ -120,7 +115,7 @@ public class NativeObfuscator {
         return output;
     }
     
-    private static Map<String, String> createMap(Object... parts) {
+    private Map<String, String> createMap(Object... parts) {
         HashMap<String, String> tokens = new HashMap<>();
         for (int i = 0; i < parts.length; i += 2) {
             tokens.put(parts[i].toString(), parts[i + 1].toString());
@@ -128,7 +123,7 @@ public class NativeObfuscator {
         return tokens;
     }
     
-    private static String dynamicFormat(String string, Map<String, String> tokens) {
+    private String dynamicFormat(String string, Map<String, String> tokens) {
         String patternString = "\\$(" + String.join("|", tokens.keySet().stream().map(x -> unicodify(x)).collect(Collectors.toList())) + ")";
         Pattern pattern = Pattern.compile(patternString);
         Matcher matcher = pattern.matcher(string);
@@ -142,7 +137,7 @@ public class NativeObfuscator {
         return sb.toString();
     }
     
-    private static String dynamicRawFormat(String string, Map<String, String> tokens) {
+    private String dynamicRawFormat(String string, Map<String, String> tokens) {
         if (tokens.isEmpty())
             return string;
         String patternString = "(" + String.join("|", tokens.keySet().stream().map(x -> unicodify(x)).collect(Collectors.toList())) + ")";
@@ -158,14 +153,17 @@ public class NativeObfuscator {
         return sb.toString();
     }
     
-    private static HashMap<String, Integer> stringPool = new HashMap<>();
-    private static HashMap<String, Integer> cachedClasses = new HashMap<>();
-    private static HashMap<CachedMethodInfo, Integer> cachedMethods = new HashMap<>();
-    private static HashMap<CachedFieldInfo, Integer> cachedFields = new HashMap<>();
+    private final HashMap<String, Integer> stringPool = new HashMap<>();
+    private final HashMap<String, Integer> cachedClasses = new HashMap<>();
+    private final HashMap<CachedMethodInfo, Integer> cachedMethods = new HashMap<>();
+    private final HashMap<CachedFieldInfo, Integer> cachedFields = new HashMap<>();
+    private StringBuilder ifaceStaticNativeMethodsSb = new StringBuilder();
+    private StringBuilder nativeMethodsSb = new StringBuilder();
+    private Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
     
-    private static int currentLength = 0;
+    private int currentLength = 0;
     
-    private static String getStringPooledString(String value) {
+    private String getStringPooledString(String value) {
         if (!stringPool.containsKey(value)) {
             stringPool.put(value, currentLength);
             currentLength += value.getBytes(StandardCharsets.UTF_8).length + 1;
@@ -173,37 +171,37 @@ public class NativeObfuscator {
         return "((char *)(string_pool + " + stringPool.get(value) + "LL))";
     }
     
-    private static String getCachedClassPointer(String name) {
+    private String getCachedClassPointer(String name) {
         if (!cachedClasses.containsKey(name)) 
             cachedClasses.put(name, cachedClasses.size());
         return "(cclasses[" + cachedClasses.get(name) + "])";
     }
     
-    private static String getCachedMethodPointer(String clazz, String name, String desc, boolean isStatic) {
+    private String getCachedMethodPointer(String clazz, String name, String desc, boolean isStatic) {
         if (!cachedMethods.containsKey(new CachedMethodInfo(clazz, name, desc, isStatic))) 
             cachedMethods.put(new CachedMethodInfo(clazz, name, desc, isStatic), cachedMethods.size());
         return "(cmethods[" + cachedMethods.get(new CachedMethodInfo(clazz, name, desc, isStatic)) + "].load())";
     }
     
-    private static String getCachedFieldPointer(String clazz, String name, String desc, boolean isStatic) {
+    private String getCachedFieldPointer(String clazz, String name, String desc, boolean isStatic) {
         if (!cachedFields.containsKey(new CachedFieldInfo(clazz, name, desc, isStatic))) 
             cachedFields.put(new CachedFieldInfo(clazz, name, desc, isStatic), cachedFields.size());
         return "(cfields[" + cachedFields.get(new CachedFieldInfo(clazz, name, desc, isStatic)) + "].load())";
     }
     
-    private static int getCachedMethodId(String clazz, String name, String desc, boolean isStatic) {
+    private int getCachedMethodId(String clazz, String name, String desc, boolean isStatic) {
         if (!cachedMethods.containsKey(new CachedMethodInfo(clazz, name, desc, isStatic))) 
             cachedMethods.put(new CachedMethodInfo(clazz, name, desc, isStatic), cachedMethods.size());
         return cachedMethods.get(new CachedMethodInfo(clazz, name, desc, isStatic));
     }
     
-     private static int getCachedFieldId(String clazz, String name, String desc, boolean isStatic) {
+    private int getCachedFieldId(String clazz, String name, String desc, boolean isStatic) {
         if (!cachedFields.containsKey(new CachedFieldInfo(clazz, name, desc, isStatic))) 
             cachedFields.put(new CachedFieldInfo(clazz, name, desc, isStatic), cachedFields.size());
         return cachedFields.get(new CachedFieldInfo(clazz, name, desc, isStatic));
     }
     
-    private static String unicodify(String string) {
+    private String unicodify(String string) {
         StringBuilder result = new StringBuilder();
         for (char c : string.toCharArray()) {
             result.append("\\u").append(String.format("%04x", (int)c));
@@ -211,7 +209,7 @@ public class NativeObfuscator {
         return result.toString();
     }
     
-    private static String dynamicStringPoolFormat(String key, Map<String, String> tokens) {
+    private String dynamicStringPoolFormat(String key, Map<String, String> tokens) {
         String value = CPP_SNIPPETS.getProperty(key);
         if (value == null)
             throw new RuntimeException(key + " not found");
@@ -240,10 +238,10 @@ public class NativeObfuscator {
         return dynamicRawFormat(value, replaceTokens);
     }
     
-    private static List<ClassNode> readyIfaceStaticClasses = new ArrayList<>();
-    private static ClassNode currentIfaceStaticClass;
+    private final List<ClassNode> readyIfaceStaticClasses = new ArrayList<>();
+    private ClassNode currentIfaceStaticClass;
     
-    private static void setupNewIfaceStaticClass() {
+    private void setupNewIfaceStaticClass() {
         if (currentIfaceStaticClass != null && currentIfaceStaticClass.methods.size() > 0)
             readyIfaceStaticClasses.add(currentIfaceStaticClass);
         currentIfaceStaticClass = new ClassNode();
@@ -254,7 +252,7 @@ public class NativeObfuscator {
         currentIfaceStaticClass.access = Opcodes.ACC_PUBLIC;
     }
     
-    private static String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
+    private String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
         if (((methodNode.access & Opcodes.ACC_ABSTRACT) > 0) || ((methodNode.access & Opcodes.ACC_NATIVE) > 0))
             return "";
         if (methodNode.name.equals("<init>"))
@@ -718,7 +716,7 @@ public class NativeObfuscator {
         return outputSb.toString();
     }
     
-    private static void processIndy(ClassNode classNode, String methodName, InvokeDynamicInsnNode indy) {
+    private void processIndy(ClassNode classNode, String methodName, InvokeDynamicInsnNode indy) {
         MethodNode indyWrapper = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC, methodName, indy.desc, null, new String[0]);
         int localVarsPosition = 0;
         for (Type arg : Type.getArgumentTypes(indy.desc)) {
@@ -730,13 +728,13 @@ public class NativeObfuscator {
         classNode.methods.add(indyWrapper);
     }
 
-    private static String writeStreamToString(InputStream stream) throws IOException {
+    private String writeStreamToString(InputStream stream) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         transfer(stream,baos);
         return new String(baos.toByteArray(), StandardCharsets.UTF_8);
     }
     
-    private static void writeStreamToFile(InputStream stream, Path path) throws IOException {
+    private void writeStreamToFile(InputStream stream, Path path) throws IOException {
         byte[] buffer = new byte[4096];
         int bytesRead;
         try (OutputStream outputStream = Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -746,18 +744,7 @@ public class NativeObfuscator {
         }
     }
     
-    private static final String VERSION = "1.5r";
-    
-    static String stripExtension(String str) {
-        if (str == null) 
-            return null;
-        int pos = str.lastIndexOf(".");
-        if (pos == -1) 
-            return str;
-        return str.substring(0, pos);
-    }
-    
-    private static String getGetterForType(String desc) {
+    private String getGetterForType(String desc) {
         if (desc.startsWith("["))
             return "env->FindClass(" + getStringPooledString(desc) + ")";
         if (desc.endsWith(";"))
@@ -765,26 +752,19 @@ public class NativeObfuscator {
         return "utils::find_class_wo_static(env, " + getStringPooledString(desc.replace("/", ".")) + ")";
     }
     
-    private static int currentClassId;
-    private static int nativeDirId = 0;
+    private int currentClassId;
+    private int nativeDirId = 0;
     
-    /**
-     * @param args the command line arguments
-     * @throws java.io.IOException
-     * @throws java.lang.IllegalAccessException
-     */
-    public static void main(String[] args) throws IOException, IllegalArgumentException, IllegalAccessException {
-        System.out.println("native-obfuscator v" + VERSION);
-        if (args.length < 2) {
-            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory> [libraries dir]");
-            return;
-        }
-        String libsDir = args.length > 2 ? args[2] : null;
-        for (Field f : Opcodes.class.getFields())
-            INSTRUCTIONS.put((int) f.get(null), f.getName());
-        CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/cppsnippets.properties"));
-        final File jar = Paths.get(args[0]).normalize().toAbsolutePath().toFile();
-        final Path outputDir = Paths.get(args[1]).normalize().toAbsolutePath();
+    public void process(Path inputJar, Path outputDir, List<Path> libs) throws IOException {
+        libs.add(inputJar);
+        ClassMetadataReader metadataReader = new ClassMetadataReader(libs.stream().map(x -> {
+            try {
+                return new JarFile(inputJar.toFile());
+            } catch (IOException ex) {
+                return null;
+            }
+        }).collect(Collectors.toList()));
+        final File jar = inputJar.toAbsolutePath().toFile();
         Files.createDirectories(outputDir);
         Files.createDirectories(outputDir.resolve("cpp"));
         Files.createDirectories(outputDir.resolve("cpp").resolve("output"));
@@ -810,24 +790,10 @@ public class NativeObfuscator {
         cmakeMainFiles.add("native_jvm_output.cpp");
         cmakeMainFiles.add("string_pool.hpp");
         cmakeMainFiles.add("string_pool.cpp");
-        String projectName = "native_jvm_classes_" + args[0].replaceAll("[$#\\.\\s\\/]", "_") + "_" + Math.abs(new Random().nextLong());
+        String projectName = "native_jvm_classes_" + inputJar.getFileName().toString().replaceAll("[$#\\.\\s\\/]", "_") + "_" + Math.abs(new Random().nextLong());
         try (final JarFile f = new JarFile(jar); final ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jar.getName()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))) {
             System.out.println("Processing " + jar + "...");
-            List<JarFile> libs = new ArrayList<>();
-            if (libsDir != null)
-                Files.walkFileTree(Paths.get(libsDir), Collections.singleton(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                        throws IOException
-                    {
-                        Objects.requireNonNull(file);
-                        Objects.requireNonNull(attrs);
-                        if (file.toString().endsWith(".jar") || file.toString().endsWith(".zip"))
-                            libs.add(new JarFile(file.toFile()));
-                        return super.visitFile(file, attrs);
-                    }
-                });
-            libs.add(f);
+            
             while (true) {
                 final int currentNativeDirId = nativeDirId;
                 if (!f.stream().anyMatch(x -> x.getName().startsWith("native" + currentNativeDirId)))
@@ -843,10 +809,10 @@ public class NativeObfuscator {
                         writeEntry(f, out, e);
                         return;
                     }
-                    // Ignore entries with invalid magic
+                    
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     try (InputStream in = f.getInputStream(e)) {
-                        transfer(in,baos);
+                        transfer(in, baos);
                     }
                     byte[] src = baos.toByteArray();
                     if (byteArrayToInt(Arrays.copyOfRange(src, 0, 4)) != 0xCAFEBABE) {
@@ -882,7 +848,7 @@ public class NativeObfuscator {
                                 classNode.methods.get(i).access &= ~Opcodes.ACC_NATIVE;
                         invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
                         classNode.version = 52;
-                        ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                        ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                         classNode.accept(classWriter);
                         writeEntry(out, e.getName(), classWriter.toByteArray());
                         
@@ -957,7 +923,7 @@ public class NativeObfuscator {
             Manifest mf = f.getManifest();
             setupNewIfaceStaticClass();
             for (ClassNode ifaceStaticClass : readyIfaceStaticClasses) {
-                ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 ifaceStaticClass.accept(classWriter);
                 writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
             }
@@ -969,7 +935,7 @@ public class NativeObfuscator {
             loaderClass.access = Opcodes.ACC_PUBLIC;
             MethodNode registerNativesForClassMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_NATIVE, "registerNativesForClass", "(I)V", null, new String[0]);
             loaderClass.methods.add(registerNativesForClassMethod);
-            ClassWriter classWriter = new SafeClassWriter(new ClassMetadataReader(libs), Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             loaderClass.accept(classWriter);
             writeEntry(out, "native" + nativeDirId + "/Loader.class", classWriter.toByteArray());
             System.out.println("Jar file ready!");
@@ -999,9 +965,7 @@ public class NativeObfuscator {
             out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
             mf.write(out);
             out.closeEntry();
-            libs.stream().forEach(f1 -> {
-            	if (f != f1) ClassMetadataReader.close(f1);
-            });
+            metadataReader.close();
         }
 
         TreeMap<Integer, String> stringPoolSorted = new TreeMap<>();

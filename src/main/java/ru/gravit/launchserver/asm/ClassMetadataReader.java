@@ -12,10 +12,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.jar.JarFile;
 
-/**
- * Позволяет искать методы внутри незагруженных классов и общие суперклассы для
- * чего угодно. Работает через поиск class-файлов в classpath.
- */
 public class ClassMetadataReader {
     private class CheckSuperClassVisitor extends ClassVisitor {
 
@@ -32,18 +28,18 @@ public class ClassMetadataReader {
         }
     }
 
-    private final List<JarFile> cp;
+    private final List<JarFile> classPath;
 
-    public ClassMetadataReader(List<JarFile> cp) {
-        this.cp = cp;
+    public ClassMetadataReader(List<JarFile> classPath) {
+        this.classPath = classPath;
     }
 
     public List<JarFile> getCp() {
-        return cp;
+        return classPath;
     }
 
     public ClassMetadataReader() {
-        this.cp = new ArrayList<>();
+        this.classPath = new ArrayList<>();
     }
 
     public void acceptVisitor(byte[] classData, ClassVisitor visitor) {
@@ -65,13 +61,11 @@ public class ClassMetadataReader {
     }
 
     public byte[] getClassData(String className) throws IOException, ClassNotFoundException {
-        for (JarFile f : cp) {
-            if (f.getEntry(className + ".class") != null) {
-                byte[] bytes = null;
-                try (InputStream in = f.getInputStream(f.getEntry(className + ".class"))) {
-                    bytes = read(in);
-                }
-                return bytes;
+        for (JarFile file : classPath) {
+            if (file.getEntry(className + ".class") == null)
+                continue;
+            try (InputStream in = file.getInputStream(file.getEntry(className + ".class"))) {
+                return read(in);
             }
         }
         throw new ClassNotFoundException(className);
@@ -81,7 +75,7 @@ public class ClassMetadataReader {
         if (type.equals("java/lang/Object")) return null;
         try {
             return getSuperClassASM(type);
-        } catch (Exception e) {
+        } catch (IOException | ClassNotFoundException e) {
             return "java/lang/Object";
         }
     }
@@ -92,10 +86,6 @@ public class ClassMetadataReader {
         return cv.superClassName;
     }
 
-    /**
-     * Возвращает суперклассы в порядке возрастающей конкретности (начиная с
-     * java/lang/Object и заканчивая данным типом)
-     */
     public ArrayList<String> getSuperClasses(String type) {
         ArrayList<String> superclasses = new ArrayList<>(1);
         superclasses.add(type);
@@ -105,10 +95,13 @@ public class ClassMetadataReader {
         return superclasses;
     }
 
-    public static void close(AutoCloseable closable) {
-        try {
-            closable.close();
-        } catch (Exception ignored) {
-        }
+    public void close() {
+        classPath.forEach((file) -> {
+            try {
+                file.close();
+            } catch (IOException ex) {
+                
+            }
+        });
     }
 }

@@ -1,31 +1,36 @@
 plugins {
-	id 'java'
-	id 'eclipse'
-	id 'idea'
+    id 'java'
+    id 'eclipse'
+    id 'idea'
 }
 
 sourceCompatibility = targetCompatibility = '1.8'
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
 if (!hasProperty('mainClass')) {
-	ext.mainClass = 'by.radioegor146.NativeObfuscator'
+    ext.mainClass = 'by.radioegor146.Main'
 }
 
 repositories {
-	mavenLocal()
-	mavenCentral()
+    mavenLocal()
+    mavenCentral()
 }
 
 dependencies {
-	compile 'org.ow2.asm:asm:7.1'
-	compile 'org.ow2.asm:asm-tree:7.1'
-	testCompile group: 'junit', name: 'junit', version: '4.12'
+    compile 'org.ow2.asm:asm:7.1'
+    compile 'org.ow2.asm:asm-tree:7.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
+    testRuntime 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
 }
 
 jar {
-	manifest.attributes("Main-Class": getProperty('mainClass'))
-		from(configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }) {
-		exclude "META-INF/*"
-		exclude "module-info.class"
-	}
+    manifest.attributes("Main-Class": getProperty('mainClass'))
+    from(configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude "META-INF/*"
+        exclude "module-info.class"
+    }
+}
+
+test {
+    useJUnitPlatform();
 }
