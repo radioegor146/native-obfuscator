@@ -10,7 +10,6 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
         message(FATAL_ERROR "GCC version must be at least 6.0!")
     endif()
-    unset(CMAKE_GENERATOR_PLATFORM)
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY build/lib)
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG build/lib)
@@ -18,14 +17,11 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY build/lib)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG build/lib)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE build/lib)
+	set(CMAKE_CXX_FLAGS /MP8)
+	set(CMAKE_CXX_FLAGS /wd4102)
+	set(CMAKE_CXX_FLAGS /EHsc)
 else()
-    message(WARNING "You are using an unsupported compiler! Compilation has only been tested with MSVC and GCC.")
-endif()
-
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-	set(CMAKE_CXX_FLAGS /MP8)     #multicore compilation
-	set(CMAKE_CXX_FLAGS /wd4102)  #unused labels warn
-	set(CMAKE_CXX_FLAGS /EHsc)    #exception handling
+    message(FATAL_ERROR "You are using an unsupported compiler! Compilation has only been tested with MSVC and GCC.")
 endif()
 
 find_package(JNI REQUIRED)

@@ -90,10 +90,14 @@ public class ClassicTest implements Executable {
             idealRunResult.check("Ideal run");
             
             System.out.println("Compiling CPP code...");
-            String arch = "x64";
-            if (System.getProperty("sun.arch.data.model").equals("32"))
-                arch = "x86";
-            ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch,  ".").check("CMake prepare");
+            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+                String arch = "x64";
+                if (System.getProperty("sun.arch.data.model").equals("32"))
+                    arch = "x86";
+                ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, ".").check("CMake prepare");
+            } else {
+                ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", ".").check("CMake prepare");
+            }
             ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 30000, "cmake", "--build", ".", "--config", "Release").check("CMake build");
             for (File libFile : tempOutputDirectory.resolve("cpp").resolve("build").resolve("lib").toFile().listFiles(x -> !x.isDirectory()))
                 Files.copy(libFile.toPath(), tempOutputDirectory.resolve(libFile.getName()));
