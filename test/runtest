@@ -15,6 +15,7 @@ do
     rm -f temp/test_build.jar
 
     # compiling
+    cp $test_dir/output temp/current/test.ideal
     javac -d temp/test_build $test_dir/source/*.java 
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     jar cvfe temp/test_build.jar Test -C temp/test_build/ .
@@ -33,7 +34,11 @@ do
 
     # testing
     cd temp/current
-    java -Djava.library.path=. -jar test.jar
+    java -Djava.library.path=. -jar test.jar > test.no
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cd ../..
+
+    # checking
+    cmp -s temp/current/test.no temp/current/test.ideal
+    rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 done
