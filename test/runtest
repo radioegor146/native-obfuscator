@@ -30,7 +30,7 @@ do
     cmake --build . --config Release
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cd ../../..
-    cp temp/current/cpp/build/Release/lib/* temp/current/*
+    cp temp/current/cpp/build/Release/lib/* temp/current/
 
     # testing
     cd temp/current
