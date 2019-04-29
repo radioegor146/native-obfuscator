@@ -4,7 +4,7 @@ rm -f native-obfuscator.jar
 cp ../build/libs/native-obfuscator.jar native-obfuscator.jar
 mkdir -p temp/current
 mkdir -p temp/test_build
-for test_dir in `find tests -mindepth 1 -type d`
+for test_dir in `find tests -mindepth 1 -maxdepth 1 -type d`
 do
     test_id=`basename $test_dir`
 
