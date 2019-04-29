@@ -92,12 +92,16 @@ public class ClassicTest implements Executable {
             System.out.println("Compiling CPP code...");
             ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", ".").check("CMake prepare");
             ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 30000, "cmake", "--build", ".", "--config", "Release").check("CMake build");
-            for (File libFile : tempOutputDirectory.resolve("cpp").resolve("build").resolve("lib").toFile().listFiles(x -> x.getName().endsWith(".java")))
+            for (File libFile : tempOutputDirectory.resolve("cpp").resolve("build").resolve("lib").toFile().listFiles())
                 Files.copy(libFile.toPath(), tempOutputDirectory.resolve(libFile.getName()));
             
             System.out.println("Running test...");
-            ProcessHelper.run(tempOutputDirectory, 10 * idealRunResult.execTime, "java", "-Djava.library.path=.", "-jar",
-                    tempOutputDirectory.resolve("test.jar").toAbsolutePath().toString()).check("Test run");
+            ProcessResult testRunResult = ProcessHelper.run(tempOutputDirectory, 10 * idealRunResult.execTime, "java", "-Djava.library.path=.", "-jar",
+                    tempOutputDirectory.resolve("test.jar").toAbsolutePath().toString());
+            testRunResult.check("Test run");
+            
+            if (!testRunResult.stdout.equals(idealRunResult))
+                throw new RuntimeException("Ideal != Test");
             
             System.out.println("OK");
         } catch (IOException | RuntimeException e) {
