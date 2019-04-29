@@ -1,6 +1,7 @@
 package by.radioegor146;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -15,7 +16,7 @@ public class TestsGenerator {
         File[] tests = new File(TestsGenerator.class.getClassLoader().getResource("tests").getFile()).listFiles();
         for (File test : tests)
             if (test.isDirectory())
-                dynamicTests.add(DynamicTest.dynamicTest("Test #" + test.getName(), new ClassicTest(test)));
+                dynamicTests.add(DynamicTest.dynamicTest("Test #" + test.getName(), new URI("https://gradle.please.fix.sharp5975"), new ClassicTest(test)));
         return dynamicTests;
     }
 }
