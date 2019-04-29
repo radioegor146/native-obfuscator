@@ -1,6 +1,25 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project($projectname)
 set(CMAKE_CXX_STANDARD 17)
+
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY build/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY build/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY build/bin)
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY build/lib)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG build/lib)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE build/lib)
+endif()
+
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
+        message(FATAL_ERROR "GCC version must be at least 6.0!")
+    endif()
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+else()
+    message(WARNING "You are using an unsupported compiler! Compilation has only been tested with MSVC and GCC.")
+endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 	set(CMAKE_CXX_FLAGS /MP8)     #multicore compilation

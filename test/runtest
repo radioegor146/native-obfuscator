@@ -1,0 +1,52 @@
+#!/bin/bash
+cd test
+rm -f native-obfuscator.jar
+cp ../build/libs/native-obfuscator.jar native-obfuscator.jar
+mkdir -p temp/current
+mkdir -p temp/test_build
+for test_dir in `find tests -mindepth 1 -maxdepth 1 -type d`
+do
+    test_id=`basename $test_dir`
+
+    echo -e -n "\e[1;33mTest #"$test_id"\e[0m -> "
+    # cleanup
+    rm -rf temp/current/*
+    rm -rf temp/test_build/*
+    rm -f temp/test_build.jar
+
+    # compiling
+    javac -d temp/test_build $test_dir/source/*.java 1>/dev/null
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: JCE\e[0m"; exit $rc; fi
+    jar cvfe temp/test_build.jar Test -C temp/test_build/ . 1>/dev/null
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: JE\e[0m"; exit $rc; fi
+
+    # making test
+    java -jar native-obfuscator.jar temp/test_build.jar temp/current 1>/dev/null
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: NOE\e[0m"; exit $rc; fi
+    cd temp/current/cpp
+    cmake . 1>/dev/null
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: PCE\e[0m"; exit $rc; fi
+    cmake --build . --config Release 1>/dev/null
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: CE\e[0m"; exit $rc; fi
+    cd ../../..
+    cp temp/current/cpp/build/lib/* temp/current/
+
+    # ideal output
+    cd temp
+    java -jar test_build.jar 1>test.ideal
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: IRE\e[0m"; exit $rc; fi
+    cd ..
+    cp temp/test.ideal temp/current/test.ideal
+
+    # testing
+    cd temp/current
+    java -Djava.library.path=. -jar test_build.jar 1>test.no
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: NRE\e[0m"; exit $rc; fi
+    cd ../..
+
+    # checking
+    cmp -s temp/current/test.no temp/current/test.ideal
+    rc=$?; if [[ $rc != 0 ]]; then echo -e "\e[1;31mFailed: WA\e[0m"; exit $rc; fi
+
+    echo -e "\e[1;32mOK\e[0m"
+done
