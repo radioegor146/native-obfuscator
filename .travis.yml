@@ -15,6 +15,8 @@ matrix:
         - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
 before_install:
   - eval "${MATRIX_EVAL}"
+install:
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
 deploy:
   provider: releases
   api_key: 
