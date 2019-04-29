@@ -54,6 +54,7 @@ public class ClassicTest implements Executable {
     @Override
     public void execute() throws Throwable {
         try {
+            System.err.println("Running test #" + testDirectory.toFile().getName());
             Path sourceDirectory = testDirectory.resolve("source");
             if (!sourceDirectory.toFile().exists()) 
                 throw new IOException("Source directory not found");
