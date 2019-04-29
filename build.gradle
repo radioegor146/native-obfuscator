@@ -34,7 +34,31 @@ jar {
 test {
     useJUnitPlatform();
     testLogging {
-        events "passed", "skipped", "failed"
-        exceptionFormat "full"
+        events ()
+        lifecycle {
+            events ()
+        }
+        error {
+            events ()
+        }
+        warn {
+            events ()
+        }
+        info {
+            events ()
+        }
+        debug {
+            events ()
+        }
+        quiet {
+            events ()
+        }
+    }
+    afterTest { desc, result -> 
+        logger.lifecycle "${desc.name} result: ${result}\n"
+    }
+    onOutput { desc, event ->
+        if (event.destination == org.gradle.api.tasks.testing.TestOutputEvent.Destination.StdErr)
+            logger.lifecycle "${desc.name} [STDERR]: ${event.message.replaceAll("[\n\r]", "")}"
     }
 }
