@@ -34,6 +34,7 @@ do
 
     # testing
     cd temp/current
+    ls -l
     java -Djava.library.path=. -jar test.jar > test.no
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cd ../..
