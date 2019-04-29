@@ -8,7 +8,7 @@ for test_dir in `find tests -mindepth 1 -type d`
 do
     test_id=`basename $test_dir`
 
-    echo -e "\e[93mTest #"$test_id"\e[0m"
+    echo -e "\e[1;33mTest #"$test_id"\e[0m"
     # cleanup
     rm -rf temp/current/*
     rm -rf temp/test_build/*
@@ -41,4 +41,6 @@ do
     # checking
     cmp -s temp/current/test.no temp/current/test.ideal
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
+
+    echo -e "\e[1;32mOK\e[0m"
 done
