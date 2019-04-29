@@ -100,7 +100,7 @@ public class ClassicTest implements Executable {
                     tempOutputDirectory.resolve("test.jar").toAbsolutePath().toString());
             testRunResult.check("Test run");
             
-            if (!testRunResult.stdout.equals(idealRunResult))
+            if (!testRunResult.stdout.equals(idealRunResult.stdout))
                 throw new RuntimeException("Ideal != Test");
             
             System.out.println("OK");
