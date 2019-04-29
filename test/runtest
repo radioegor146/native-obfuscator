@@ -15,7 +15,7 @@ do
     rm -f temp/test_build.jar
 
     # compiling
-    javac -d temp/test_build $test_dir/*.java 
+    javac -d temp/test_build $test_dir/source/*.java 
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     jar cvfe temp/test_build.jar Test -C temp/test_build/ .
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
@@ -33,7 +33,7 @@ do
 
     # testing
     cd temp/current
-    java -jar test.jar
+    java -Djava.library.path=. -jar test.jar
     rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
     cd ../..
 done
