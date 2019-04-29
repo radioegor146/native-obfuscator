@@ -8,7 +8,7 @@ for test_dir in `find tests -mindepth 1 -maxdepth 1 -type d`
 do
     test_id=`basename $test_dir`
 
-    echo -e "\e[1;33mTest #"$test_id"\e[0m"
+    echo -e -n "\e[1;33mTest #"$test_id"\e[0m -> "
     # cleanup
     rm -rf temp/current/*
     rm -rf temp/test_build/*
