@@ -27,11 +27,11 @@ public class ClassicTest implements Executable {
     private final Path testDirectory;
     private Path tempDirectory;
     
-    public ClassicTest(File directory) {
+    ClassicTest(File directory) {
         testDirectory = directory.toPath();
     }
     
-    public void clean() {
+    private void clean() {
         try {
             Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
                 @Override
@@ -90,9 +90,12 @@ public class ClassicTest implements Executable {
             idealRunResult.check("Ideal run");
             
             System.out.println("Compiling CPP code...");
-            ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", ".").check("CMake prepare");
+            String arch = "x64";
+            if (System.getProperty("sun.arch.data.model").equals("32"))
+                arch = "x86";
+            ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch,  ".").check("CMake prepare");
             ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 30000, "cmake", "--build", ".", "--config", "Release").check("CMake build");
-            for (File libFile : tempOutputDirectory.resolve("cpp").resolve("build").resolve("lib").toFile().listFiles())
+            for (File libFile : tempOutputDirectory.resolve("cpp").resolve("build").resolve("lib").toFile().listFiles(x -> !x.isDirectory()))
                 Files.copy(libFile.toPath(), tempOutputDirectory.resolve(libFile.getName()));
             
             System.out.println("Running test...");
