@@ -97,7 +97,7 @@ public class ClassicTest implements Executable {
             
             System.out.println("Running test...");
             ProcessHelper.run(tempOutputDirectory, 10 * idealRunResult.execTime, "java", "-Djava.library.path=.", "-jar",
-                    tempOutputDirectory.resolve("cpp").resolve("test.jar").toAbsolutePath().toString()).check("Test run");
+                    tempOutputDirectory.resolve("test.jar").toAbsolutePath().toString()).check("Test run");
             
             System.out.println("OK");
         } catch (IOException | RuntimeException e) {
