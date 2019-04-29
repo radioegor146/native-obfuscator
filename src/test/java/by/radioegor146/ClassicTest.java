@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.function.Executable;
 
 /**
@@ -65,12 +66,18 @@ public class ClassicTest implements Executable {
             tempClassFilesDirectory.toFile().mkdirs();
             Path tempOutputDirectory = tempDirectory.resolve("output");
             tempOutputDirectory.toFile().mkdirs();
-
+            
             for (File sourceFile : sourceDirectory.toFile().listFiles(x -> x.getName().endsWith(".java")))
                 Files.copy(sourceFile.toPath(), tempSourceDirectory.resolve(sourceFile.getName()));
             
             System.out.println("Compiling...");
-            ProcessHelper.run(tempDirectory, 10000, "javac", "-d", tempClassFilesDirectory.toAbsolutePath().toString(), tempSourceDirectory.toAbsolutePath().toString() + "/*.java")
+            List<String> javacParameters = new ArrayList<>();
+            javacParameters.add("javac");
+            javacParameters.add("-d");
+            javacParameters.add(tempClassFilesDirectory.toAbsolutePath().toString());
+            for (File sourceFile : sourceDirectory.toFile().listFiles(x -> x.getName().endsWith(".java")))
+                javacParameters.add(sourceFile.getAbsolutePath());
+            ProcessHelper.run(tempDirectory, 10000, javacParameters.toArray(new String[0]))
                     .check("Compilation");
             ProcessHelper.run(tempDirectory, 10000, "jar", "cvfe", tempDirectory.resolve("test.jar").toAbsolutePath().toString(), "Test", "-C", tempClassFilesDirectory.toAbsolutePath().toString() + "/", ".")
                     .check("Jar command");
