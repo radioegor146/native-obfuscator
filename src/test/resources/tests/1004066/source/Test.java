@@ -38,9 +38,7 @@ class Thread1 extends Thread {
     }
 
     public void run() {
-        System.out.println("Thread1 synchronizing");
         synchronized (o) {
-            System.out.println("Thread1 exception:");
             throw new RuntimeException("exception!");
         }
     }
@@ -54,7 +52,6 @@ class Thread2 extends Thread {
     }
 
     public void run() {
-        System.out.println("Thread2 sleeping");
 
         try {
             sleep(5000);
@@ -62,7 +59,6 @@ class Thread2 extends Thread {
             System.out.println("Thread2 interrupted!");
         }
 
-        System.out.println("Thread2 synchronizing");
         synchronized (o) {
             System.out.println("Thread2 successfully synchronized");
         }
