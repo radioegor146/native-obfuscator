@@ -28,12 +28,12 @@ import java.util.jar.Manifest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+
+import org.objectweb.asm.*;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
@@ -64,33 +64,60 @@ public class NativeObfuscator {
     private static final Map<Integer, String> INSTRUCTIONS = new HashMap<>();
     private static final Properties CPP_SNIPPETS = new Properties();
     private static final String[] CPP_TYPES = {
-        "void", // 0
-        "jboolean", // 1
-        "jchar", // 2
-        "jbyte", // 3
-        "jshort", // 4
-        "jint", // 5
-        "jfloat", // 6
-        "jlong", // 7
-        "jdouble", // 8
-        "jarray", // 9
-        "jobject", // 10
-        "jobject" // 11
+            "void", // 0
+            "jboolean", // 1
+            "jchar", // 2
+            "jbyte", // 3
+            "jshort", // 4
+            "jint", // 5
+            "jfloat", // 6
+            "jlong", // 7
+            "jdouble", // 8
+            "jarray", // 9
+            "jobject", // 10
+            "jobject" // 11
     };
     
     private static final String[] JAVA_DESCRIPTORS = {
-        "V", // 0
-        "Z", // 1
-        "C", // 2
-        "B", // 3
-        "S", // 4
-        "I", // 5
-        "F", // 6
-        "J", // 7
-        "D", // 8
-        "Ljava/lang/Object;", // 9
-        "Ljava/lang/Object;", // 10
-        "Ljava/lang/Object;" // 11
+            "V", // 0
+            "Z", // 1
+            "C", // 2
+            "B", // 3
+            "S", // 4
+            "I", // 5
+            "F", // 6
+            "J", // 7
+            "D", // 8
+            "Ljava/lang/Object;", // 9
+            "Ljava/lang/Object;", // 10
+            "Ljava/lang/Object;" // 11
+    };
+
+    private static final int[] TYPE_TO_STACK = {
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            0,
+            0,
+            0
+    };
+
+    private static final int[] STACK_TO_STACK = {
+            1,
+            1,
+            1,
+            2,
+            2,
+            0,
+            0,
+            0,
+            0
     };
     
     static {
@@ -240,7 +267,14 @@ public class NativeObfuscator {
     
     private final List<ClassNode> readyIfaceStaticClasses = new ArrayList<>();
     private ClassNode currentIfaceStaticClass;
-    
+
+    @SuppressWarnings("unchecked")
+    static <T> Stream<T> reverse(Stream<T> input) {
+        Object[] temp = input.toArray();
+        return (Stream<T>) IntStream.range(0, temp.length)
+                .mapToObj(i -> temp[temp.length - i - 1]);
+    }
+
     private void setupNewIfaceStaticClass() {
         if (currentIfaceStaticClass != null && currentIfaceStaticClass.methods.size() > 0)
             readyIfaceStaticClasses.add(currentIfaceStaticClass);
@@ -332,6 +366,7 @@ public class NativeObfuscator {
             outputSb.append("    ").append("utils::jvm_stack<").append(methodNode.maxStack).append("> cstack;").append("\n");
         if (methodNode.maxLocals > 0)
             outputSb.append("    ").append("utils::local_vars<").append(methodNode.maxLocals).append("> clocals;").append("\n");
+        outputSb.append("    ").append("std::unordered_set<jobject> refs;").append("\n");
         outputSb.append("\n");
         int localIndex = 0;
         if (((methodNode.access & Opcodes.ACC_STATIC) == 0)) {
@@ -354,6 +389,12 @@ public class NativeObfuscator {
         List<TryCatchBlockNode> currentTryCatches = new ArrayList<>();
         int currentLine = -1;
         int invokeSpecialId = -1;
+        List<Integer> currentStack = new ArrayList<>();
+        List<Integer> currentLocals = new ArrayList<>();
+        if ((methodNode.access & Opcodes.ACC_STATIC) == 0)
+            currentLocals.add(TYPE_TO_STACK[Type.OBJECT]);
+        for (Type localArg : args)
+            currentLocals.add(TYPE_TO_STACK[localArg.getSort()]);
         for (int insnIndex = 0; insnIndex < methodNode.instructions.size(); insnIndex++) {
             if (methodNode.name.equals("<init>") && invokeSpecialId < 0) {
                 if (methodNode.instructions.get(insnIndex).getOpcode() == Opcodes.INVOKESPECIAL) {
@@ -365,7 +406,7 @@ public class NativeObfuscator {
             switch (insnNode.getType()) {
                 case AbstractInsnNode.LABEL:
                     outputSb.append(((LabelNode) insnNode).getLabel()).append(": ;").append("\n");
-                    methodNode.tryCatchBlocks.stream().filter((node) -> (node.start.equals(insnNode))).forEachOrdered(currentTryCatches::add);
+                    reverse(methodNode.tryCatchBlocks.stream().filter((node) -> (node.start.equals(insnNode)))).forEachOrdered(currentTryCatches::add);
                     methodNode.tryCatchBlocks.stream().filter((node) -> (node.end.equals(insnNode))).forEachOrdered(currentTryCatches::remove);
                     break;
                 case AbstractInsnNode.LINE:
@@ -374,13 +415,82 @@ public class NativeObfuscator {
                     break;
                 case AbstractInsnNode.FRAME:
                     FrameNode frameNode = (FrameNode) insnNode;
-                    
+                    switch (frameNode.type) {
+                        case Opcodes.F_APPEND:
+                            for (Object local : frameNode.local) {
+                                if (local instanceof String)
+                                    currentLocals.add(TYPE_TO_STACK[Type.OBJECT]);
+                                else if (local instanceof LabelNode)
+                                    currentLocals.add(TYPE_TO_STACK[Type.OBJECT]);
+                                else
+                                    currentLocals.add(STACK_TO_STACK[(int) local]);
+                            }
+                            break;
+                        case Opcodes.F_CHOP:
+                            for (int i = 0; i < frameNode.local.size(); i++)
+                                currentLocals.remove(currentLocals.size() - 1);
+                            currentStack.clear();
+                            break;
+                        case Opcodes.F_NEW:
+                        case Opcodes.F_FULL:
+                            currentLocals.clear();
+                            currentStack.clear();
+                            for (Object local : frameNode.local) {
+                                if (local instanceof String)
+                                    currentLocals.add(TYPE_TO_STACK[Type.OBJECT]);
+                                else if (local instanceof LabelNode)
+                                    currentLocals.add(TYPE_TO_STACK[Type.OBJECT]);
+                                else
+                                    currentLocals.add(STACK_TO_STACK[(int) local]);
+                            }
+                            for (Object stack : frameNode.stack) {
+                                if (stack instanceof String)
+                                    currentStack.add(TYPE_TO_STACK[Type.OBJECT]);
+                                else if (stack instanceof LabelNode)
+                                    currentStack.add(TYPE_TO_STACK[Type.OBJECT]);
+                                else
+                                    currentStack.add(STACK_TO_STACK[(int) stack]);
+                            }
+                            break;
+                        case Opcodes.F_SAME:
+                            break;
+                        case Opcodes.F_SAME1:
+                            if (frameNode.stack.get(0) instanceof String)
+                                currentStack.add(TYPE_TO_STACK[Type.OBJECT]);
+                            else if (frameNode.stack.get(0) instanceof LabelNode)
+                                currentStack.add(TYPE_TO_STACK[Type.OBJECT]);
+                            else
+                                currentStack.add(STACK_TO_STACK[(int) frameNode.stack.get(0)]);
+                            break;
+                    }
+                    if (currentStack.stream().anyMatch(x -> x == 0)) {
+                        int currentSp = 0;
+                        outputSb.append("    ");
+                        for (int type : currentStack) {
+                            if (type == 0)
+                                outputSb.append("refs.erase(cstack.refs[" + currentSp + "]); ");
+                            currentSp += Math.max(1, type);
+                        }
+                        outputSb.append("\n");
+                    }
+                    if (currentLocals.stream().anyMatch(x -> x == 0)) {
+                        int currentLp = 0;
+                        outputSb.append("    ");
+                        for (int type : currentLocals) {
+                            if (type == 0)
+                                outputSb.append("refs.erase(clocals.refs[" + currentLp + "]); ");
+                            currentLp += Math.max(1, type);
+                        }
+                        outputSb.append("\n");
+                    }
+                    outputSb.append("    utils::clear_refs(env, refs);\n");
                     break;
                 default:
                     StringBuilder tryCatch = new StringBuilder("\n");
                     if (currentTryCatches.size() > 0) {
                         tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_START", createMap())).append("\n");
-                        for (TryCatchBlockNode tryCatchBlock : currentTryCatches) {
+                        for (int i = currentTryCatches.size() - 1; i >= 0; i--) {
+                            TryCatchBlockNode tryCatchBlock = currentTryCatches.get(i);
                             if (tryCatchBlock.type == null) {
                                 tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_ANY_L", createMap(
                                         "rettype", CPP_TYPES[returnTypeSort],
@@ -404,6 +514,7 @@ public class NativeObfuscator {
                     props.put("line", String.valueOf(currentLine));
                     props.put("trycatchhandler", tryCatch.toString());
                     props.put("rettype", CPP_TYPES[returnTypeSort]);
+                    String trimmedTryCatchBlock = tryCatch.toString().trim().replace("\n", " ");
                     if (insnNode instanceof FieldInsnNode) {
                         insnName += "_" + Type.getType(((FieldInsnNode) insnNode).desc).getSort();
                         if (insnNode.getOpcode() == Opcodes.GETSTATIC || insnNode.getOpcode() == Opcodes.PUTSTATIC)
@@ -425,9 +536,9 @@ public class NativeObfuscator {
                                 .append(getStringPooledString(((FieldInsnNode) insnNode).name))
                                 .append(", ")
                                 .append(getStringPooledString(((FieldInsnNode) insnNode).desc))
-                                .append(")); } ");
-//                                .append(tryCatch.toString().trim().replace("\n", " "))
-//                                .append("  } ");
+                                .append(")); ")
+                                .append(trimmedTryCatchBlock)
+                                .append("  } ");
                         props.put("fieldid", getCachedFieldPointer(
                                 ((FieldInsnNode) insnNode).owner, 
                                 ((FieldInsnNode) insnNode).name, 
@@ -481,9 +592,9 @@ public class NativeObfuscator {
                                 .append(getStringPooledString(indyMethodName))
                                 .append(", ")
                                 .append(getStringPooledString(((InvokeDynamicInsnNode) insnNode).desc))
-                                .append(")); } ");
-//                                .append(tryCatch.toString().trim().replace("\n", " "))
-//                                .append("  } ");
+                                .append(")); ")
+                                .append(trimmedTryCatchBlock)
+                                .append("  } ");
                         props.put("methodid", getCachedMethodPointer(
                                 classNode.name, 
                                 indyMethodName, 
@@ -583,9 +694,9 @@ public class NativeObfuscator {
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).name))
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
-                                    .append(")); } ");
-//                                    .append(tryCatch.toString().trim().replace("\n", " "))
-//                                    .append("  } ");
+                                    .append(")); ")
+                                    .append(trimmedTryCatchBlock)
+                                    .append("  } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 
@@ -616,9 +727,9 @@ public class NativeObfuscator {
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).name))
                                     .append(", ")
                                     .append(getStringPooledString(((MethodInsnNode) insnNode).desc))
-                                    .append(")); } ");
-//                                    .append(tryCatch.toString().trim().replace("\n", " "))
-//                                    .append("  } ");
+                                    .append(")); ")
+                                    .append(trimmedTryCatchBlock)
+                                    .append("  } ");
                             props.put("methodid", getCachedMethodPointer(
                                     ((MethodInsnNode) insnNode).owner, 
                                     ((MethodInsnNode) insnNode).name, 

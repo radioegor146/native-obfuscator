@@ -38,7 +38,7 @@ public class ProcessHelper {
         public void check(String processName) {
             if (exitCode == 0 && success)
                 return;
-            System.err.println(processName + " has failed");
+            System.err.println(processName + " has failed. Success: " + success);
             System.err.println("Exit code: " + exitCode);
             System.err.println("Command line: \n" + commandLine);
             System.err.println("stdout: \n" + stdout);

@@ -1,4 +1,5 @@
 #include "native_jvm.hpp"
+#include <limits>
 
 namespace native_jvm::utils {
 
@@ -138,5 +139,53 @@ namespace native_jvm::utils {
         else
             env->GetByteArrayRegion((jbyteArray) array, index, 1, (jbyte*) (&ret_value));
         return ret_value;
+    }
+
+
+    jlong cast_dl(jdouble value) {
+        if (std::isnan(value))
+            return 0;
+        int exponent;
+        std::frexp(value, &exponent);
+        if (std::isfinite(value) && exponent <= 63)
+            return (jlong) value;
+        return std::signbit(value) ? std::numeric_limits<jlong>::min() : std::numeric_limits<jlong>::max();
+    }
+
+    jlong cast_fl(jfloat value) {
+        if (std::isnan(value))
+            return 0;
+        int exponent;
+        std::frexp(value, &exponent);
+        if (std::isfinite(value) && exponent <= 63)
+            return (jlong) value;
+        return std::signbit(value) ? std::numeric_limits<jlong>::min() : std::numeric_limits<jlong>::max();
+    }
+
+    jint cast_di(jdouble value) {
+        if (std::isnan(value))
+            return 0;
+        int exponent;
+        std::frexp(value, &exponent);
+        if (std::isfinite(value) && exponent <= 31)
+            return (jlong) value;
+        return std::signbit(value) ? std::numeric_limits<jint>::min() : std::numeric_limits<jint>::max();
+    }
+
+    jint cast_fi(jfloat value) {
+        if (std::isnan(value))
+          return 0;
+        int exponent;
+        std::frexp(value, &exponent);
+        if (std::isfinite(value) && exponent <= 31)
+          return (jlong) value;
+        return std::signbit(value) ? std::numeric_limits<jint>::min() : std::numeric_limits<jint>::max();
+    }
+
+    void clear_refs(JNIEnv *env, std::unordered_set<jobject> &refs) {
+        for (jobject ref : refs)
+            if (env->GetObjectRefType(ref) == JNILocalRefType)
+                env->DeleteLocalRef(ref);
+        refs.clear();
     }
 }

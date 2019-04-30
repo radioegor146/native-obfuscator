@@ -32,6 +32,8 @@ public class ClassicTest implements Executable {
     }
     
     private void clean() {
+        if (true)
+            return;
         try {
             Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
                 @Override
@@ -87,29 +89,33 @@ public class ClassicTest implements Executable {
             new NativeObfuscator().process(tempDirectory.resolve("test.jar"), tempOutputDirectory, new ArrayList<>());
             
             System.out.println("Ideal...");
-            ProcessResult idealRunResult = ProcessHelper.run(tempDirectory, 10000, "java", "-jar", tempDirectory.resolve("test.jar").toAbsolutePath().toString());
+            ProcessResult idealRunResult = ProcessHelper.run(tempDirectory, 30000, "java", "-jar", tempDirectory.resolve("test.jar").toAbsolutePath().toString());
             idealRunResult.check("Ideal run");
-            
             System.out.println("Compiling CPP code...");
             if (System.getProperty("os.name").toLowerCase().contains("windows")) {
                 String arch = "x64";
                 if (System.getProperty("sun.arch.data.model").equals("32"))
                     arch = "x86";
-                ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, ".").check("CMake prepare");
+                ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 40000, "cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, ".").check("CMake prepare");
             } else {
-                ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 10000, "cmake", ".").check("CMake prepare");
+                ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 40000, "cmake", ".").check("CMake prepare");
             }
-            ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 30000, "cmake", "--build", ".", "--config", "Release").check("CMake build");
+            ProcessHelper.run(tempOutputDirectory.resolve("cpp"), 40000, "cmake", "--build", ".", "--config", "Release").check("CMake build");
             for (File libFile : tempOutputDirectory.resolve("cpp").resolve("build").resolve("lib").toFile().listFiles(x -> !x.isDirectory()))
                 Files.copy(libFile.toPath(), tempOutputDirectory.resolve(libFile.getName()));
             
             System.out.println("Running test...");
-            ProcessResult testRunResult = ProcessHelper.run(tempOutputDirectory, 10 * idealRunResult.execTime, "java", "-Djava.library.path=.", "-jar",
+            ProcessResult testRunResult = ProcessHelper.run(tempOutputDirectory, 30000, "java", "-Djava.library.path=.", "-jar",
                     tempOutputDirectory.resolve("test.jar").toAbsolutePath().toString());
             testRunResult.check("Test run");
             
-            if (!testRunResult.stdout.equals(idealRunResult.stdout))
+            if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
+                System.err.println("Ideal:");
+                System.err.println(idealRunResult.stdout);
+                System.err.println("Test:");
+                System.err.println(testRunResult.stdout);
                 throw new RuntimeException("Ideal != Test");
+            }
             
             System.out.println("OK");
         } catch (IOException | RuntimeException e) {
