@@ -60,7 +60,7 @@ public class ClassicTest implements Executable {
                 throw new IOException("Source directory not found");
 
             System.out.println("Preparing...");
-            tempDirectory = Files.createTempDirectory("native-obfuscator-test");
+            tempDirectory = Files.createTempDirectory("native-obfuscator-test-N" + testDirectory.toFile().getName());
             Path tempSourceDirectory = tempDirectory.resolve("source");
             tempSourceDirectory.toFile().mkdirs();
             Path tempClassFilesDirectory = tempDirectory.resolve("classes");
@@ -116,12 +116,11 @@ public class ClassicTest implements Executable {
             }
             
             System.out.println("OK");
+            clean();
         } catch (IOException | RuntimeException e) {
             e.printStackTrace(System.err);
-            clean();
             throw e;
         }
-        clean();
     }
     
 }
