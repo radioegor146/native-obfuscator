@@ -117,6 +117,7 @@ public class ClassicTest implements Executable {
             
             System.out.println("OK");
         } catch (IOException | RuntimeException e) {
+            e.printStackTrace(System.err);
             clean();
             throw e;
         }
