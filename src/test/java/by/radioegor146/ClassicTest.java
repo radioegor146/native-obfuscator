@@ -32,8 +32,6 @@ public class ClassicTest implements Executable {
     }
     
     private void clean() {
-        if (true)
-            return;
         try {
             Files.walkFileTree(tempDirectory, new SimpleFileVisitor<Path>() {
                 @Override
