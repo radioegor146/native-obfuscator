@@ -23,7 +23,7 @@ public class Main {
             System.err.println("java -jar native-obfuscator.jar <jar file> <output directory> [libraries dir]");
             return;
         }
-        String libsDir = args[2];
+        String libsDir = args.length < 3 ? null : args[2];
         List<Path> libs = new ArrayList<>();
         if (libsDir != null)
             Files.walkFileTree(Paths.get(libsDir), Collections.singleton(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<Path>() {
