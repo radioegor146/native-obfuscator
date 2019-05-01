@@ -623,7 +623,7 @@ public class NativeObfuscator {
                         } else if (cst instanceof java.lang.Long) {
                             insnName += "_LONG";
                             long cstVal = (long) cst;
-                            if (cst == -9223372036854775808)
+                            if (cstVal == -9223372036854775808L)
                                 props.put("cst", "(jlong) 9223372036854775808ULL");   
                             else
                                 props.put("cst", String.valueOf(((LdcInsnNode) insnNode).cst) + "LL");
