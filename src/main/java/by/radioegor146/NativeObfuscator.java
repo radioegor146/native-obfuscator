@@ -323,6 +323,12 @@ public class NativeObfuscator {
             if (currentIfaceStaticClass.methods.size() > 16384) {
                 throw new RuntimeException("too many static interface methods");
             }
+            if ((methodNode.access & Opcodes.ACC_STATIC) == 0) {
+                List<Type> argsList = new ArrayList<>();
+                argsList.add(Type.getType(JAVA_DESCRIPTORS[Type.OBJECT]));
+                argsList.addAll(Arrays.asList(args));
+                args = argsList.toArray(new Type[0]);
+            }
             StringBuilder resultProcType = new StringBuilder("(");
             for (Type t : args)
                 resultProcType.append(JAVA_DESCRIPTORS[t.getSort()]);
@@ -818,8 +824,9 @@ public class NativeObfuscator {
                         list.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
                         localVarsPosition += arg.getSize();
                     }
-                    methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, currentIfaceStaticClass.name, nativeMethod.name, nativeMethod.desc));
-                    methodNode.instructions.add(new InsnNode(Type.getReturnType(methodNode.desc).getOpcode(Opcodes.IRETURN)));
+                    list.add(new MethodInsnNode(Opcodes.INVOKESTATIC, currentIfaceStaticClass.name, nativeMethod.name, nativeMethod.desc));
+                    list.add(new InsnNode(Type.getReturnType(methodNode.desc).getOpcode(Opcodes.IRETURN)));
+                    methodNode.instructions = list;
                 }
                 break;
         }
