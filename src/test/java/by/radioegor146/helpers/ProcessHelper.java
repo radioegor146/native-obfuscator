@@ -17,15 +17,16 @@ import java.util.stream.Collectors;
  * @author radioegor146
  */
 public class ProcessHelper {
-    
+
     public static class ProcessResult {
+
         public int exitCode;
         public long execTime;
         public boolean success;
         public String stdout;
         public String stderr;
         public String commandLine;
-        
+
         public ProcessResult(int exitCode, long execTime, boolean success, String stdout, String stderr, String commandLine) {
             this.exitCode = exitCode;
             this.execTime = execTime;
@@ -34,10 +35,11 @@ public class ProcessHelper {
             this.success = success;
             this.commandLine = commandLine;
         }
-        
+
         public void check(String processName) {
-            if (exitCode == 0 && success)
+            if (exitCode == 0 && success) {
                 return;
+            }
             System.err.println(processName + " has failed. Success: " + success);
             System.err.println("Exit code: " + exitCode);
             System.err.println("Command line: \n" + commandLine);
@@ -46,7 +48,7 @@ public class ProcessHelper {
             throw new RuntimeException(processName + " has failed");
         }
     }
-    
+
     public static ProcessResult run(Path directory, long timeLimit, String... command) throws IOException {
         Process process = new ProcessBuilder(command).directory(directory.toFile()).start();
         long startTime = System.currentTimeMillis();
