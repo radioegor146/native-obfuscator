@@ -15,7 +15,7 @@ import java.util.Objects;
 
 public class Main {
     
-    private static final String VERSION = "1.6b";
+    private static final String VERSION = "1.7b";
     
     public static void main(String[] args) throws IOException {
         System.out.println("native-obfuscator v" + VERSION);
