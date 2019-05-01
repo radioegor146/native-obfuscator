@@ -1,18 +1,18 @@
 package ru.gravit.launchserver.asm;
 
 import java.io.ByteArrayOutputStream;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.Opcodes;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.jar.JarFile;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Opcodes;
 
 public class ClassMetadataReader {
+
     private class CheckSuperClassVisitor extends ClassVisitor {
 
         String superClassName;
@@ -23,7 +23,7 @@ public class ClassMetadataReader {
 
         @Override
         public void visit(int version, int access, String name, String signature, String superName,
-                          String[] interfaces) {
+                String[] interfaces) {
             superClassName = superName;
         }
     }
@@ -49,7 +49,7 @@ public class ClassMetadataReader {
     public void acceptVisitor(String className, ClassVisitor visitor) throws IOException, ClassNotFoundException {
         acceptVisitor(getClassData(className), visitor);
     }
-    
+
     private static byte[] read(InputStream input) throws IOException {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[4096];
@@ -62,8 +62,9 @@ public class ClassMetadataReader {
 
     public byte[] getClassData(String className) throws IOException, ClassNotFoundException {
         for (JarFile file : classPath) {
-            if (file.getEntry(className + ".class") == null)
+            if (file.getEntry(className + ".class") == null) {
                 continue;
+            }
             try (InputStream in = file.getInputStream(file.getEntry(className + ".class"))) {
                 return read(in);
             }
@@ -72,7 +73,9 @@ public class ClassMetadataReader {
     }
 
     public String getSuperClass(String type) {
-        if (type.equals("java/lang/Object")) return null;
+        if (type.equals("java/lang/Object")) {
+            return null;
+        }
         try {
             return getSuperClassASM(type);
         } catch (IOException | ClassNotFoundException e) {
@@ -89,8 +92,9 @@ public class ClassMetadataReader {
     public ArrayList<String> getSuperClasses(String type) {
         ArrayList<String> superclasses = new ArrayList<>(1);
         superclasses.add(type);
-        while ((type = getSuperClass(type)) != null)
+        while ((type = getSuperClass(type)) != null) {
             superclasses.add(type);
+        }
         Collections.reverse(superclasses);
         return superclasses;
     }
@@ -100,7 +104,7 @@ public class ClassMetadataReader {
             try {
                 file.close();
             } catch (IOException ex) {
-                
+
             }
         });
     }

@@ -3,11 +3,12 @@ package by.radioegor146;
 import java.util.Objects;
 
 public class CachedFieldInfo {
+
     public String clazz;
     public String name;
     public String desc;
     public boolean isStatic;
-    
+
     public CachedFieldInfo(String clazz, String name, String desc, boolean isStatic) {
         this.clazz = clazz;
         this.name = name;
