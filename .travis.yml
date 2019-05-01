@@ -17,6 +17,8 @@ before_install:
   - eval "${MATRIX_EVAL}"
 install:
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
+before_deploy:
+  - ./gradlew assemble
 deploy:
   provider: releases
   api_key: 
