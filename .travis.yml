@@ -24,6 +24,3 @@ deploy:
   file: "build/libs/native-obfuscator.jar"
   skip_cleanup: true
   draft: true
-script:
-  - ./gradlew build
-  - test/runtest

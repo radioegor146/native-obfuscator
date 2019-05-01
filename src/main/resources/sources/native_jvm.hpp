@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdio>
 #include <atomic>
+#include <unordered_set>
 
 #ifndef NATIVE_JVM_HPP_GUARD
 
@@ -142,6 +143,13 @@ namespace native_jvm::utils {
 
     void bastore(JNIEnv *env, jarray array, jint index, jint value);
     jbyte baload(JNIEnv *env, jarray array, jint index);
+
+    jlong cast_dl(jdouble value);
+    jlong cast_fl(jfloat value);
+    jint cast_di(jdouble value);
+    jint cast_fi(jfloat value);
+
+    void clear_refs(JNIEnv *env, std::unordered_set<jobject> &refs);
 }
 
 #endif
