@@ -24,7 +24,7 @@ import java.io.InputStream;
 
 public class Test {
     static public final int THREADS = 2;
-    static public final int READS = 10000000;
+    static public final int READS = 100000;
     static volatile int brr = 0;
 
     public static void main(String[] args) throws Exception {
