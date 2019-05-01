@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package by.radioegor146;
 
 import by.radioegor146.helpers.ProcessHelper;
@@ -18,10 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.function.Executable;
 
-/**
- *
- * @author radioegor146
- */
 public class ClassicTest implements Executable {
 
     private final Path testDirectory;
@@ -81,7 +72,7 @@ public class ClassicTest implements Executable {
             for (File sourceFile : sourceDirectory.toFile().listFiles(x -> x.getName().endsWith(".java"))) {
                 javacParameters.add(sourceFile.getAbsolutePath());
             }
-            ProcessHelper.run(tempDirectory, 10000, javacParameters.toArray(new String[0]))
+            ProcessHelper.run(tempDirectory, 10000, javacParameters.toArray(new String[javacParameters.size()]))
                     .check("Compilation");
             ProcessHelper.run(tempDirectory, 10000, "jar", "cvfe", tempDirectory.resolve("test.jar").toAbsolutePath().toString(), "Test", "-C", tempClassFilesDirectory.toAbsolutePath().toString() + "/", ".")
                     .check("Jar command");

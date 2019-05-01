@@ -35,7 +35,7 @@ public class ClassMetadataReader {
     }
 
     public List<JarFile> getCp() {
-        return classPath;
+        return Collections.unmodifiableList(classPath);
     }
 
     public ClassMetadataReader() {

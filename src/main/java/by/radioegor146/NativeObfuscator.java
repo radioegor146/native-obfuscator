@@ -251,7 +251,7 @@ public class NativeObfuscator {
         if (value == null) {
             throw new RuntimeException(key + " not found");
         }
-        String[] stringVars = CPP_SNIPPETS.getProperty(key + "_S_VARS") == null || CPP_SNIPPETS.getProperty(key + "_S_VARS").equals("") ? new String[0] : CPP_SNIPPETS.getProperty(key + "_S_VARS").split(",");
+        String[] stringVars = CPP_SNIPPETS.getProperty(key + "_S_VARS") == null || CPP_SNIPPETS.getProperty(key + "_S_VARS").isEmpty() ? new String[0] : CPP_SNIPPETS.getProperty(key + "_S_VARS").split(",");
         HashMap<String, String> vars = new HashMap<>();
         for (String var : stringVars) {
             if (var.startsWith("#")) {
@@ -342,7 +342,7 @@ public class NativeObfuscator {
                 List<Type> argsList = new ArrayList<>();
                 argsList.add(Type.getType(JAVA_DESCRIPTORS[Type.OBJECT]));
                 argsList.addAll(Arrays.asList(args));
-                args = argsList.toArray(new Type[0]);
+                args = argsList.toArray(new Type[argsList.size()]);
             }
             StringBuilder resultProcType = new StringBuilder("(");
             for (Type t : args) {
