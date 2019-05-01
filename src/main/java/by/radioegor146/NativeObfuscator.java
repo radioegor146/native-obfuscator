@@ -622,7 +622,7 @@ public class NativeObfuscator {
                             props.put("cst", String.valueOf(((LdcInsnNode) insnNode).cst));
                         } else if (cst instanceof java.lang.Long) {
                             insnName += "_LONG";
-                            props.put("cst", String.valueOf(((LdcInsnNode) insnNode).cst));
+                            props.put("cst", String.valueOf(((LdcInsnNode) insnNode).cst) + "LL");
                         } else if (cst instanceof java.lang.Float) {
                             insnName += "_FLOAT";
                             props.put("cst", String.valueOf(((LdcInsnNode) insnNode).cst));
