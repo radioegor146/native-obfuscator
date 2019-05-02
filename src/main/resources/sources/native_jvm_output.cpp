@@ -30,7 +30,7 @@ $register_code
         JNINativeMethod loader_methods[] = {
             { (char *) method_name, (char *) method_desc, (void *)&register_for_class }
         };
-        env->RegisterNatives(env->FindClass("native$native_dir_id/Loader"), loader_methods, 1);
+        env->RegisterNatives(env->FindClass("$native_dir/Loader"), loader_methods, 1);
     }
 }
 
