@@ -1,8 +1,8 @@
 package by.radioegor146.source;
 
 import by.radioegor146.InterfaceStaticClassProvider;
+import by.radioegor146.NodeCache;
 import by.radioegor146.Util;
-import org.objectweb.asm.tree.ClassNode;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -73,13 +73,13 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("\n");
     }
 
-    public void registerMethods(Map<String, Integer> classes, String nativeMethods,
+    public void registerMethods(NodeCache<String> classes, String nativeMethods,
                                 InterfaceStaticClassProvider staticClassProvider) throws IOException {
 
         cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env) {\n");
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
 
-        for (Map.Entry<String, Integer> clazz : classes.entrySet()) {
+        for (Map.Entry<String, Integer> clazz : classes.getCache().entrySet()) {
             cppWriter.append("        if (jclass clazz = ").append(getGetterForType(clazz.getKey())).append(") { ")
                     .append(String.format("cclasses[%d] = ", clazz.getValue()))
                     .append("(jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); }\n");
