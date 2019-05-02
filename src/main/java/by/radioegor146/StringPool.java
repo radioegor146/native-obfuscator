@@ -4,12 +4,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class StringPoolBuilder {
+public class StringPool {
 
     private int length;
     private Map<String, Integer> pool;
 
-    public StringPoolBuilder() {
+    public StringPool() {
         this.length = 0;
         this.pool = new HashMap<>();
     }

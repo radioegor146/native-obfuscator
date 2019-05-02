@@ -95,7 +95,7 @@ public class NativeObfuscator {
         }
     }
 
-    private StringPoolBuilder stringPool = new StringPoolBuilder();
+    private StringPool stringPool = new StringPool();
 
     private final HashMap<String, Integer> cachedClasses = new HashMap<>();
     private final HashMap<CachedMethodInfo, Integer> cachedMethods = new HashMap<>();
@@ -788,16 +788,6 @@ public class NativeObfuscator {
         classNode.methods.add(indyWrapper);
     }
 
-    private String getGetterForType(String desc) {
-        if (desc.startsWith("[")) {
-            return "env->FindClass(" + stringPool.get(desc) + ")";
-        }
-        if (desc.endsWith(";")) {
-            desc = desc.substring(1, desc.length() - 1);
-        }
-        return "utils::find_class_wo_static(env, " + stringPool.get(desc.replace("/", ".")) + ")";
-    }
-
     private int currentClassId;
     private int nativeDirId = 0;
 
@@ -890,14 +880,10 @@ public class NativeObfuscator {
                     cachedMethods.clear();
                     cachedFields.clear();
 
-                    String filename = Util.escapeCppNameString(classNode.name.replace('/', '_'));
-                    Path cppFile = cppOutput.resolve(filename.concat(".cpp"));
-                    Path hppFile = cppOutput.resolve(filename.concat(".hpp"));
-                    try (BufferedWriter cppWriter = Files.newBufferedWriter(cppFile, StandardCharsets.UTF_8);
-                            BufferedWriter hppWriter = Files.newBufferedWriter(hppFile, StandardCharsets.UTF_8)) {
-
+                    try (ClassSourceBuilder cppBuilder = new ClassSourceBuilder(cppOutput, classNode.name, stringPool)) {
                         StringBuilder insnsSb = new StringBuilder();
-                        classNode.sourceFile = cppFile.getFileName().toString();
+
+                        classNode.sourceFile = cppBuilder.getCppFilename();
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
                             insnsSb.append(visitMethod(classNode, method, i).replace("\n", "\n    "));
@@ -915,87 +901,20 @@ public class NativeObfuscator {
                         classNode.accept(classWriter);
                         Util.writeEntry(out, entry.getName(), classWriter.toByteArray());
 
-                        cppWriter.append("#include \"../native_jvm.hpp\"\n");
-                        hppWriter.append("#include \"../native_jvm.hpp\"\n");
-                        cppWriter.append("#include \"../string_pool.hpp\"\n");
-                        cppWriter.append("#include \"").append(hppFile.getFileName().toString()).append("\"\n");
-                        cMakeBuilder.addClassFile("output/" + hppFile.getFileName());
-                        cMakeBuilder.addClassFile("output/" + cppFile.getFileName());
-                        outputHeaderIncludesSb.append("#include \"output/").append(hppFile.getFileName()).append("\"\n");
+                        cppBuilder.addHeader(cachedClasses.size(), cachedMethods.size(), cachedFields.size());
+                        cppBuilder.addInstructions(insnsSb.toString());
+                        cppBuilder.registerMethods(cachedClasses, nativeMethodsSb.toString(),
+                                ifaceStaticNativeMethodsSb.toString(), currentIfaceStaticClass);
 
-                        cppWriter.append("\n");
-                        cppWriter.append("// ").append(classNode.name).append("\n");
-                        cppWriter.append("namespace native_jvm::classes::__ngen_")
-                                .append(filename)
-                                .append(" {\n\n");
-                        cppWriter.append("    char *string_pool;\n\n");
-                        if (cachedClasses.size() > 0) {
-                            cppWriter.append("    jclass cclasses[" + cachedClasses.size() + "];\n");
-                        }
-                        if (cachedMethods.size() > 0) {
-                            cppWriter.append("    std::atomic<jmethodID> cmethods[" + cachedMethods.size() + "];\n");
-                        }
-                        if (cachedFields.size() > 0) {
-                            cppWriter.append("    std::atomic<jfieldID> cfields[" + cachedFields.size() + "];\n");
-                        }
-                        cppWriter.append("\n");
-                        hppWriter.append("\n");
-                        hppWriter.append("#ifndef ").append(filename.concat("_hpp").toUpperCase()).append("_GUARD\n");
-                        hppWriter.append("\n");
-                        hppWriter.append("#define ").append(filename.concat("_hpp").toUpperCase()).append("_GUARD\n");
-                        hppWriter.append("\n");
-                        hppWriter.append("// ").append(classNode.name).append("\n");
-                        hppWriter.append("namespace native_jvm::classes::__ngen_")
-                                .append(filename)
-                                .append(" {\n\n");
-                        cppWriter.append("    ");
-                        cppWriter.append(insnsSb);
-                        cppWriter.append("\n");
-                        cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env) {\n");
-                        hppWriter.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env);\n");
-                        cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
+                        cMakeBuilder.addClassFile("output/" + cppBuilder.getHppFilename());
+                        cMakeBuilder.addClassFile("output/" + cppBuilder.getCppFilename());
+                        outputHeaderIncludesSb
+                                .append("#include \"output/").append(cppBuilder.getHppFilename()).append("\"\n");
 
-                        for (Map.Entry<String, Integer> clazz : cachedClasses.entrySet()) {
-                            cppWriter.append("        if (jclass clazz = ")
-                                    .append(getGetterForType(clazz.getKey())).append(") { ")
-                                    .append("cclasses[" + clazz.getValue() + "] = " +
-                                            "(jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); }\n");
-                        }
-
-                        if (!cachedClasses.isEmpty()) {
-                            cppWriter.append("\n");
-                        }
-
-                        if (nativeMethodsSb.length() > 0) {
-                            cppWriter.append("        JNINativeMethod __ngen_methods[] = {\n");
-                            cppWriter.append(nativeMethodsSb);
-                            cppWriter.append("        };\n\n");
-                            cppWriter.append("        jclass clazz = ").append(getGetterForType(classNode.name)).append(";\n");
-                            cppWriter.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
-                            cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
-                                    .append(stringPool.get(classNode.name.replace("/", ".")))
-                                    .append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
-                            cppWriter.append("\n");
-                        }
-
-                        if (ifaceStaticNativeMethodsSb.length() > 0) {
-                            cppWriter.append("        JNINativeMethod __ngen_static_iface_methods[] = {\n");
-                            cppWriter.append(ifaceStaticNativeMethodsSb);
-                            cppWriter.append("        };\n\n");
-                            cppWriter.append("        jclass clazz = utils::find_class_wo_static(env, ")
-                                    .append(stringPool.get(currentIfaceStaticClass.name.replace("/", "."))).append(");\n");
-                            cppWriter.append("        if (clazz) env->RegisterNatives(clazz, __ngen_static_iface_methods, sizeof(__ngen_static_iface_methods) / sizeof(__ngen_static_iface_methods[0]));\n");
-                            cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
-                                    .append(stringPool.get(classNode.name.replace("/", ".")))
-                                    .append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
-                        }
-                        cppWriter.append("    }\n");
-                        cppWriter.append("}");
-                        hppWriter.append("}\n\n#endif");
                         outputHeaderSb.append("        reg_methods[")
                                 .append(currentClassId)
                                 .append("] = &(native_jvm::classes::__ngen_")
-                                .append(filename)
+                                .append(cppBuilder.getFilename())
                                 .append("::__ngen_register_methods);\n");
                     }
                     currentClassId++;
