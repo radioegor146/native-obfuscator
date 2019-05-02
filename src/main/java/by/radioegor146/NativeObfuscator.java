@@ -37,12 +37,13 @@ public class NativeObfuscator {
     private Snippets snippets;
     private StringPool stringPool;
     private InterfaceStaticClassProvider staticClassProvider;
+    private MethodProcessor methodProcessor;
 
     private NodeCache<String> cachedClasses;
     private NodeCache<CachedMethodInfo> cachedMethods;
     private NodeCache<CachedFieldInfo> cachedFields;
 
-    private StringBuilder nativeMethodsSb;
+    private StringBuilder nativeMethods;
     private Map<String, InvokeDynamicInsnNode> invokeDynamics;
 
     private int currentClassId;
@@ -55,6 +56,7 @@ public class NativeObfuscator {
         cachedMethods = new NodeCache<>("(cmethods[%d].load())");
         cachedFields = new NodeCache<>("(cfields[%d].load())");
         invokeDynamics = new HashMap<>();
+        methodProcessor = new MethodProcessor(this);
     }
 
     private void processIndy(ClassNode classNode, String methodName, InvokeDynamicInsnNode indy) {
@@ -135,7 +137,7 @@ public class NativeObfuscator {
                         return;
                     }
 
-                    nativeMethodsSb = new StringBuilder();
+                    nativeMethods = new StringBuilder();
                     invokeDynamics = new HashMap<>();
 
                     ClassReader classReader = new ClassReader(src);
@@ -165,12 +167,11 @@ public class NativeObfuscator {
                         classNode.sourceFile = cppBuilder.getCppFilename();
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
-                            MethodProcessor processor = new MethodProcessor(this, classNode, method, currentClassId, i);
-                            processor.processMethod();
-                            instructions.append(processor.getOutput()
-                                    .replace("\n", "\n    "));
+                            MethodContext context = new MethodContext(this, method, i, classNode, currentClassId);
+                            methodProcessor.processMethod(context);
+                            instructions.append(context.output.toString().replace("\n", "\n    "));
 
-                            nativeMethodsSb.append(processor.getNativeMethods());
+                            nativeMethods.append(context.nativeMethods);
 
                             if((classNode.access & Opcodes.ACC_INTERFACE) > 0) {
                                 method.access &= ~Opcodes.ACC_NATIVE;
@@ -187,7 +188,7 @@ public class NativeObfuscator {
 
                         cppBuilder.addHeader(cachedClasses.size(), cachedMethods.size(), cachedFields.size());
                         cppBuilder.addInstructions(instructions.toString());
-                        cppBuilder.registerMethods(cachedClasses, nativeMethodsSb.toString(), staticClassProvider);
+                        cppBuilder.registerMethods(cachedClasses, nativeMethods.toString(), staticClassProvider);
 
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getHppFilename());
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getCppFilename());

@@ -19,6 +19,10 @@ import java.util.zip.ZipOutputStream;
 
 public class Util {
 
+    public static boolean getFlag(int value, int flag) {
+        return (value & flag) > 0;
+    }
+
     public static Map<String, String> createMap(Object... parts) {
         HashMap<String, String> tokens = new HashMap<>();
         for (int i = 0; i < parts.length; i += 2) {
@@ -77,7 +81,7 @@ public class Util {
         }
     }
 
-    public static String writeStreamToString(InputStream stream) {
+    private static String writeStreamToString(InputStream stream) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             transfer(stream, baos);
