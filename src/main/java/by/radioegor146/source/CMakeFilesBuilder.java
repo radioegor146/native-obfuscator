@@ -1,9 +1,11 @@
-package by.radioegor146;
+package by.radioegor146.source;
+
+import by.radioegor146.Util;
 
 import java.util.ArrayList;
 import java.util.List;
 
-class CMakeFilesBuilder {
+public class CMakeFilesBuilder {
 
     private String projectName;
     private List<String> classFiles;

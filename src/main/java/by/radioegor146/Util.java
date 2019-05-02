@@ -108,7 +108,7 @@ public class Util {
         }
     }
 
-    static String escapeCppNameString(String value) {
+    public static String escapeCppNameString(String value) {
         Matcher m = Pattern.compile("([^a-zA-Z_0-9])").matcher(value);
         StringBuffer sb = new StringBuffer(value.length());
         while (m.find()) {

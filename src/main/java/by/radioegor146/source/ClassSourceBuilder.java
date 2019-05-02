@@ -1,5 +1,7 @@
-package by.radioegor146;
+package by.radioegor146.source;
 
+import by.radioegor146.InterfaceStaticClassProvider;
+import by.radioegor146.Util;
 import org.objectweb.asm.tree.ClassNode;
 
 import java.io.BufferedWriter;
@@ -72,7 +74,7 @@ public class ClassSourceBuilder implements AutoCloseable {
     }
 
     public void registerMethods(Map<String, Integer> classes, String nativeMethods,
-                                String ifaceStaticNativeMethods, ClassNode currentIfaceStaticClass) throws IOException {
+                                InterfaceStaticClassProvider staticClassProvider) throws IOException {
 
         cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env) {\n");
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
@@ -99,12 +101,12 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append("\n");
         }
 
-        if (!ifaceStaticNativeMethods.isEmpty()) {
+        if (!staticClassProvider.isEmpty()) {
             cppWriter.append("        JNINativeMethod __ngen_static_iface_methods[] = {\n");
-            cppWriter.append(ifaceStaticNativeMethods);
+            cppWriter.append(staticClassProvider.getMethods());
             cppWriter.append("        };\n\n");
             cppWriter.append("        jclass clazz = utils::find_class_wo_static(env, ")
-                    .append(stringPool.get(currentIfaceStaticClass.name.replace("/", "."))).append(");\n");
+                    .append(stringPool.get(staticClassProvider.getCurrentClassName().replace("/", "."))).append(");\n");
             cppWriter.append("        if (clazz) env->RegisterNatives(clazz, __ngen_static_iface_methods, sizeof(__ngen_static_iface_methods) / sizeof(__ngen_static_iface_methods[0]));\n");
             cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
                     .append(stringPool.get(className.replace("/", ".")))

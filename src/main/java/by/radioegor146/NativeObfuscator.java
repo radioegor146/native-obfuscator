@@ -1,5 +1,9 @@
 package by.radioegor146;
 
+import by.radioegor146.source.CMakeFilesBuilder;
+import by.radioegor146.source.ClassSourceBuilder;
+import by.radioegor146.source.MainSourceBuilder;
+import by.radioegor146.source.StringPool;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -96,16 +100,13 @@ public class NativeObfuscator {
     }
 
     private StringPool stringPool = new StringPool();
+    private InterfaceStaticClassProvider staticClassProvider;
 
     private final HashMap<String, Integer> cachedClasses = new HashMap<>();
     private final HashMap<CachedMethodInfo, Integer> cachedMethods = new HashMap<>();
     private final HashMap<CachedFieldInfo, Integer> cachedFields = new HashMap<>();
-    private StringBuilder ifaceStaticNativeMethodsSb;
     private StringBuilder nativeMethodsSb;
     private Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
-
-    private final List<ClassNode> readyIfaceStaticClasses = new ArrayList<>();
-    private ClassNode currentIfaceStaticClass;
 
 
     private String getCachedClassPointer(String name) {
@@ -163,27 +164,13 @@ public class NativeObfuscator {
             throw new RuntimeException(key + " - " + var.getKey() + " is null");
         });
         HashMap<String, String> replaceTokens = new HashMap<>();
-        vars.entrySet().forEach((var) -> {
-            replaceTokens.put(var.getKey(), stringPool.get(var.getValue()));
-        });
-        tokens.entrySet().forEach((var) -> {
-            if (!replaceTokens.containsKey("$" + var.getKey())) {
-                replaceTokens.put("$" + var.getKey(), var.getValue());
+        vars.forEach((key1, value1) -> replaceTokens.put(key1, stringPool.get(value1)));
+        tokens.forEach((key1, value1) -> {
+            if (!replaceTokens.containsKey("$" + key1)) {
+                replaceTokens.put("$" + key1, value1);
             }
         });
         return Util.dynamicRawFormat(value, replaceTokens);
-    }
-
-    private void setupNewIfaceStaticClass() {
-        if (currentIfaceStaticClass != null && currentIfaceStaticClass.methods.size() > 0) {
-            readyIfaceStaticClasses.add(currentIfaceStaticClass);
-        }
-        currentIfaceStaticClass = new ClassNode();
-        currentIfaceStaticClass.sourceFile = "synthetic";
-        currentIfaceStaticClass.name = "native" + nativeDirId + "/interfacestatic/Methods" + readyIfaceStaticClasses.size();
-        currentIfaceStaticClass.version = 52;
-        currentIfaceStaticClass.superName = "java/lang/Object";
-        currentIfaceStaticClass.access = Opcodes.ACC_PUBLIC;
     }
 
     private String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
@@ -222,31 +209,26 @@ public class NativeObfuscator {
         Type[] args = Type.getArgumentTypes(methodNode.desc);
         MethodNode nativeMethod = null;
         if ((classNode.access & Opcodes.ACC_INTERFACE) > 0) {
-            if (currentIfaceStaticClass.methods.size() > 16384) {
-                throw new RuntimeException("too many static interface methods");
-            }
             if ((methodNode.access & Opcodes.ACC_STATIC) == 0) {
                 List<Type> argsList = new ArrayList<>();
                 argsList.add(Type.getType(JAVA_DESCRIPTORS[Type.OBJECT]));
                 argsList.addAll(Arrays.asList(args));
-                args = argsList.toArray(new Type[argsList.size()]);
+                args = argsList.toArray(new Type[0]);
             }
+
             StringBuilder resultProcType = new StringBuilder("(");
             for (Type t : args) {
                 resultProcType.append(JAVA_DESCRIPTORS[t.getSort()]);
             }
             resultProcType.append(")").append(JAVA_DESCRIPTORS[returnTypeSort]);
-            String outerJavaMethodName = "iface_static_" + currentClassId + "_" + index;
+
+            String outerJavaMethodName = String.format("iface_static_%d_%d", currentClassId, index);
             nativeMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_NATIVE | Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, outerJavaMethodName, resultProcType.toString(), null, new String[0]);
-            currentIfaceStaticClass.methods.add(nativeMethod);
-            ifaceStaticNativeMethodsSb
-                    .append("            { (char *)")
-                    .append(stringPool.get(outerJavaMethodName))
-                    .append(", (char *)")
-                    .append(stringPool.get(resultProcType.toString()))
-                    .append(", (void *)&")
-                    .append(methodName)
-                    .append(" },\n");
+
+            String methodSource = String.format("            { (char *)%s, (char *)%s, (void *)&%s },\n",
+                    stringPool.get(outerJavaMethodName), stringPool.get(resultProcType.toString()), methodName);
+
+            staticClassProvider.addMethod(nativeMethod, methodSource);
         } else {
             nativeMethodsSb
                     .append("            { (char *)")
@@ -543,10 +525,10 @@ public class NativeObfuscator {
                         } else if (cst instanceof java.lang.Long) {
                             insnName += "_LONG";
                             long cstVal = (long) cst;
-                            if (cstVal == -9223372036854775808L) {
+                            if (cstVal == Long.MIN_VALUE) {
                                 props.put("cst", "(jlong) 9223372036854775808ULL");
                             } else {
-                                props.put("cst", String.valueOf(((LdcInsnNode) insnNode).cst) + "LL");
+                                props.put("cst", ((LdcInsnNode) insnNode).cst + "LL");
                             }
                         } else if (cst instanceof java.lang.Float) {
                             insnName += "_FLOAT";
@@ -739,14 +721,15 @@ public class NativeObfuscator {
             break;
             case "<clinit>":
                 methodNode.instructions.clear();
-                methodNode.instructions.add(new LdcInsnNode((int) currentClassId));
-                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "native" + nativeDirId + "/Loader", "registerNativesForClass", "(I)V"));
+                methodNode.instructions.add(new LdcInsnNode(currentClassId));
+                methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, nativeDir + "/Loader", "registerNativesForClass", "(I)V"));
                 methodNode.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, classNode.name, "native_special_clinit" + index, methodNode.desc));
                 if ((classNode.access & Opcodes.ACC_INTERFACE) > 0) {
                     if (nativeMethod == null) {
                         throw new RuntimeException("Native method not created?!");
                     }
-                    proxifiedResult.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, currentIfaceStaticClass.name, nativeMethod.name, nativeMethod.desc));
+                    proxifiedResult.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                            staticClassProvider.getCurrentClassName(), nativeMethod.name, nativeMethod.desc));
                     proxifiedResult.instructions.add(new InsnNode(Opcodes.RETURN));
                 }
                 methodNode.instructions.add(new InsnNode(Opcodes.RETURN));
@@ -766,7 +749,8 @@ public class NativeObfuscator {
                     if (nativeMethod == null) {
                         throw new RuntimeException("Native method not created?!");
                     }
-                    list.add(new MethodInsnNode(Opcodes.INVOKESTATIC, currentIfaceStaticClass.name, nativeMethod.name, nativeMethod.desc));
+                    list.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                            staticClassProvider.getCurrentClassName(), nativeMethod.name, nativeMethod.desc));
                     list.add(new InsnNode(Type.getReturnType(methodNode.desc).getOpcode(Opcodes.IRETURN)));
                     methodNode.instructions = list;
                 }
@@ -789,7 +773,7 @@ public class NativeObfuscator {
     }
 
     private int currentClassId;
-    private int nativeDirId = 0;
+    private String nativeDir;
 
     public void process(Path inputJarPath, Path outputDir, List<Path> libs) throws IOException {
         libs.add(inputJarPath);
@@ -811,9 +795,6 @@ public class NativeObfuscator {
         Util.copyResource(Paths.get("sources", "native_jvm_output.hpp"), cppDir);
         Util.copyResource(Paths.get("sources", "string_pool.hpp"), cppDir);
 
-        StringBuilder outputHeaderSb = new StringBuilder();
-        StringBuilder outputHeaderIncludesSb = new StringBuilder();
-
         String projectName = String.format("native_jvm_classes_%s",
                 inputJarPath.getFileName().toString().replaceAll("[$#.\\s/]", "_"));
 
@@ -825,15 +806,20 @@ public class NativeObfuscator {
         cMakeBuilder.addMainFile("string_pool.hpp");
         cMakeBuilder.addMainFile("string_pool.cpp");
 
+        MainSourceBuilder mainSourceBuilder = new MainSourceBuilder();
+
         File jarFile = inputJarPath.toAbsolutePath().toFile();
         try (JarFile jar = new JarFile(jarFile);
              ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())))) {
 
             System.out.println("Processing " + jarFile + "...");
 
-            nativeDirId = IntStream.iterate(nativeDirId, i -> i + 1)
+            int nativeDirId = IntStream.iterate(0, i -> i + 1)
                     .filter(i -> jar.stream().noneMatch(x -> x.getName().startsWith("native" + i)))
                     .findFirst().orElseThrow(RuntimeException::new);
+            nativeDir = "native" + nativeDirId;
+
+            staticClassProvider = new InterfaceStaticClassProvider(nativeDir);
 
             jar.stream().forEach(entry -> {
                 if(entry.getName().equals(JarFile.MANIFEST_NAME)) return;
@@ -856,7 +842,6 @@ public class NativeObfuscator {
                     }
 
                     nativeMethodsSb = new StringBuilder();
-                    ifaceStaticNativeMethodsSb = new StringBuilder();
                     invokeDynamics = new HashMap<>();
 
                     ClassReader classReader = new ClassReader(src);
@@ -874,7 +859,7 @@ public class NativeObfuscator {
                         classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC, "<clinit>", "()V", null, new String[0]));
                     }
 
-                    setupNewIfaceStaticClass();
+                    staticClassProvider.newClass();
 
                     cachedClasses.clear();
                     cachedMethods.clear();
@@ -903,32 +888,26 @@ public class NativeObfuscator {
 
                         cppBuilder.addHeader(cachedClasses.size(), cachedMethods.size(), cachedFields.size());
                         cppBuilder.addInstructions(insnsSb.toString());
-                        cppBuilder.registerMethods(cachedClasses, nativeMethodsSb.toString(),
-                                ifaceStaticNativeMethodsSb.toString(), currentIfaceStaticClass);
+                        cppBuilder.registerMethods(cachedClasses, nativeMethodsSb.toString(), staticClassProvider);
 
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getHppFilename());
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getCppFilename());
-                        outputHeaderIncludesSb
-                                .append("#include \"output/").append(cppBuilder.getHppFilename()).append("\"\n");
 
-                        outputHeaderSb.append("        reg_methods[")
-                                .append(currentClassId)
-                                .append("] = &(native_jvm::classes::__ngen_")
-                                .append(cppBuilder.getFilename())
-                                .append("::__ngen_register_methods);\n");
+                        mainSourceBuilder.addHeader(cppBuilder.getHppFilename());
+                        mainSourceBuilder.registerClassMethods(currentClassId, cppBuilder.getFilename());
                     }
                     currentClassId++;
                 } catch (IOException e1) {
                     e1.printStackTrace(System.err);
                 }
             });
-            Manifest mf = jar.getManifest();
-            setupNewIfaceStaticClass();
-            for (ClassNode ifaceStaticClass : readyIfaceStaticClasses) {
+            for (ClassNode ifaceStaticClass : staticClassProvider.getReadyClasses()) {
                 ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 ifaceStaticClass.accept(classWriter);
                 Util.writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
             }
+
+            Manifest mf = jar.getManifest();
             ClassNode loaderClass = new ClassNode();
             loaderClass.sourceFile = "synthetic";
             loaderClass.name = "native" + nativeDirId + "/Loader";
@@ -970,18 +949,10 @@ public class NativeObfuscator {
             metadataReader.close();
         }
 
-
         Files.write(cppDir.resolve("string_pool.cpp"), stringPool.build().getBytes(StandardCharsets.UTF_8));
 
-        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/native_jvm_output.cpp")) {
-            Files.write(cppDir.resolve("native_jvm_output.cpp"),
-                    Util.dynamicFormat(Util.writeStreamToString(in), Util.createMap(
-                            "register_code", outputHeaderSb,
-                            "includes", outputHeaderIncludesSb,
-                            "native_dir_id", nativeDirId,
-                            "class_count", currentClassId
-                    )).getBytes(StandardCharsets.UTF_8));
-        }
+        Files.write(cppDir.resolve("native_jvm_output.cpp"), mainSourceBuilder.build(nativeDir, currentClassId)
+                .getBytes(StandardCharsets.UTF_8));
 
         Files.write(cppDir.resolve("CMakeLists.txt"), cMakeBuilder.build().getBytes(StandardCharsets.UTF_8));
     }

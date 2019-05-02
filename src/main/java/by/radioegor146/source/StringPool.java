@@ -1,4 +1,6 @@
-package by.radioegor146;
+package by.radioegor146.source;
+
+import by.radioegor146.Util;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -39,7 +41,7 @@ public class StringPool {
 
         String template = Util.readResource("sources/string_pool.cpp");
         return Util.dynamicFormat(template, Util.createMap(
-        "size", bytes.size() + "LL",
+                "size", bytes.size() + "LL",
                 "value", result
         ));
     }
