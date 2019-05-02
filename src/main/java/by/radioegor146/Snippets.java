@@ -34,6 +34,10 @@ public class Snippets {
         return result.split(",");
     }
 
+    public String getSnippet(String key) {
+        return getSnippet(key, Util.createMap());
+    }
+
     public String getSnippet(String key, Map<String, String> tokens) {
         String value = snippets.getProperty(key);
         Objects.requireNonNull(value, key);
