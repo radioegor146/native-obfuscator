@@ -474,12 +474,13 @@ public class MethodProcessor {
     private abstract class GenericInstructionHandler<T extends AbstractInsnNode> implements InstructionTypeHandler<T> {
 
 
-        protected Map<String, String> props = new HashMap<>();
+        protected Map<String, String> props;
         protected String instructionName;
         protected String trimmedTryCatchBlock;
 
         @Override
         public void accept(InstructionContext context, T node) {
+            props = new HashMap<>();
             StringBuilder tryCatch = new StringBuilder("\n");
             if (context.tryCatches.size() > 0) {
                 tryCatch.append(String.format("    %s\n", obfuscator.getSnippets().getSnippet("TRYCATCH_START")));
