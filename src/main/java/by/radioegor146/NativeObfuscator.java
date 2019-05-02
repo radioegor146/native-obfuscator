@@ -30,7 +30,7 @@ import java.util.zip.ZipOutputStream;
 public class NativeObfuscator {
 
     private static final Map<Integer, String> INSTRUCTIONS = new HashMap<>();
-    private static final Properties CPP_SNIPPETS = new Properties();
+
     private static final String[] CPP_TYPES = {
         "void", // 0
         "jboolean", // 1
@@ -93,49 +93,32 @@ public class NativeObfuscator {
             for (Field f : Opcodes.class.getFields()) {
                 INSTRUCTIONS.put((int) f.get(null), f.getName());
             }
-            CPP_SNIPPETS.load(NativeObfuscator.class.getClassLoader().getResourceAsStream("sources/cppsnippets.properties"));
-        } catch (IllegalArgumentException | IllegalAccessException | IOException ex) {
+        } catch (IllegalArgumentException | IllegalAccessException ex) {
             throw new RuntimeException(ex);
         }
     }
 
-    private StringPool stringPool = new StringPool();
+    private Snippets snippets;
+    private StringPool stringPool;
     private InterfaceStaticClassProvider staticClassProvider;
 
-    private NodeCache<String> cachedClasses = new NodeCache<>("(cclasses[%d])");
-    private NodeCache<CachedMethodInfo> cachedMethods = new NodeCache<>("(cmethods[%d].load())");
-    private NodeCache<CachedFieldInfo> cachedFields = new NodeCache<>("(cfields[%d].load())");
+    private NodeCache<String> cachedClasses;
+    private NodeCache<CachedMethodInfo> cachedMethods;
+    private NodeCache<CachedFieldInfo> cachedFields;
 
     private StringBuilder nativeMethodsSb;
-    private Map<String, InvokeDynamicInsnNode> invokeDynamics = new HashMap<>();
+    private Map<String, InvokeDynamicInsnNode> invokeDynamics;
 
-    private String dynamicStringPoolFormat(String key, Map<String, String> tokens) {
-        String value = CPP_SNIPPETS.getProperty(key);
-        if (value == null) {
-            throw new RuntimeException(key + " not found");
-        }
-        String[] stringVars = CPP_SNIPPETS.getProperty(key + "_S_VARS") == null || CPP_SNIPPETS.getProperty(key + "_S_VARS").isEmpty() ? new String[0] : CPP_SNIPPETS.getProperty(key + "_S_VARS").split(",");
-        HashMap<String, String> vars = new HashMap<>();
-        for (String var : stringVars) {
-            if (var.startsWith("#")) {
-                vars.put(var, CPP_SNIPPETS.getProperty(key + "_S_CONST_" + var.substring(1)));
-            } else if (var.startsWith("$")) {
-                vars.put(var, tokens.get(var.substring(1)));
-            } else {
-                throw new RuntimeException("Unknown format modifier: " + var);
-            }
-        }
-        vars.entrySet().stream().filter((var) -> (var.getValue() == null)).forEachOrdered((var) -> {
-            throw new RuntimeException(key + " - " + var.getKey() + " is null");
-        });
-        HashMap<String, String> replaceTokens = new HashMap<>();
-        vars.forEach((key1, value1) -> replaceTokens.put(key1, stringPool.get(value1)));
-        tokens.forEach((key1, value1) -> {
-            if (!replaceTokens.containsKey("$" + key1)) {
-                replaceTokens.put("$" + key1, value1);
-            }
-        });
-        return Util.dynamicRawFormat(value, replaceTokens);
+    private int currentClassId;
+    private String nativeDir;
+
+    public NativeObfuscator() {
+        stringPool = new StringPool();
+        snippets = new Snippets(stringPool);
+        cachedClasses = new NodeCache<>("(cclasses[%d])");
+        cachedMethods = new NodeCache<>("(cmethods[%d].load())");
+        cachedFields = new NodeCache<>("(cfields[%d].load())");
+        invokeDynamics = new HashMap<>();
     }
 
     private String visitMethod(ClassNode classNode, MethodNode methodNode, int index) {
@@ -195,15 +178,10 @@ public class NativeObfuscator {
 
             staticClassProvider.addMethod(nativeMethod, methodSource);
         } else {
-            nativeMethodsSb
-                    .append("            { (char *)")
-                    .append(stringPool.get(proxifiedResult.name))
-                    .append(", (char *)")
-                    .append(stringPool.get(methodNode.desc))
-                    .append(", (void *)&")
-                    .append(methodName)
-                    .append(" },\n");
+            nativeMethodsSb.append(String.format("            { (char *)%s, (char *)%s, (void *)&%s },\n",
+                    stringPool.get(proxifiedResult.name), stringPool.get(methodNode.desc), methodName));
         }
+
         outputSb
                 .append(CPP_TYPES[returnTypeSort])
                 .append(" ")
@@ -231,7 +209,7 @@ public class NativeObfuscator {
         outputSb.append("\n");
         int localIndex = 0;
         if (((methodNode.access & Opcodes.ACC_STATIC) == 0)) {
-            outputSb.append("    ").append(dynamicStringPoolFormat("LOCAL_LOAD_ARG_" + 9,
+            outputSb.append("    ").append(snippets.getSnippet("LOCAL_LOAD_ARG_" + 9,
                     Util.createMap(
                             "index", localIndex,
                             "arg", "obj"
@@ -239,7 +217,7 @@ public class NativeObfuscator {
             localIndex++;
         }
         for (int i = 0; i < args.length; i++) {
-            outputSb.append("    ").append(dynamicStringPoolFormat("LOCAL_LOAD_ARG_" + args[i].getSort(),
+            outputSb.append("    ").append(snippets.getSnippet("LOCAL_LOAD_ARG_" + args[i].getSort(),
                     Util.createMap(
                             "index", localIndex,
                             "arg", "arg" + i
@@ -267,15 +245,18 @@ public class NativeObfuscator {
             }
             AbstractInsnNode insnNode = methodNode.instructions.get(insnIndex);
             switch (insnNode.getType()) {
+
                 case AbstractInsnNode.LABEL:
                     outputSb.append(((LabelNode) insnNode).getLabel()).append(": ;").append("\n");
                     Util.reverse(methodNode.tryCatchBlocks.stream().filter((node) -> (node.start.equals(insnNode)))).forEachOrdered(currentTryCatches::add);
                     methodNode.tryCatchBlocks.stream().filter((node) -> (node.end.equals(insnNode))).forEachOrdered(currentTryCatches::remove);
                     break;
+
                 case AbstractInsnNode.LINE:
                     outputSb.append("    ").append("// Line ").append(((LineNumberNode) insnNode).line).append(":").append("\n");
                     currentLine = ((LineNumberNode) insnNode).line;
                     break;
+
                 case AbstractInsnNode.FRAME:
                     FrameNode frameNode = (FrameNode) insnNode;
                     switch (frameNode.type) {
@@ -355,29 +336,30 @@ public class NativeObfuscator {
                     }
                     outputSb.append("    utils::clear_refs(env, refs);\n");
                     break;
+
                 default:
                     StringBuilder tryCatch = new StringBuilder("\n");
                     if (currentTryCatches.size() > 0) {
-                        tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_START", Util.createMap())).append("\n");
+                        tryCatch.append("    ").append(snippets.getSnippet("TRYCATCH_START", Util.createMap())).append("\n");
                         for (int i = currentTryCatches.size() - 1; i >= 0; i--) {
                             TryCatchBlockNode tryCatchBlock = currentTryCatches.get(i);
                             if (tryCatchBlock.type == null) {
-                                tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_ANY_L", Util.createMap(
+                                tryCatch.append("    ").append(snippets.getSnippet("TRYCATCH_ANY_L", Util.createMap(
                                         "rettype", CPP_TYPES[returnTypeSort],
                                         "handler_block", tryCatchBlock.handler.getLabel().toString()
                                 ))).append("\n");
                                 break;
                             } else {
-                                tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_CHECK", Util.createMap(
+                                tryCatch.append("    ").append(snippets.getSnippet("TRYCATCH_CHECK", Util.createMap(
                                         "rettype", CPP_TYPES[returnTypeSort],
                                         "exception_class_ptr", cachedClasses.getPointer(tryCatchBlock.type),
                                         "handler_block", tryCatchBlock.handler.getLabel().toString()
                                 ))).append("\n");
                             }
                         }
-                        tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_END", Util.createMap("rettype", CPP_TYPES[returnTypeSort])));
+                        tryCatch.append("    ").append(snippets.getSnippet("TRYCATCH_END", Util.createMap("rettype", CPP_TYPES[returnTypeSort])));
                     } else {
-                        tryCatch.append("    ").append(dynamicStringPoolFormat("TRYCATCH_EMPTY", Util.createMap("rettype", CPP_TYPES[returnTypeSort])));
+                        tryCatch.append("    ").append(snippets.getSnippet("TRYCATCH_EMPTY", Util.createMap("rettype", CPP_TYPES[returnTypeSort])));
                     }
                     outputSb.append("    ");
                     String insnName = INSTRUCTIONS.getOrDefault(insnNode.getOpcode(), "NOTFOUND");
@@ -446,9 +428,9 @@ public class NativeObfuscator {
                             argSorts.add(argType.getSort());
                         }
                         for (int i = 0; i < argOffsets.size(); i++) {
-                            argsBuilder.append(", ").append(dynamicStringPoolFormat("INVOKE_ARG_" + argSorts.get(i), Util.createMap("index", String.valueOf(argOffsets.get(i)))));
+                            argsBuilder.append(", ").append(snippets.getSnippet("INVOKE_ARG_" + argSorts.get(i), Util.createMap("index", String.valueOf(argOffsets.get(i)))));
                         }
-                        outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", Util.createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
+                        outputSb.append(snippets.getSnippet("INVOKE_POPCNT", Util.createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
                         props.put("class_ptr", cachedClasses.getPointer(classNode.name));
                         int methodId = cachedMethods.getId(new CachedMethodInfo(
                                 classNode.name,
@@ -526,17 +508,17 @@ public class NativeObfuscator {
                         }
                     }
                     if (insnNode instanceof LookupSwitchInsnNode) {
-                        outputSb.append(dynamicStringPoolFormat("LOOKUPSWITCH_START", Util.createMap())).append("\n");
+                        outputSb.append(snippets.getSnippet("LOOKUPSWITCH_START", Util.createMap())).append("\n");
                         for (int switchIndex = 0; switchIndex < ((LookupSwitchInsnNode) insnNode).labels.size(); switchIndex++) {
-                            outputSb.append("    ").append("    ").append(dynamicStringPoolFormat("LOOKUPSWITCH_PART", Util.createMap(
+                            outputSb.append("    ").append("    ").append(snippets.getSnippet("LOOKUPSWITCH_PART", Util.createMap(
                                     "key", String.valueOf(((LookupSwitchInsnNode) insnNode).keys.get(switchIndex)),
                                     "label", String.valueOf(((LookupSwitchInsnNode) insnNode).labels.get(switchIndex).getLabel())
                             ))).append("\n");
                         }
-                        outputSb.append("    ").append("    ").append(dynamicStringPoolFormat("LOOKUPSWITCH_DEFAULT", Util.createMap(
+                        outputSb.append("    ").append("    ").append(snippets.getSnippet("LOOKUPSWITCH_DEFAULT", Util.createMap(
                                 "label", String.valueOf(((LookupSwitchInsnNode) insnNode).dflt.getLabel())
                         ))).append("\n");
-                        outputSb.append("    ").append(dynamicStringPoolFormat("LOOKUPSWITCH_END", Util.createMap())).append("\n");
+                        outputSb.append("    ").append(snippets.getSnippet("LOOKUPSWITCH_END", Util.createMap())).append("\n");
                         continue;
                     }
                     if (insnNode instanceof MethodInsnNode) {
@@ -555,10 +537,10 @@ public class NativeObfuscator {
                         }
                         if (insnNode.getOpcode() == Opcodes.INVOKEINTERFACE || insnNode.getOpcode() == Opcodes.INVOKESPECIAL || insnNode.getOpcode() == Opcodes.INVOKEVIRTUAL) {
                             for (int i = 0; i < argOffsets.size(); i++) {
-                                argsBuilder.append(", ").append(dynamicStringPoolFormat("INVOKE_ARG_" + argSorts.get(i), Util.createMap("index", String.valueOf(argOffsets.get(i) - 1))));
+                                argsBuilder.append(", ").append(snippets.getSnippet("INVOKE_ARG_" + argSorts.get(i), Util.createMap("index", String.valueOf(argOffsets.get(i) - 1))));
                             }
                             if (stackOffset != 0) {
-                                outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", Util.createMap("count", String.valueOf(-stackOffset)))).append(" ");
+                                outputSb.append(snippets.getSnippet("INVOKE_POPCNT", Util.createMap("count", String.valueOf(-stackOffset)))).append(" ");
                             }
                             if (insnNode.getOpcode() == Opcodes.INVOKESPECIAL) {
                                 props.put("class_ptr", cachedClasses.getPointer(((MethodInsnNode) insnNode).owner));
@@ -592,10 +574,10 @@ public class NativeObfuscator {
                             props.put("args", argsBuilder.toString());
                         } else {
                             for (int i = 0; i < argOffsets.size(); i++) {
-                                argsBuilder.append(", ").append(dynamicStringPoolFormat("INVOKE_ARG_" + argSorts.get(i), Util.createMap("index", String.valueOf(argOffsets.get(i)))));
+                                argsBuilder.append(", ").append(snippets.getSnippet("INVOKE_ARG_" + argSorts.get(i), Util.createMap("index", String.valueOf(argOffsets.get(i)))));
                             }
                             if (-stackOffset - 1 != 0) {
-                                outputSb.append(dynamicStringPoolFormat("INVOKE_POPCNT", Util.createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
+                                outputSb.append(snippets.getSnippet("INVOKE_POPCNT", Util.createMap("count", String.valueOf(-stackOffset - 1)))).append(" ");
                             }
                             props.put("class_ptr", cachedClasses.getPointer(((MethodInsnNode) insnNode).owner));
                             int methodId = cachedMethods.getId(new CachedMethodInfo(
@@ -630,34 +612,32 @@ public class NativeObfuscator {
                         props.put("count", String.valueOf(((MultiANewArrayInsnNode) insnNode).dims));
                         props.put("desc", ((MultiANewArrayInsnNode) insnNode).desc);
                     }
+
                     if (insnNode instanceof TableSwitchInsnNode) {
-                        outputSb.append(dynamicStringPoolFormat("TABLESWITCH_START", Util.createMap())).append("\n");
+                        outputSb.append(snippets.getSnippet("TABLESWITCH_START", Util.createMap())).append("\n");
                         for (int switchIndex = 0; switchIndex < ((TableSwitchInsnNode) insnNode).labels.size(); switchIndex++) {
-                            outputSb.append("    ").append("    ").append(dynamicStringPoolFormat("TABLESWITCH_PART", Util.createMap(
+                            outputSb.append("    ").append("    ").append(snippets.getSnippet("TABLESWITCH_PART", Util.createMap(
                                     "index", String.valueOf(((TableSwitchInsnNode) insnNode).min + switchIndex),
                                     "label", String.valueOf(((TableSwitchInsnNode) insnNode).labels.get(switchIndex).getLabel())
                             ))).append("\n");
                         }
-                        outputSb.append("    ").append("    ").append(dynamicStringPoolFormat("TABLESWITCH_DEFAULT", Util.createMap(
+                        outputSb.append("    ").append("    ").append(snippets.getSnippet("TABLESWITCH_DEFAULT", Util.createMap(
                                 "label", String.valueOf(((TableSwitchInsnNode) insnNode).dflt.getLabel())
                         ))).append("\n");
-                        outputSb.append("    ").append(dynamicStringPoolFormat("TABLESWITCH_END", Util.createMap())).append("\n");
+                        outputSb.append("    ").append(snippets.getSnippet("TABLESWITCH_END", Util.createMap())).append("\n");
                         continue;
                     }
+
                     if (insnNode instanceof TypeInsnNode) {
                         props.put("desc", (((TypeInsnNode) insnNode).desc));
                         props.put("desc_ptr", cachedClasses.getPointer(((TypeInsnNode) insnNode).desc));
                     }
+
                     if (insnNode instanceof VarInsnNode) {
                         props.put("var", String.valueOf(((VarInsnNode) insnNode).var));
                     }
-                    String cppCode = CPP_SNIPPETS.getProperty(insnName);
-                    if (cppCode == null) {
-                        throw new RuntimeException("insn not found: " + insnName);
-                    } else {
-                        cppCode = dynamicStringPoolFormat(insnName, props);
-                        outputSb.append(cppCode);
-                    }
+
+                    outputSb.append(snippets.getSnippet(insnName, props));
                     outputSb.append("\n");
                     break;
             }
@@ -737,9 +717,6 @@ public class NativeObfuscator {
         indyWrapper.instructions.add(new InsnNode(Opcodes.ARETURN));
         classNode.methods.add(indyWrapper);
     }
-
-    private int currentClassId;
-    private String nativeDir;
 
     public void process(Path inputJarPath, Path outputDir, List<Path> libs) throws IOException {
         libs.add(inputJarPath);
