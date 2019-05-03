@@ -10,7 +10,10 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class MethodProcessor {
@@ -51,29 +54,32 @@ public class MethodProcessor {
     };
 
     private NativeObfuscator obfuscator;
-
     private InstructionHandlerContainer<?>[] handlers;
 
     public MethodProcessor(NativeObfuscator obfuscator) {
         this.obfuscator = obfuscator;
 
         handlers = new InstructionHandlerContainer[16];
-        handlers[0] = new InstructionHandlerContainer<>(new InsnHandler(), InsnNode.class);
-        handlers[1] = new InstructionHandlerContainer<>(new IntInstructionHandler(), IntInsnNode.class);
-        handlers[2] = new InstructionHandlerContainer<>(new VarHandler(), VarInsnNode.class);
-        handlers[3] = new InstructionHandlerContainer<>(new TypeHandler(), TypeInsnNode.class);
-        handlers[4] = new InstructionHandlerContainer<>(new FieldInstructionHandler(), FieldInsnNode.class);
-        handlers[5] = new InstructionHandlerContainer<>(new MethodHandler(), MethodInsnNode.class);
-        handlers[6] = new InstructionHandlerContainer<>(new InvokeDynamicHandler(), InvokeDynamicInsnNode.class);
-        handlers[7] = new InstructionHandlerContainer<>(new JumpHandler(), JumpInsnNode.class);
-        handlers[8] = new InstructionHandlerContainer<>(new LabelHandler(), LabelNode.class);
-        handlers[9] = new InstructionHandlerContainer<>(new LdcHandler(), LdcInsnNode.class);
-        handlers[10] = new InstructionHandlerContainer<>(new IincInstructionHandler(), IincInsnNode.class);
-        handlers[11] = new InstructionHandlerContainer<>(new TableSwitchHandler(), TableSwitchInsnNode.class);
-        handlers[12] = new InstructionHandlerContainer<>(new LookupSwitchHandler(), LookupSwitchInsnNode.class);
-        handlers[13] = new InstructionHandlerContainer<>(new MultiANewArrayHandler(), MultiANewArrayInsnNode.class);
-        handlers[14] = new InstructionHandlerContainer<>(new FrameHandler(), FrameNode.class);
-        handlers[15] = new InstructionHandlerContainer<>(new LineNumberHandler(), LineNumberNode.class);
+        addHandler(AbstractInsnNode.INSN, new InsnHandler(), InsnNode.class);
+        addHandler(AbstractInsnNode.INT_INSN, new IntHandler(), IntInsnNode.class);
+        addHandler(AbstractInsnNode.VAR_INSN, new VarHandler(), VarInsnNode.class);
+        addHandler(AbstractInsnNode.TYPE_INSN, new TypeHandler(), TypeInsnNode.class);
+        addHandler(AbstractInsnNode.FIELD_INSN, new FieldHandler(), FieldInsnNode.class);
+        addHandler(AbstractInsnNode.METHOD_INSN, new MethodHandler(), MethodInsnNode.class);
+        addHandler(AbstractInsnNode.INVOKE_DYNAMIC_INSN, new InvokeDynamicHandler(), InvokeDynamicInsnNode.class);
+        addHandler(AbstractInsnNode.JUMP_INSN, new JumpHandler(), JumpInsnNode.class);
+        addHandler(AbstractInsnNode.LABEL, new LabelHandler(), LabelNode.class);
+        addHandler(AbstractInsnNode.LDC_INSN, new LdcHandler(), LdcInsnNode.class);
+        addHandler(AbstractInsnNode.IINC_INSN, new IincHandler(), IincInsnNode.class);
+        addHandler(AbstractInsnNode.TABLESWITCH_INSN, new TableSwitchHandler(), TableSwitchInsnNode.class);
+        addHandler(AbstractInsnNode.LOOKUPSWITCH_INSN, new LookupSwitchHandler(), LookupSwitchInsnNode.class);
+        addHandler(AbstractInsnNode.MULTIANEWARRAY_INSN, new MultiANewArrayHandler(), MultiANewArrayInsnNode.class);
+        addHandler(AbstractInsnNode.FRAME, new FrameHandler(), FrameNode.class);
+        addHandler(AbstractInsnNode.LINE, new LineNumberHandler(), LineNumberNode.class);
+    }
+
+    private <T extends AbstractInsnNode> void addHandler(int id, InstructionTypeHandler<T> handler, Class<T> instructionClass) {
+        handlers[id] = new InstructionHandlerContainer<>(handler, instructionClass);
     }
 
     private SpecialMethodProcessor getSpecialMethodProcessor(String name) {
@@ -84,12 +90,17 @@ public class MethodProcessor {
         }
     }
 
+    public static boolean shouldProcess(MethodNode method) {
+        return !Util.getFlag(method.access, Opcodes.ACC_ABSTRACT) &&
+                !Util.getFlag(method.access, Opcodes.ACC_NATIVE) &&
+                !method.name.equals("<init>");
+    }
+
     public void processMethod(MethodContext context) {
         MethodNode method = context.method;
         StringBuilder output = context.output;
 
-        if ((Util.getFlag(method.access, Opcodes.ACC_ABSTRACT) || Util.getFlag(method.access, Opcodes.ACC_NATIVE) ||
-                method.name.equals("<init>"))) {
+        if (!shouldProcess(method)) {
             return;
         }
 
@@ -101,7 +112,6 @@ public class MethodProcessor {
         methodName = "__ngen_" + methodName.replace("/", "_");
         methodName = Util.escapeCppNameString(methodName);
 
-        boolean isInterface = Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE);
         boolean isStatic = Util.getFlag(method.access, Opcodes.ACC_STATIC);
         context.ret = Type.getReturnType(method.desc);
         Type[] args = Type.getArgumentTypes(method.desc);

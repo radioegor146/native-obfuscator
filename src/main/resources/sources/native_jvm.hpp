@@ -4,7 +4,6 @@
 #include <cstring>
 #include <string>
 #include <cstdio>
-#include <atomic>
 #include <unordered_set>
 
 #ifndef NATIVE_JVM_HPP_GUARD
@@ -15,8 +14,8 @@ namespace native_jvm::utils {
     
     template <std::size_t N>
     struct jvm_stack {
-        jobject refs[2 * N];
-        jint data[2 * N];
+        jobject refs[N];
+        jint data[N];
         jint sptr = 0;
 
         void push2(jlong value) {

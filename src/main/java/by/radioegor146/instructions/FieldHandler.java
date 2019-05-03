@@ -6,7 +6,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.FieldInsnNode;
 
-public class FieldInstructionHandler extends GenericInstructionHandler<FieldInsnNode> {
+public class FieldHandler extends GenericInstructionHandler<FieldInsnNode> {
 
     @Override
     protected void process(MethodContext context, FieldInsnNode node) {
@@ -21,15 +21,13 @@ public class FieldInstructionHandler extends GenericInstructionHandler<FieldInsn
         int fieldId = context.getCachedFields().getId(info);
         props.put("fieldid", context.getCachedFields().getPointer(info));
 
-        context.output
-                .append(String.format("if (!cfields[%d].load()) { cfields[%d].store(env->Get",
-                        fieldId, fieldId))
-                .append(isStatic ? "Static" : "")
-                .append(String.format("FieldID(%s, %s, %s));",
-                        context.getCachedClasses().getPointer(node.owner),
-                        context.getStringPool().get(node.name),
-                        context.getStringPool().get(node.desc)))
-                .append(trimmedTryCatchBlock)
-                .append("  } ");
+        context.output.append(String.format("if (!cfields[%d]) { cfields[%d] = env->Get%sFieldID(%s, %s, %s); %s  } ",
+                fieldId,
+                fieldId,
+                isStatic ? "Static" : "",
+                context.getCachedClasses().getPointer(node.owner),
+                context.getStringPool().get(node.name),
+                context.getStringPool().get(node.desc),
+                trimmedTryCatchBlock));
     }
 }

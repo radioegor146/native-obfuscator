@@ -1,5 +1,6 @@
 package by.radioegor146;
 
+import by.radioegor146.instructions.InvokeDynamicHandler;
 import by.radioegor146.source.CMakeFilesBuilder;
 import by.radioegor146.source.ClassSourceBuilder;
 import by.radioegor146.source.MainSourceBuilder;
@@ -7,7 +8,6 @@ import by.radioegor146.source.StringPool;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 import ru.gravit.launchserver.asm.ClassMetadataReader;
 import ru.gravit.launchserver.asm.SafeClassWriter;
@@ -53,22 +53,10 @@ public class NativeObfuscator {
         stringPool = new StringPool();
         snippets = new Snippets(stringPool);
         cachedClasses = new NodeCache<>("(cclasses[%d])");
-        cachedMethods = new NodeCache<>("(cmethods[%d].load())");
-        cachedFields = new NodeCache<>("(cfields[%d].load())");
+        cachedMethods = new NodeCache<>("(cmethods[%d])");
+        cachedFields = new NodeCache<>("(cfields[%d])");
         invokeDynamics = new HashMap<>();
         methodProcessor = new MethodProcessor(this);
-    }
-
-    private void processIndy(ClassNode classNode, String methodName, InvokeDynamicInsnNode indy) {
-        MethodNode indyWrapper = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC, methodName, indy.desc, null, new String[0]);
-        int localVarsPosition = 0;
-        for (Type arg : Type.getArgumentTypes(indy.desc)) {
-            indyWrapper.instructions.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
-            localVarsPosition += arg.getSize();
-        }
-        indyWrapper.instructions.add(new InvokeDynamicInsnNode(indy.name, indy.desc, indy.bsm, indy.bsmArgs));
-        indyWrapper.instructions.add(new InsnNode(Opcodes.ARETURN));
-        classNode.methods.add(indyWrapper);
     }
 
     public void process(Path inputJarPath, Path outputDir, List<Path> libs) throws IOException {
@@ -138,24 +126,27 @@ public class NativeObfuscator {
                     }
 
                     nativeMethods = new StringBuilder();
-                    invokeDynamics = new HashMap<>();
 
                     ClassReader classReader = new ClassReader(src);
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
 
-                    if (classNode.methods.stream().noneMatch(x -> (x.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0 && !x.name.equals("<init>"))) {
+                    if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess)) {
                         System.out.println("Skipping " + classNode.name);
                         Util.writeEntry(out, entry.getName(), src);
                         return;
                     }
 
                     System.out.println("Processing " + classNode.name);
+
                     if (classNode.methods.stream().noneMatch(x -> x.name.equals("<clinit>"))) {
-                        classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC, "<clinit>", "()V", null, new String[0]));
+                        classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC,
+                                "<clinit>", "()V", null, new String[0]));
                     }
 
                     staticClassProvider.newClass();
+
+                    invokeDynamics.clear();
 
                     cachedClasses.clear();
                     cachedMethods.clear();
@@ -178,7 +169,7 @@ public class NativeObfuscator {
                             }
                         }
 
-                        invokeDynamics.forEach((key, value) -> processIndy(classNode, key, value));
+                        invokeDynamics.forEach((key, value) -> InvokeDynamicHandler.processIndy(classNode, key, value));
 
                         classNode.version = 52;
                         ClassWriter classWriter = new SafeClassWriter(metadataReader,
@@ -196,11 +187,13 @@ public class NativeObfuscator {
                         mainSourceBuilder.addHeader(cppBuilder.getHppFilename());
                         mainSourceBuilder.registerClassMethods(currentClassId, cppBuilder.getFilename());
                     }
+
                     currentClassId++;
                 } catch (IOException e1) {
                     e1.printStackTrace(System.err);
                 }
             });
+
             for (ClassNode ifaceStaticClass : staticClassProvider.getReadyClasses()) {
                 ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 ifaceStaticClass.accept(classWriter);
@@ -281,11 +274,11 @@ public class NativeObfuscator {
         return cachedFields;
     }
 
-    public Map<String, InvokeDynamicInsnNode> getInvokeDynamics() {
-        return invokeDynamics;
-    }
-
     public String getNativeDir() {
         return nativeDir;
+    }
+
+    public Map<String, InvokeDynamicInsnNode> getInvokeDynamics() {
+        return invokeDynamics;
     }
 }

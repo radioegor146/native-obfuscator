@@ -1,6 +1,7 @@
 package by.radioegor146.instructions;
 
 import by.radioegor146.MethodContext;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.LdcInsnNode;
 
 public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
@@ -44,7 +45,7 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             } else if (cstVal == Double.NEGATIVE_INFINITY) {
                 props.put("cst", "-HUGE_VAL");
             }
-        } else if (cst instanceof org.objectweb.asm.Type) {
+        } else if (cst instanceof Type) {
             instructionName += "_CLASS";
             props.put("cst_ptr", context.getCachedClasses().getPointer(node.cst.toString()));
         } else {
