@@ -22,10 +22,10 @@ public class FieldInstructionHandler extends GenericInstructionHandler<FieldInsn
         props.put("fieldid", context.getCachedFields().getPointer(info));
 
         context.output
-                .append(String.format("if (!cfields[%d].load()) { cfields[%d].store(env->Get",
+                .append(String.format("if (!cfields[%d]) { cfields[%d] = env->Get",
                         fieldId, fieldId))
                 .append(isStatic ? "Static" : "")
-                .append(String.format("FieldID(%s, %s, %s));",
+                .append(String.format("FieldID(%s, %s, %s);",
                         context.getCachedClasses().getPointer(node.owner),
                         context.getStringPool().get(node.name),
                         context.getStringPool().get(node.desc)))

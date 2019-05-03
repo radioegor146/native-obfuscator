@@ -44,15 +44,15 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
             ));
             context.output.append("if (!cmethods[")
                     .append(methodId)
-                    .append("].load()) { cmethods[")
+                    .append("]) { cmethods[")
                     .append(methodId)
-                    .append("].store(env->GetMethodID(")
+                    .append("] = env->GetMethodID(")
                     .append(context.obfuscator.getCachedClasses().getPointer(node.owner))
                     .append(", ")
                     .append(context.obfuscator.getStringPool().get(node.name))
                     .append(", ")
                     .append(context.obfuscator.getStringPool().get(node.desc))
-                    .append(")); ")
+                    .append("); ")
                     .append(trimmedTryCatchBlock)
                     .append("  } ");
             props.put("methodid", context.obfuscator.getCachedMethods().getPointer(new CachedMethodInfo(
@@ -75,15 +75,15 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
             ));
             context.output.append("if (!cmethods[")
                     .append(methodId)
-                    .append("].load()) { cmethods[")
+                    .append("]) { cmethods[")
                     .append(methodId)
-                    .append("].store(env->GetStaticMethodID(")
+                    .append("] = env->GetStaticMethodID(")
                     .append(context.getCachedClasses().getPointer(node.owner))
                     .append(", ")
                     .append(context.getStringPool().get(node.name))
                     .append(", ")
                     .append(context.getStringPool().get(node.desc))
-                    .append(")); ")
+                    .append("); ")
                     .append(trimmedTryCatchBlock)
                     .append("  } ");
             props.put("methodid", context.getCachedMethods().getPointer(new CachedMethodInfo(

@@ -53,8 +53,8 @@ public class NativeObfuscator {
         stringPool = new StringPool();
         snippets = new Snippets(stringPool);
         cachedClasses = new NodeCache<>("(cclasses[%d])");
-        cachedMethods = new NodeCache<>("(cmethods[%d].load())");
-        cachedFields = new NodeCache<>("(cfields[%d].load())");
+        cachedMethods = new NodeCache<>("(cmethods[%d])");
+        cachedFields = new NodeCache<>("(cfields[%d])");
         invokeDynamics = new HashMap<>();
         methodProcessor = new MethodProcessor(this);
     }
