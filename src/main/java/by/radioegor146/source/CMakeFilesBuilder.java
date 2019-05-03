@@ -7,9 +7,9 @@ import java.util.List;
 
 public class CMakeFilesBuilder {
 
-    private String projectName;
-    private List<String> classFiles;
-    private List<String> mainFiles;
+    private final String projectName;
+    private final List<String> classFiles;
+    private final List<String> mainFiles;
 
     public CMakeFilesBuilder(String projectName) {
         this.projectName = projectName;

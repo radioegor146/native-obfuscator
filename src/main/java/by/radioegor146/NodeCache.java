@@ -5,8 +5,8 @@ import java.util.Map;
 
 public class NodeCache<T> {
 
-    private String pointerPattern;
-    private Map<T, Integer> cache;
+    private final String pointerPattern;
+    private final Map<T, Integer> cache;
 
     public NodeCache(String pointerPattern) {
         this.pointerPattern = pointerPattern;

@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.jar.Attributes.Name;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.zip.ZipEntry;
@@ -34,17 +36,19 @@ import java.util.zip.ZipOutputStream;
 
 public class NativeObfuscator {
 
-    private Snippets snippets;
-    private StringPool stringPool;
-    private InterfaceStaticClassProvider staticClassProvider;
-    private MethodProcessor methodProcessor;
+    private final static Logger LOGGER = Logger.getLogger(NativeObfuscator.class.getName());
 
-    private NodeCache<String> cachedClasses;
-    private NodeCache<CachedMethodInfo> cachedMethods;
-    private NodeCache<CachedFieldInfo> cachedFields;
+    private final Snippets snippets;
+    private final StringPool stringPool;
+    private InterfaceStaticClassProvider staticClassProvider;
+    private final MethodProcessor methodProcessor;
+
+    private final NodeCache<String> cachedClasses;
+    private final NodeCache<CachedMethodInfo> cachedMethods;
+    private final NodeCache<CachedFieldInfo> cachedFields;
 
     private StringBuilder nativeMethods;
-    private Map<String, InvokeDynamicInsnNode> invokeDynamics;
+    private final Map<String, InvokeDynamicInsnNode> invokeDynamics;
 
     private int currentClassId;
     private String nativeDir;
@@ -96,7 +100,7 @@ public class NativeObfuscator {
         try (JarFile jar = new JarFile(jarFile);
              ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())))) {
 
-            System.out.println("Processing " + jarFile + "...");
+            LOGGER.log(Level.INFO, "Processing {0}...", jarFile);
 
             int nativeDirId = IntStream.iterate(0, i -> i + 1)
                     .filter(i -> jar.stream().noneMatch(x -> x.getName().startsWith("native" + i)))
@@ -132,12 +136,12 @@ public class NativeObfuscator {
                     classReader.accept(classNode, 0);
 
                     if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess)) {
-                        System.out.println("Skipping " + classNode.name);
+                        LOGGER.log(Level.INFO, "Skipping {0}", classNode.name);
                         Util.writeEntry(out, entry.getName(), src);
                         return;
                     }
 
-                    System.out.println("Processing " + classNode.name);
+                    LOGGER.log(Level.INFO, "Processing {0}", classNode.name);
 
                     if (classNode.methods.stream().noneMatch(x -> x.name.equals("<clinit>"))) {
                         classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC,
@@ -189,8 +193,8 @@ public class NativeObfuscator {
                     }
 
                     currentClassId++;
-                } catch (IOException e1) {
-                    e1.printStackTrace(System.err);
+                } catch (IOException ex) {
+                    LOGGER.log(Level.WARNING, "Error while processing " + entry.getName(), ex);
                 }
             });
 
@@ -212,10 +216,10 @@ public class NativeObfuscator {
             ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             loaderClass.accept(classWriter);
             Util.writeEntry(out, "native" + nativeDirId + "/Loader.class", classWriter.toByteArray());
-            System.out.println("Jar file ready!");
+            LOGGER.info("Jar file ready!");
             String mainClass = (String) mf.getMainAttributes().get(Name.MAIN_CLASS);
             if (mainClass != null) {
-                System.out.println("Creating bootstrap classes...");
+                LOGGER.info("Creating bootstrap classes...");
                 mf.getMainAttributes().put(Name.MAIN_CLASS, "native" + nativeDirId + "/Bootstrap");
                 ClassNode bootstrapClass = new ClassNode(Opcodes.ASM7);
                 bootstrapClass.sourceFile = "synthetic";
@@ -232,9 +236,9 @@ public class NativeObfuscator {
                 bootstrapClass.methods.add(mainMethod);
                 bootstrapClass.accept(classWriter);
                 Util.writeEntry(out, "native" + nativeDirId + "/Bootstrap.class", classWriter.toByteArray());
-                System.out.println("Created!");
+                LOGGER.info("Created!");
             } else {
-                System.out.println("Main-Class not found - no bootstrap classes!");
+                LOGGER.info("Main-Class not found - no bootstrap classes!");
             }
             out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
             mf.write(out);

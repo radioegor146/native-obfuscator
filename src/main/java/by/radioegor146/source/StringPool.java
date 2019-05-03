@@ -8,8 +8,8 @@ import java.util.stream.Collectors;
 
 public class StringPool {
 
-    private int length;
-    private Map<String, Integer> pool;
+    private long length;
+    private final Map<String, Long> pool;
 
     public StringPool() {
         this.length = 0;

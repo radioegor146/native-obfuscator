@@ -4,10 +4,10 @@ import java.util.Objects;
 
 public class CachedFieldInfo {
 
-    private String clazz;
-    private String name;
-    private String desc;
-    private boolean isStatic;
+    private final String clazz;
+    private final String name;
+    private final String desc;
+    private final boolean isStatic;
 
     public CachedFieldInfo(String clazz, String name, String desc, boolean isStatic) {
         this.clazz = clazz;

@@ -5,8 +5,8 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 
 public class InstructionHandlerContainer<T extends AbstractInsnNode> {
 
-    private InstructionTypeHandler<T> handler;
-    private Class<T> clazz;
+    private final InstructionTypeHandler<T> handler;
+    private final Class<T> clazz;
 
     public InstructionHandlerContainer(InstructionTypeHandler<T> handler, Class<T> clazz) {
         this.handler = handler;

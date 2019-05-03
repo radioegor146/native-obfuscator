@@ -13,14 +13,14 @@ import java.util.Map;
 
 public class ClassSourceBuilder implements AutoCloseable {
 
-    private Path cppFile;
-    private Path hppFile;
-    private BufferedWriter cppWriter;
-    private BufferedWriter hppWriter;
-    private String className;
-    private String filename;
+    private final Path cppFile;
+    private final Path hppFile;
+    private final BufferedWriter cppWriter;
+    private final BufferedWriter hppWriter;
+    private final String className;
+    private final String filename;
 
-    private StringPool stringPool;
+    private final StringPool stringPool;
 
     public ClassSourceBuilder(Path cppOutputDir, String className, StringPool stringPool) throws IOException {
         this.className = className;
