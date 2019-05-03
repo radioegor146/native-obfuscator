@@ -131,24 +131,26 @@ public class NativeObfuscator {
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
 
-                    if (classNode.methods.stream().noneMatch(x -> (x.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) == 0 && !x.name.equals("<init>"))) {
+                    if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess)) {
                         System.out.println("Skipping " + classNode.name);
                         Util.writeEntry(out, entry.getName(), src);
                         return;
                     }
 
                     System.out.println("Processing " + classNode.name);
+
                     if (classNode.methods.stream().noneMatch(x -> x.name.equals("<clinit>"))) {
-                        classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC, "<clinit>", "()V", null, new String[0]));
+                        classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC,
+                                "<clinit>", "()V", null, new String[0]));
                     }
 
                     staticClassProvider.newClass();
 
+                    invokeDynamics.clear();
+
                     cachedClasses.clear();
                     cachedMethods.clear();
                     cachedFields.clear();
-
-                    invokeDynamics = new HashMap<>();
 
                     try (ClassSourceBuilder cppBuilder = new ClassSourceBuilder(cppOutput, classNode.name, stringPool)) {
                         StringBuilder instructions = new StringBuilder();
@@ -185,11 +187,13 @@ public class NativeObfuscator {
                         mainSourceBuilder.addHeader(cppBuilder.getHppFilename());
                         mainSourceBuilder.registerClassMethods(currentClassId, cppBuilder.getFilename());
                     }
+
                     currentClassId++;
                 } catch (IOException e1) {
                     e1.printStackTrace(System.err);
                 }
             });
+
             for (ClassNode ifaceStaticClass : staticClassProvider.getReadyClasses()) {
                 ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 ifaceStaticClass.accept(classWriter);

@@ -4,7 +4,7 @@ import by.radioegor146.MethodContext;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.IntInsnNode;
 
-public class IntInstructionHandler extends GenericInstructionHandler<IntInsnNode> {
+public class IntHandler extends GenericInstructionHandler<IntInsnNode> {
 
     @Override
     protected void process(MethodContext context, IntInsnNode node) {

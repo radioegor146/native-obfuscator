@@ -4,10 +4,10 @@ import java.util.Objects;
 
 public class CachedMethodInfo {
 
-    public String clazz;
-    public String name;
-    public String desc;
-    public boolean isStatic;
+    private String clazz;
+    private String name;
+    private String desc;
+    private boolean isStatic;
 
     public CachedMethodInfo(String clazz, String name, String desc, boolean isStatic) {
         this.clazz = clazz;
@@ -17,36 +17,18 @@ public class CachedMethodInfo {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final CachedMethodInfo other = (CachedMethodInfo) obj;
-        if (!Objects.equals(this.clazz, other.clazz)) {
-            return false;
-        }
-        if (!Objects.equals(this.name, other.name)) {
-            return false;
-        }
-        if (!Objects.equals(this.desc, other.desc)) {
-            return false;
-        }
-        return Objects.equals(this.isStatic, other.isStatic);
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CachedMethodInfo that = (CachedMethodInfo) o;
+        return isStatic == that.isStatic &&
+                clazz.equals(that.clazz) &&
+                name.equals(that.name) &&
+                desc.equals(that.desc);
     }
 
     @Override
     public int hashCode() {
-        int hash = 7;
-        hash = 97 * hash + Objects.hashCode(this.clazz);
-        hash = 97 * hash + Objects.hashCode(this.name);
-        hash = 97 * hash + Objects.hashCode(this.desc);
-        hash = 97 * hash + Objects.hashCode(this.isStatic);
-        return hash;
+        return Objects.hash(clazz, name, desc, isStatic);
     }
 }
