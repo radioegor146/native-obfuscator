@@ -3,11 +3,13 @@ package by.radioegor146;
 import by.radioegor146.source.StringPool;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class MethodContext {
 
@@ -68,6 +70,10 @@ public class MethodContext {
 
     public StringPool getStringPool() {
         return obfuscator.getStringPool();
+    }
+
+    public Map<String, InvokeDynamicInsnNode> getInvokeDynamics() {
+        return obfuscator.getInvokeDynamics();
     }
 
 }

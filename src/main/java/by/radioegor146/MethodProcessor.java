@@ -62,7 +62,7 @@ public class MethodProcessor {
         handlers[1] = new InstructionHandlerContainer<>(new IntInstructionHandler(), IntInsnNode.class);
         handlers[2] = new InstructionHandlerContainer<>(new VarHandler(), VarInsnNode.class);
         handlers[3] = new InstructionHandlerContainer<>(new TypeHandler(), TypeInsnNode.class);
-        handlers[4] = new InstructionHandlerContainer<>(new FieldInstructionHandler(), FieldInsnNode.class);
+        handlers[4] = new InstructionHandlerContainer<>(new FieldHandler(), FieldInsnNode.class);
         handlers[5] = new InstructionHandlerContainer<>(new MethodHandler(), MethodInsnNode.class);
         handlers[6] = new InstructionHandlerContainer<>(new InvokeDynamicHandler(), InvokeDynamicInsnNode.class);
         handlers[7] = new InstructionHandlerContainer<>(new JumpHandler(), JumpInsnNode.class);

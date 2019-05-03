@@ -4,7 +4,6 @@
 #include <cstring>
 #include <string>
 #include <cstdio>
-#include <atomic>
 #include <unordered_set>
 
 #ifndef NATIVE_JVM_HPP_GUARD
