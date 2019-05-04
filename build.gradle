@@ -41,3 +41,8 @@ test {
             logger.lifecycle "${desc.name} [STDERR]: ${event.message.replaceAll("[\n\r]", "")}"
     }
 }
+
+processTestResources {
+    from 'test_data'
+}
+
