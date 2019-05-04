@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ public class NativeObfuscator {
     private final NodeCache<CachedMethodInfo> cachedMethods;
     private final NodeCache<CachedFieldInfo> cachedFields;
 
+    public List<String> exclusions = Collections.emptyList();
     private StringBuilder nativeMethods;
     private final Map<String, InvokeDynamicInsnNode> invokeDynamics;
 
@@ -63,9 +65,9 @@ public class NativeObfuscator {
         methodProcessor = new MethodProcessor(this);
     }
 
-    public void process(Path inputJarPath, Path outputDir, List<Path> libs) throws IOException {
+    public void process(Path inputJarPath, Path outputDir, List<Path> libs, List<String> exclusions) throws IOException {
         libs.add(inputJarPath);
-
+        this.exclusions = exclusions;
         ClassMetadataReader metadataReader = new ClassMetadataReader(libs.stream().map(x -> {
             try {
                 return new JarFile(x.toFile());
@@ -135,7 +137,7 @@ public class NativeObfuscator {
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
 
-                    if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess)) {
+                    if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) || exclusions.contains(classNode.name)) {
                         LOGGER.log(Level.INFO, "Skipping {0}", classNode.name);
                         Util.writeEntry(out, entry.getName(), src);
                         return;
@@ -254,7 +256,7 @@ public class NativeObfuscator {
         Files.write(cppDir.resolve("CMakeLists.txt"), cMakeBuilder.build().getBytes(StandardCharsets.UTF_8));
     }
 
-    public Snippets getSnippets() {
+	public Snippets getSnippets() {
         return snippets;
     }
 

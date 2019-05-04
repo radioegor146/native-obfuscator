@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.function.Executable;
 
@@ -78,7 +79,7 @@ public class ClassicTest implements Executable {
                     .check("Jar command");
 
             System.out.println("Processing...");
-            new NativeObfuscator().process(tempDirectory.resolve("test.jar"), tempOutputDirectory, new ArrayList<>());
+            new NativeObfuscator().process(tempDirectory.resolve("test.jar"), tempOutputDirectory, new ArrayList<>(), Collections.emptyList());
 
             System.out.println("Ideal...");
             ProcessResult idealRunResult = ProcessHelper.run(tempDirectory, 30000, "java", "-jar", tempDirectory.resolve("test.jar").toAbsolutePath().toString());

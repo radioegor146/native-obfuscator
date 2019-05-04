@@ -100,7 +100,7 @@ public class MethodProcessor {
         MethodNode method = context.method;
         StringBuilder output = context.output;
 
-        if (!shouldProcess(method)) {
+        if (!shouldProcess(method) || context.obfuscator.exclusions.contains(nameFromNode(method, context.clazz))) {
             return;
         }
 
@@ -200,6 +200,10 @@ public class MethodProcessor {
         method.tryCatchBlocks.clear();
 
         specialMethodProcessor.postProcess(context);
+    }
+
+    public static String nameFromNode(MethodNode m, ClassNode cn) {
+    	return cn.name + "#" + m.name + m.desc;
     }
 
 }
