@@ -11,6 +11,10 @@ if (!hasProperty('mainClass')) {
     ext.mainClass = 'by.radioegor146.Main'
 }
 
+if (!hasProperty('ide.eclipse')) {
+    sourceSets.test.resources.srcDirs += file('test_data')
+}
+
 repositories {
     mavenLocal()
     mavenCentral()
@@ -42,6 +46,7 @@ test {
     }
 }
 
+if (hasProperty('ide.eclipse'))
 processTestResources {
     from 'test_data'
 }
