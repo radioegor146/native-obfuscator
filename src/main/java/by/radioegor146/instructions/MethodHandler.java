@@ -8,7 +8,6 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.MethodInsnNode;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {

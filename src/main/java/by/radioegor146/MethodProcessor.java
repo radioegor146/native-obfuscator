@@ -203,7 +203,7 @@ public class MethodProcessor {
     }
 
     public static String nameFromNode(MethodNode m, ClassNode cn) {
-    	return cn.name + "#" + m.name + m.desc;
+    	return cn.name + '#' + m.name + '!' + m.desc;
     }
 
 }
