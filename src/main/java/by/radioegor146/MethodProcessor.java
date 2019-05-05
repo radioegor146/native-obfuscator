@@ -173,15 +173,16 @@ public class MethodProcessor {
             classesForTryCatches.forEach((clazz) -> {
                 int classId = context.getCachedClasses().getId(clazz);
 
-                context.output.append(String.format("if (!cclasses[%d]) { cclasses_mtx[%d].lock(); "
+                context.output.append(String.format("    if (!cclasses[%d]) { cclasses_mtx[%d].lock(); "
                         + "if (!cclasses[%d]) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); } } "
-                        + "cclasses_mtx[%d].unlock(); if (env->ExceptionCheck()) { return; } } ",
+                        + "cclasses_mtx[%d].unlock(); if (env->ExceptionCheck()) { return (%s) 0; } }\n",
                         classId,
                         classId,
                         classId,
                         getClassGetter(context, clazz),
                         classId,
-                        classId));
+                        classId,
+                        CPP_TYPES[context.ret.getSort()]));
             });
         }
 
