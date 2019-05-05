@@ -37,6 +37,7 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
         switch (node.type) {
             case Opcodes.F_APPEND:
                 node.local.forEach(appendLocal);
+                context.stack.clear();
                 break;
 
             case Opcodes.F_CHOP:
@@ -57,6 +58,7 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
                 break;
 
             case Opcodes.F_SAME1:
+                context.stack.clear();
                 appendStack.accept(node.stack.get(0));
                 break;
         }
