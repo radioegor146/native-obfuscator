@@ -82,10 +82,10 @@ public class NativeObfuscator {
         Path cppOutput = cppDir.resolve("output");
         Files.createDirectories(cppOutput);
 
-        Util.copyResource(Paths.get("sources", "native_jvm.cpp"), cppDir);
-        Util.copyResource(Paths.get("sources", "native_jvm.hpp"), cppDir);
-        Util.copyResource(Paths.get("sources", "native_jvm_output.hpp"), cppDir);
-        Util.copyResource(Paths.get("sources", "string_pool.hpp"), cppDir);
+        Util.copyResource("sources/native_jvm.cpp", cppDir);
+        Util.copyResource("sources/native_jvm.hpp", cppDir);
+        Util.copyResource("sources/native_jvm_output.hpp", cppDir);
+        Util.copyResource("sources/string_pool.hpp", cppDir);
 
         String projectName = String.format("native_jvm_classes_%s",
                 inputJarPath.getFileName().toString().replaceAll("[$#.\\s/]", "_"));
@@ -221,7 +221,7 @@ public class NativeObfuscator {
             loaderClass.accept(classWriter);
             Util.writeEntry(out, "native" + nativeDirId + "/Loader.class", classWriter.toByteArray());
             LOGGER.info("Jar file ready!");
-            String mainClass = (String) mf.getMainAttributes().get(Name.MAIN_CLASS);
+            String mainClass = mf != null ? (String) mf.getMainAttributes().get(Name.MAIN_CLASS) : null;
             if (mainClass != null) {
                 LOGGER.info("Creating bootstrap classes...");
                 mf.getMainAttributes().put(Name.MAIN_CLASS, "native" + nativeDirId + "/Bootstrap");
@@ -245,7 +245,8 @@ public class NativeObfuscator {
                 LOGGER.info("Main-Class not found - no bootstrap classes!");
             }
             out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
-            mf.write(out);
+            if (mf != null)
+                mf.write(out);
             out.closeEntry();
             metadataReader.close();
         }

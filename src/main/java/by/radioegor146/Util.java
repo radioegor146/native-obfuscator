@@ -4,6 +4,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
@@ -74,10 +75,10 @@ public class Util {
         }
     }
 
-    public static void copyResource(Path from, Path to) throws IOException {
-        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream(from.toString())) {
+    public static void copyResource(String from, Path to) throws IOException {
+        try (InputStream in = NativeObfuscator.class.getClassLoader().getResourceAsStream(from)) {
             Objects.requireNonNull(in, "Can't copy resource " + from);
-            Files.copy(in, to.resolve(from.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(in, to.resolve(Paths.get(from).getFileName()), StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
