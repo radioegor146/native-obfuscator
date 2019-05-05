@@ -25,7 +25,6 @@ public class TestsGenerator {
         return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS)
                 .filter(Files::isDirectory)
                 .filter(TestsGenerator::noChildDirectories)
-//                .filter(p -> p.toString().contains("util"))
                 .map(p -> DynamicTest.dynamicTest(p.toString(), new ClassicTest(p)));
     }
 
