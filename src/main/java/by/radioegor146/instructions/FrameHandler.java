@@ -53,16 +53,11 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
                 break;
 
             case Opcodes.F_SAME:
+                context.stack.clear();
                 break;
 
             case Opcodes.F_SAME1:
-                if (node.stack.get(0) instanceof String) {
-                    context.stack.add(MethodProcessor.TYPE_TO_STACK[Type.OBJECT]);
-                } else if (node.stack.get(0) instanceof LabelNode) {
-                    context.stack.add(MethodProcessor.TYPE_TO_STACK[Type.OBJECT]);
-                } else {
-                    context.stack.add(MethodProcessor.STACK_TO_STACK[(int) node.stack.get(0)]);
-                }
+                appendStack.accept(node.stack.get(0));
                 break;
         }
 
