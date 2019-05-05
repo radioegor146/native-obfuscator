@@ -11,7 +11,6 @@ import java.util.Map;
 
 public abstract class GenericInstructionHandler<T extends AbstractInsnNode> implements InstructionTypeHandler<T> {
 
-
     protected Map<String, String> props;
     protected String instructionName;
     protected String trimmedTryCatchBlock;
