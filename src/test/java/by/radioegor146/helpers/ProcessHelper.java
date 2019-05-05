@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -40,7 +41,7 @@ public class ProcessHelper {
         }
     }
 
-    public static ProcessResult run(Path directory, long timeLimit, String... command) throws IOException {
+    public static ProcessResult run(Path directory, long timeLimit, List<String> command) throws IOException {
         Process process = new ProcessBuilder(command).directory(directory.toFile()).start();
         long startTime = System.currentTimeMillis();
         boolean success = true;
