@@ -11,10 +11,10 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
         Object cst = node.cst;
         if (cst instanceof String) {
             instructionName += "_STRING";
-            props.put("cst", String.valueOf(node.cst));
+            props.put("cst_ptr", context.getCachedStrings().getPointer(node.cst.toString()));
         } else if (cst instanceof Integer) {
             instructionName += "_INT";
-            props.put("cst", String.valueOf(node.cst));
+            props.put("cst", node.cst.toString());
         } else if (cst instanceof Long) {
             instructionName += "_LONG";
             long cstVal = (long) cst;
@@ -25,7 +25,7 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             }
         } else if (cst instanceof Float) {
             instructionName += "_FLOAT";
-            props.put("cst", String.valueOf(node.cst));
+            props.put("cst", node.cst.toString());
             float cstVal = (float) cst;
             if (cst.toString().equals("NaN")) {
                 props.put("cst", "NAN");
@@ -36,7 +36,7 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             }
         } else if (cst instanceof Double) {
             instructionName += "_DOUBLE";
-            props.put("cst", String.valueOf(node.cst));
+            props.put("cst", node.cst.toString());
             double cstVal = (double) cst;
             if (cst.toString().equals("NaN")) {
                 props.put("cst", "NAN");

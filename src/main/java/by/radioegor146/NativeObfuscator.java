@@ -44,6 +44,7 @@ public class NativeObfuscator {
     private InterfaceStaticClassProvider staticClassProvider;
     private final MethodProcessor methodProcessor;
 
+    private final NodeCache<String> cachedStrings;
     private final NodeCache<String> cachedClasses;
     private final NodeCache<CachedMethodInfo> cachedMethods;
     private final NodeCache<CachedFieldInfo> cachedFields;
@@ -58,6 +59,7 @@ public class NativeObfuscator {
     public NativeObfuscator() {
         stringPool = new StringPool();
         snippets = new Snippets(stringPool);
+        cachedStrings = new NodeCache<>("(cstrings[%d])");
         cachedClasses = new NodeCache<>("(cclasses[%d])");
         cachedMethods = new NodeCache<>("(cmethods[%d])");
         cachedFields = new NodeCache<>("(cfields[%d])");
@@ -183,9 +185,9 @@ public class NativeObfuscator {
                         classNode.accept(classWriter);
                         Util.writeEntry(out, entry.getName(), classWriter.toByteArray());
 
-                        cppBuilder.addHeader(cachedClasses.size(), cachedMethods.size(), cachedFields.size());
+                        cppBuilder.addHeader(cachedStrings.size(), cachedClasses.size(), cachedMethods.size(), cachedFields.size());
                         cppBuilder.addInstructions(instructions.toString());
-                        cppBuilder.registerMethods(cachedClasses, nativeMethods.toString(), staticClassProvider);
+                        cppBuilder.registerMethods(cachedStrings, cachedClasses, nativeMethods.toString(), staticClassProvider);
 
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getHppFilename());
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getCppFilename());
@@ -266,6 +268,10 @@ public class NativeObfuscator {
 
     public InterfaceStaticClassProvider getStaticClassProvider() {
         return staticClassProvider;
+    }
+
+    public NodeCache<String> getCachedStrings() {
+        return cachedStrings;
     }
 
     public NodeCache<String> getCachedClasses() {

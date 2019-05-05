@@ -39,6 +39,7 @@ namespace native_jvm::utils {
     }
 
     jclass boolean_array_class;
+    jmethodID string_intern_method;
 
     void init_utils(JNIEnv *env) {
         jclass clazz = env->FindClass("[Z");
@@ -46,6 +47,14 @@ namespace native_jvm::utils {
             return;
         boolean_array_class = (jclass) env->NewGlobalRef(clazz);
         env->DeleteLocalRef(clazz);
+
+        jclass string_clazz = env->FindClass("java/lang/String");
+        if (env->ExceptionCheck())
+            return;
+        string_intern_method = env->GetMethodID(string_clazz, "intern", "()Ljava/lang/String;");
+        if (env->ExceptionCheck())
+            return;
+        env->DeleteLocalRef(string_clazz);
     }
 
     jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, const char *class_name, int line) {
@@ -187,5 +196,12 @@ namespace native_jvm::utils {
             if (env->GetObjectRefType(ref) == JNILocalRefType)
                 env->DeleteLocalRef(ref);
         refs.clear();
+    }
+
+    jstring get_interned(JNIEnv *env, jstring value) {
+        jstring result = (jstring) env->CallObjectMethod(value, string_intern_method);
+        if (env->ExceptionCheck())
+            return nullptr;
+        return result;
     }
 }

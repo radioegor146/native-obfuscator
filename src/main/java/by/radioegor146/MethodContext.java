@@ -52,6 +52,10 @@ public class MethodContext {
         this.tryCatches = new ArrayList<>();
     }
 
+    public NodeCache<String> getCachedStrings() {
+        return obfuscator.getCachedStrings();
+    }
+
     public NodeCache<String> getCachedClasses() {
         return obfuscator.getCachedClasses();
     }

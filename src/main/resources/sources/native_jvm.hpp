@@ -149,6 +149,8 @@ namespace native_jvm::utils {
     jint cast_fi(jfloat value);
 
     void clear_refs(JNIEnv *env, std::unordered_set<jobject> &refs);
+
+    jstring get_interned(JNIEnv *env, jstring value);
 }
 
 #endif

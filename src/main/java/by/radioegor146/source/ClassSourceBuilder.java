@@ -33,7 +33,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         hppWriter = Files.newBufferedWriter(hppFile, StandardCharsets.UTF_8);
     }
 
-    public void addHeader(int classes, int methods, int fields) throws IOException {
+    public void addHeader(int strings, int classes, int methods, int fields) throws IOException {
         cppWriter.append("#include \"../native_jvm.hpp\"\n");
         cppWriter.append("#include \"../string_pool.hpp\"\n");
         cppWriter.append("#include \"").append(getHppFilename()).append("\"\n");
@@ -42,6 +42,9 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("namespace native_jvm::classes::__ngen_").append(filename).append(" {\n\n");
         cppWriter.append("    char *string_pool;\n\n");
 
+        if (strings > 0) {
+            cppWriter.append(String.format("    jstring cstrings[%d];\n", strings));
+        }
         if (classes > 0) {
             cppWriter.append(String.format("    jclass cclasses[%d];\n", classes));
         }
@@ -73,7 +76,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("\n");
     }
 
-    public void registerMethods(NodeCache<String> classes, String nativeMethods,
+    public void registerMethods(NodeCache<String> strings, NodeCache<String> classes, String nativeMethods,
                                 InterfaceStaticClassProvider staticClassProvider) throws IOException {
 
         cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env) {\n");
@@ -83,6 +86,12 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append("        if (jclass clazz = ").append(getGetterForType(clazz.getKey())).append(") { ")
                     .append(String.format("cclasses[%d] = ", clazz.getValue()))
                     .append("(jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); }\n");
+        }
+
+        for (Map.Entry<String, Integer> string : strings.getCache().entrySet()) {
+            cppWriter.append("            if (jstring str = env->NewStringUTF(" + stringPool.get(string.getKey()) + ")) { if (jstring int_str = utils::get_interned(env, str)) { ")
+                    .append(String.format("cstrings[%d] = ", string.getValue()))
+                    .append("(jstring) env->NewGlobalRef(int_str); env->DeleteLocalRef(str); env->DeleteLocalRef(int_str); } }\n");
         }
 
         if (!classes.isEmpty()) {
