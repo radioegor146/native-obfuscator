@@ -13,7 +13,9 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class MethodProcessor {
@@ -96,6 +98,16 @@ public class MethodProcessor {
                 !method.name.equals("<init>");
     }
 
+    public static String getClassGetter(MethodContext context, String desc) {
+        if (desc.startsWith("[")) {
+            return "env->FindClass(" + context.getStringPool().get(desc) + ")";
+        }
+        if (desc.endsWith(";")) {
+            desc = desc.substring(1, desc.length() - 1);
+        }
+        return "utils::find_class_wo_static(env, " + context.getStringPool().get(desc.replace("/", ".")) + ")";
+    }
+
     public void processMethod(MethodContext context) {
         MethodNode method = context.method;
         StringBuilder output = context.output;
@@ -117,11 +129,11 @@ public class MethodProcessor {
         Type[] args = Type.getArgumentTypes(method.desc);
 
         context.argTypes = new ArrayList<>(Arrays.asList(args));
-        if(!isStatic) {
+        if (!isStatic) {
             context.argTypes.add(0, Type.getType(Object.class));
         }
 
-        if(Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
+        if (Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
             String targetDesc = String.format("(%s)%s",
                     context.argTypes.stream().map(Type::getDescriptor).collect(Collectors.joining()),
                     context.ret.getDescriptor());
@@ -146,7 +158,7 @@ public class MethodProcessor {
         output.append(isStatic ? "jclass clazz" : "jobject obj");
 
         ArrayList<String> argNames = new ArrayList<>();
-        if(!isStatic) argNames.add("obj");
+        if (!isStatic) argNames.add("obj");
 
         for (int i = 0; i < args.length; i++) {
             argNames.add("arg" + i);
@@ -155,11 +167,29 @@ public class MethodProcessor {
 
         output.append(") {").append("\n");
 
-        if(method.maxStack > 0) {
+        if (method.tryCatchBlocks != null) {
+            Set<String> classesForTryCatches = method.tryCatchBlocks.stream().filter((tryCatchBlock) -> (tryCatchBlock.type != null)).map(x -> x.type)
+                    .collect(Collectors.toSet());
+            classesForTryCatches.forEach((clazz) -> {
+                int classId = context.getCachedClasses().getId(clazz);
+
+                context.output.append(String.format("if (!cclasses[%d]) { cclasses_mtx[%d].lock(); "
+                        + "if (!cclasses[%d]) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); } } "
+                        + "cclasses_mtx[%d].unlock(); if (env->ExceptionCheck()) { return; } } ",
+                        classId,
+                        classId,
+                        classId,
+                        getClassGetter(context, clazz),
+                        classId,
+                        classId));
+            });
+        }
+
+        if (method.maxStack > 0) {
             output.append(String.format("    utils::jvm_stack<%d> cstack;\n", method.maxStack));
         }
 
-        if(method.maxLocals > 0) {
+        if (method.maxLocals > 0) {
             output.append(String.format("    utils::local_vars<%d> clocals;\n", method.maxLocals));
         }
 
@@ -167,7 +197,7 @@ public class MethodProcessor {
         output.append("\n");
 
         int localIndex = 0;
-        for(int i = 0; i < context.argTypes.size(); ++i) {
+        for (int i = 0; i < context.argTypes.size(); ++i) {
             Type current = context.argTypes.get(i);
             output.append("    ").append(obfuscator.getSnippets().getSnippet(
                     "LOCAL_LOAD_ARG_" + current.getSort(), Util.createMap(
@@ -180,7 +210,7 @@ public class MethodProcessor {
 
         context.argTypes.forEach(t -> context.locals.add(TYPE_TO_STACK[t.getSort()]));
 
-        for(int instruction = 0; instruction < method.instructions.size(); ++instruction) {
+        for (int instruction = 0; instruction < method.instructions.size(); ++instruction) {
             AbstractInsnNode node = method.instructions.get(instruction);
 
             if(method.name.equals("<init>") && context.invokeSpecialId == -1) {

@@ -2,6 +2,7 @@ package by.radioegor146.instructions;
 
 import by.radioegor146.CachedMethodInfo;
 import by.radioegor146.MethodContext;
+import by.radioegor146.MethodProcessor;
 import by.radioegor146.Util;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -44,6 +45,17 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
         if (isStatic || node.getOpcode() == Opcodes.INVOKESPECIAL) {
             props.put("class_ptr", context.getCachedClasses().getPointer(node.owner));
         }
+
+        int classId = context.getCachedClasses().getId(node.owner);
+
+        context.output.append(String.format("if (!cclasses[%d]) { cclasses_mtx[%d].lock(); if (!cclasses[%d]) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); } } cclasses_mtx[%d].unlock(); %s } ",
+                classId,
+                classId,
+                classId,
+                MethodProcessor.getClassGetter(context, node.owner),
+                classId,
+                classId,
+                trimmedTryCatchBlock));
 
         CachedMethodInfo methodInfo = new CachedMethodInfo(node.owner, node.name, node.desc, isStatic);
         int methodId = context.getCachedMethods().getId(methodInfo);

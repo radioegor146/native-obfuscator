@@ -2,6 +2,7 @@ package by.radioegor146.instructions;
 
 import by.radioegor146.CachedMethodInfo;
 import by.radioegor146.MethodContext;
+import by.radioegor146.MethodProcessor;
 import by.radioegor146.Util;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -40,8 +41,19 @@ public class InvokeDynamicHandler extends GenericInstructionHandler<InvokeDynami
         context.output.append(context.getSnippets().getSnippet("INVOKE_POPCNT",
                 Util.createMap("count", -stackOffset - 1))).append(" ");
 
+
         props.put("class_ptr", context.getCachedClasses().getPointer(context.clazz.name));
 
+        int classId = context.getCachedClasses().getId(context.clazz.name);
+        context.output.append(String.format("if (!cclasses[%d]) { cclasses_mtx[%d].lock(); if (!cclasses[%d]) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); } } cclasses_mtx[%d].unlock(); %s } ",
+                classId,
+                classId,
+                classId,
+                MethodProcessor.getClassGetter(context, context.clazz.name),
+                classId,
+                classId,
+                trimmedTryCatchBlock));
+        
         CachedMethodInfo methodInfo = new CachedMethodInfo(context.clazz.name, indyMethodName, node.desc, true);
         int methodId = context.getCachedMethods().getId(methodInfo);
         props.put("methodid", context.getCachedMethods().getPointer(methodInfo));

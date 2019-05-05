@@ -1,6 +1,7 @@
 package by.radioegor146.instructions;
 
 import by.radioegor146.MethodContext;
+import by.radioegor146.MethodProcessor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.LdcInsnNode;
 
@@ -47,6 +48,17 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             }
         } else if (cst instanceof Type) {
             instructionName += "_CLASS";
+
+            int classId = context.getCachedClasses().getId(node.cst.toString());
+            context.output.append(String.format("if (!cclasses[%d]) { cclasses_mtx[%d].lock(); if (!cclasses[%d]) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); } } cclasses_mtx[%d].unlock(); %s } ",
+                    classId,
+                    classId,
+                    classId,
+                    MethodProcessor.getClassGetter(context, node.cst.toString()),
+                    classId,
+                    classId,
+                    trimmedTryCatchBlock));
+            
             props.put("cst_ptr", context.getCachedClasses().getPointer(node.cst.toString()));
         } else {
             throw new UnsupportedOperationException();

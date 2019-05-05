@@ -46,6 +46,7 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append(String.format("    jstring cstrings[%d];\n", strings));
         }
         if (classes > 0) {
+            cppWriter.append(String.format("    std::mutex cclasses_mtx[%d];\n", classes));
             cppWriter.append(String.format("    jclass cclasses[%d];\n", classes));
         }
         if (methods > 0) {
@@ -81,12 +82,6 @@ public class ClassSourceBuilder implements AutoCloseable {
 
         cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jvmtiEnv *jvmti_env) {\n");
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
-
-        for (Map.Entry<String, Integer> clazz : classes.getCache().entrySet()) {
-            cppWriter.append("        if (jclass clazz = ").append(getGetterForType(clazz.getKey())).append(") { ")
-                    .append(String.format("cclasses[%d] = ", clazz.getValue()))
-                    .append("(jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); }\n");
-        }
 
         for (Map.Entry<String, Integer> string : strings.getCache().entrySet()) {
             cppWriter.append("            if (jstring str = env->NewStringUTF(" + stringPool.get(string.getKey()) + ")) { if (jstring int_str = utils::get_interned(env, str)) { ")

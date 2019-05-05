@@ -2,6 +2,7 @@ package by.radioegor146.instructions;
 
 import by.radioegor146.CachedFieldInfo;
 import by.radioegor146.MethodContext;
+import by.radioegor146.MethodProcessor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.FieldInsnNode;
@@ -17,6 +18,17 @@ public class FieldHandler extends GenericInstructionHandler<FieldInsnNode> {
         if (isStatic) {
             props.put("class_ptr", context.getCachedClasses().getPointer(node.owner));
         }
+
+        int classId = context.getCachedClasses().getId(node.owner);
+
+        context.output.append(String.format("if (!cclasses[%d]) { cclasses_mtx[%d].lock(); if (!cclasses[%d]) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); } } cclasses_mtx[%d].unlock(); %s } ",
+                classId,
+                classId,
+                classId,
+                MethodProcessor.getClassGetter(context, node.owner),
+                classId,
+                classId,
+                trimmedTryCatchBlock));
 
         int fieldId = context.getCachedFields().getId(info);
         props.put("fieldid", context.getCachedFields().getPointer(info));

@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdio>
 #include <unordered_set>
+#include <mutex>
 
 #ifndef NATIVE_JVM_HPP_GUARD
 
