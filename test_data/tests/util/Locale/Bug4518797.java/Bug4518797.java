@@ -36,7 +36,7 @@ public class Bug4518797 {
     static volatile String message = null;
 
     public static void main(String[] args) {
-        int duration = 180;
+        int duration = 10;
         if (args.length == 1) {
             duration = Math.max(5, Integer.parseInt(args[0]));
         }

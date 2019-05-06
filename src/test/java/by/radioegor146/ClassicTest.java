@@ -56,8 +56,11 @@ public class ClassicTest implements Executable {
             Path resultJar = tempOutput.resolve("test.jar");
 
             List<Path> javaFiles = new ArrayList<>();
+            List<Path> resourceFiles = new ArrayList<>();
             Files.find(testData, 1, (path, attr) -> attr.isRegularFile() && path.toString().endsWith(".java"))
                     .forEach(javaFiles::add);
+            Files.find(testData, 1, (path, attr) -> attr.isRegularFile() && !path.toString().endsWith(".java"))
+                    .forEach(resourceFiles::add);
 
             String mainClassName = javaFiles.stream()
                     .filter(uncheckedPredicate(p -> Files.lines(p).anyMatch(l -> l.matches(
@@ -67,6 +70,7 @@ public class ClassicTest implements Executable {
                     .findAny().orElseThrow(() -> new RuntimeException("Can't find class with main"));
 
             javaFiles.forEach(unchecked(p -> Files.copy(p, tempSource.resolve(p.getFileName()))));
+            resourceFiles.forEach(unchecked(p -> Files.copy(p, temp.resolve(p.getFileName()))));
 
             System.out.println("Compiling...");
 
@@ -76,9 +80,10 @@ public class ClassicTest implements Executable {
             ProcessHelper.run(temp, 10000, javacParameters)
                     .check("Compilation");
 
-            List<String> jarParameters = Arrays.asList(
+            List<String> jarParameters = new ArrayList<>(Arrays.asList(
                     "jar", "cvfe", idealJar.toString(), mainClassName,
-                    "-C", tempClasses.toString() + File.separator, ".");
+                    "-C", tempClasses.toString() + File.separator, "."));
+            resourceFiles.stream().map(Path::toString).forEach(jarParameters::add);
             ProcessHelper.run(temp, 10000,
                     jarParameters)
                     .check("Jar command");
@@ -121,7 +126,11 @@ public class ClassicTest implements Executable {
             System.out.println("Running test...");
 
             ProcessResult testRunResult = ProcessHelper.run(tempOutput, 30000,
-                    Arrays.asList("java", "-Djava.library.path=.", "-Dseed=1337", "-jar", resultJar.toString()));
+                    Arrays.asList("java",
+                            "-Djava.library.path=.",
+                            "-Dseed=1337",
+                            "-Dtest.src=" + temp.toString(),
+                            "-jar", resultJar.toString()));
             System.out.println(String.format("Took %dms", testRunResult.execTime));
             testRunResult.check("Test run");
 

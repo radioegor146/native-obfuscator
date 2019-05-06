@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2005, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,35 +21,4 @@
  * questions.
  */
 
-/*
- * @test
- * @bug 4308549
- * @summary Due to a bug in LinkedList's ListIterator's remove(),
- *     the ListIterator would not check for comodification before remove.
- * @author Konstantin Kladko
- */
-
-import java.util.*;
-import java.util.ListIterator;
-import java.util.ConcurrentModificationException;
-
-public class ComodifiedRemove {
-    public static void main(String[] args) {
-        List list = new LinkedList();
-        Object o1 = new Integer(1);
-        list.add(o1);
-        ListIterator e = list.listIterator();
-        e.next();
-        Object o2 = new Integer (2);
-        list.add(o2);
-
-        try{
-            e.remove();
-        } catch (ConcurrentModificationException cme) {
-            return;
-        }
-
-        throw new RuntimeException(
-            "LinkedList ListIterator.remove() comodification check failed.");
-    }
-}
+public abstract class FooService { }

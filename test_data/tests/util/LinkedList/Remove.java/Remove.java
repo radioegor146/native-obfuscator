@@ -32,8 +32,7 @@ import java.util.LinkedList;
 import java.util.ListIterator;
 
 public class Remove {
-    public static
-    void main(String[] args) {
+    public static void main(String[] args) {
         LinkedList list = new LinkedList();
         ListIterator e = list.listIterator();
         Object o = new Integer(1);
