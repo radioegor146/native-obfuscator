@@ -51,7 +51,7 @@ import java.util.concurrent.RecursiveAction;
  */
 public final class Integrate {
 
-    static final double errorTolerance = 1.0e-11;
+    static final double errorTolerance = 1.0e-9;
     /** for time conversion */
     static final long NPS = (1000L * 1000 * 1000);
 
@@ -66,12 +66,6 @@ public final class Integrate {
 
     static final double start = 0.0;
     static final double end = 1536.0;
-    /*
-     * The number of recursive calls for
-     * integrate from start to end.
-     * (Empirically determined)
-     */
-    static final int calls = 263479047;
 
     static String keywordValue(String[] args, String keyword) {
         for (String arg : args)
@@ -118,7 +112,6 @@ public final class Integrate {
             long now = System.nanoTime();
             double s = (double) (now - lastTime) / NPS;
             lastTime = now;
-            System.out.printf("Calls/sec: %12d", (long) (calls / s));
             System.out.printf(" Time: %7.3f", s);
             System.out.printf(" Area: %12.1f", a);
             System.out.println();

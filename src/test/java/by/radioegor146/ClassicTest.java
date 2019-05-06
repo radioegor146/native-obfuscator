@@ -83,10 +83,6 @@ public class ClassicTest implements Executable {
                     jarParameters)
                     .check("Jar command");
 
-            System.out.println("Processing...");
-
-            new NativeObfuscator().process(idealJar, tempOutput, new ArrayList<>(), Collections.emptyList());
-
             System.out.println("Ideal...");
 
             ProcessResult idealRunResult = ProcessHelper.run(temp, 300000,
@@ -94,22 +90,26 @@ public class ClassicTest implements Executable {
             System.out.println(String.format("Took %dms", idealRunResult.execTime));
             idealRunResult.check("Ideal run");
 
+            System.out.println("Processing...");
+
+            new NativeObfuscator().process(idealJar, tempOutput, new ArrayList<>(), Collections.emptyList());
+
             System.out.println("Compiling CPP code...");
             if (System.getProperty("os.name").toLowerCase().contains("windows")) {
                 String arch = "x64";
                 if (System.getProperty("sun.arch.data.model").equals("32")) {
                     arch = "x86";
                 }
-                ProcessHelper.run(tempCpp, 40000,
+                ProcessHelper.run(tempCpp, 120000,
                         Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
                         .check("CMake prepare");
             } else {
-                ProcessHelper.run(tempCpp, 40000,
+                ProcessHelper.run(tempCpp, 120000,
                         Arrays.asList("cmake", "."))
                         .check("CMake prepare");
             }
 
-            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 40000,
+            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 120000,
                     Arrays.asList("cmake", "--build", ".", "--config", "Release"));
             System.out.println(String.format("Took %dms", compileRunresult.execTime));
             compileRunresult.check("CMake build");
