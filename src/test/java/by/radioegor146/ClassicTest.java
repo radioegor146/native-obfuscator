@@ -89,7 +89,7 @@ public class ClassicTest implements Executable {
 
             System.out.println("Ideal...");
 
-            ProcessResult idealRunResult = ProcessHelper.run(temp, 30000,
+            ProcessResult idealRunResult = ProcessHelper.run(temp, 300000,
                     Arrays.asList("java", "-Dseed=1337", "-jar", idealJar.toString()));
             System.out.println(String.format("Took %dms", idealRunResult.execTime));
             idealRunResult.check("Ideal run");
@@ -120,7 +120,7 @@ public class ClassicTest implements Executable {
 
             System.out.println("Running test...");
 
-            ProcessResult testRunResult = ProcessHelper.run(tempOutput, 30000,
+            ProcessResult testRunResult = ProcessHelper.run(tempOutput, Math.max(300000, idealRunResult.execTime * 20),
                     Arrays.asList("java", "-Djava.library.path=.", "-Dseed=1337", "-jar", resultJar.toString()));
             System.out.println(String.format("Took %dms", testRunResult.execTime));
             testRunResult.check("Test run");
