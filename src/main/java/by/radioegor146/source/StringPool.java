@@ -19,7 +19,7 @@ public class StringPool {
     public String get(String value) {
         if (!pool.containsKey(value)) {
             pool.put(value, length);
-            length += value.getBytes(StandardCharsets.UTF_8).length + 1;
+            length += getModifiedUtf8Bytes(value).length + 1;
         }
         return String.format("((char *)(string_pool + %dLL))", pool.get(value));
     }
