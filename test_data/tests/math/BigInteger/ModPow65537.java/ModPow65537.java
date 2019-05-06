@@ -76,7 +76,6 @@ public class ModPow65537 {
     }
 
     private static void testSigning(KeyPair kp) throws Exception {
-        System.out.println(kp.getPublic());
         byte[] data = new byte[1024];
         new Random().nextBytes(data);
 
