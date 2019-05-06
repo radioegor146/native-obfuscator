@@ -2,20 +2,17 @@ package by.radioegor146;
 
 import by.radioegor146.helpers.ProcessHelper;
 import by.radioegor146.helpers.ProcessHelper.ProcessResult;
+import org.junit.jupiter.api.function.Executable;
+
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.junit.jupiter.api.function.Executable;
 
 public class ClassicTest implements Executable {
 
@@ -88,16 +85,16 @@ public class ClassicTest implements Executable {
                     jarParameters)
                     .check("Jar command");
 
-            System.out.println("Processing...");
-
-            new NativeObfuscator().process(idealJar, tempOutput, new ArrayList<>(), Collections.emptyList());
-
             System.out.println("Ideal...");
 
-            ProcessResult idealRunResult = ProcessHelper.run(temp, 30000,
+            ProcessResult idealRunResult = ProcessHelper.run(temp, 300000,
                     Arrays.asList("java", "-Dseed=1337", "-jar", idealJar.toString()));
             System.out.println(String.format("Took %dms", idealRunResult.execTime));
             idealRunResult.check("Ideal run");
+
+            System.out.println("Processing...");
+
+            new NativeObfuscator().process(idealJar, tempOutput, new ArrayList<>(), Collections.emptyList());
 
             System.out.println("Compiling CPP code...");
             if (System.getProperty("os.name").toLowerCase().contains("windows")) {
@@ -105,16 +102,16 @@ public class ClassicTest implements Executable {
                 if (System.getProperty("sun.arch.data.model").equals("32")) {
                     arch = "x86";
                 }
-                ProcessHelper.run(tempCpp, 40000,
+                ProcessHelper.run(tempCpp, 120000,
                         Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
                         .check("CMake prepare");
             } else {
-                ProcessHelper.run(tempCpp, 40000,
+                ProcessHelper.run(tempCpp, 120000,
                         Arrays.asList("cmake", "."))
                         .check("CMake prepare");
             }
 
-            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 40000,
+            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 120000,
                     Arrays.asList("cmake", "--build", ".", "--config", "Release"));
             System.out.println(String.format("Took %dms", compileRunresult.execTime));
             compileRunresult.check("CMake build");
@@ -125,7 +122,7 @@ public class ClassicTest implements Executable {
 
             System.out.println("Running test...");
 
-            ProcessResult testRunResult = ProcessHelper.run(tempOutput, 30000,
+            ProcessResult testRunResult = ProcessHelper.run(tempOutput, Math.max(300000, idealRunResult.execTime * 20),
                     Arrays.asList("java",
                             "-Djava.library.path=.",
                             "-Dseed=1337",

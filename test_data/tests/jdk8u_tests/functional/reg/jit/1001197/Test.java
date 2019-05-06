@@ -82,12 +82,6 @@ public class Test {
         }
         is.close();
 
-        for (int i = 0; i < THREADS; ++i) {
-            if (read[i + 'a'] != THREADS * READS) {
-                System.out.println("expected " + THREADS * READS + " for " 
-                           + ('a' + i) + " but got " + read['a' + i]);
-            }
-        }
         System.out.println("Finish Test main!");
     } 
 }

@@ -36,7 +36,7 @@ public class InPlaceOpsCollisions {
     /**
      * Number of elements per map.
      */
-    private static final int TEST_SIZE = 5000;
+    private static final int TEST_SIZE = 500;
 
     final static class HashableInteger implements Comparable<HashableInteger> {
 
