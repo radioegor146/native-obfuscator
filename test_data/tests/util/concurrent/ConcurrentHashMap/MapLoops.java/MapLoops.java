@@ -162,9 +162,8 @@ public class MapLoops {
         barrier.await();
         long time = timer.getTime();
         long tpo = time / (i * (long)nops);
-        System.out.print(LoopHelpers.rightJustify(tpo) + " ns per op");
+        LoopHelpers.rightJustify(tpo);
         double secs = (double)(time) / 1000000000.0;
-        System.out.println("\t " + secs + "s run time");
         map.clear();
     }
 

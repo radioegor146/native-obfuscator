@@ -24,13 +24,13 @@ public class TestsGenerator {
         Path testDir = Paths.get(tests.toURI());
         return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS)
                 .filter(Files::isDirectory)
-                .filter(TestsGenerator::noChildDirectories)
+                .filter(TestsGenerator::hasJavaFiles)
                 .map(p -> DynamicTest.dynamicTest(p.getFileName().toString(), new ClassicTest(p)));
     }
 
-    private static boolean noChildDirectories(Path path) {
+    private static boolean hasJavaFiles(Path path) {
         try {
-            return Files.list(path).noneMatch(Files::isDirectory);
+            return Files.list(path).anyMatch(f -> Files.isRegularFile(f) && f.toString().endsWith(".java"));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

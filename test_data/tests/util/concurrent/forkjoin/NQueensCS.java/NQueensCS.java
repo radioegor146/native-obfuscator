@@ -75,11 +75,11 @@ public class NQueensCS extends RecursiveAction {
         // Board sizes too small: hard to measure well.
         // Board sizes too large: take too long to run.
         final int minBoardSize = intArg(args, "minBoardSize",  8);
-        final int maxBoardSize = intArg(args, "maxBoardSize", 15);
+        final int maxBoardSize = intArg(args, "maxBoardSize", 11);
 
         final int procs = intArg(args, "procs", 0);
 
-        for (int reps = intArg(args, "reps", 10); reps > 0; reps--) {
+        for (int reps = intArg(args, "reps", 1); reps > 0; reps--) {
             ForkJoinPool g = (procs == 0) ?
                 new ForkJoinPool() :
                 new ForkJoinPool(procs);
@@ -89,6 +89,8 @@ public class NQueensCS extends RecursiveAction {
             System.out.println(g);
             g.shutdown();
         }
+
+        System.out.println("Passed = 1, failed = 0");
     }
 
     static void test(ForkJoinPool g, int i) throws Exception {

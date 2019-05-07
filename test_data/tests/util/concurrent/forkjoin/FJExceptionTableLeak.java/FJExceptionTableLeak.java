@@ -44,8 +44,8 @@ public class FJExceptionTableLeak {
 
     // Run with TASKS_PER_STEP * 40 < Xmx < STEPS * TASKS_PER_STEP * 40
     // These work for Xmx32m:
-    static final int STEPS = 2000;
-    static final int TASKS_PER_STEP = 1000;
+    static final int STEPS = 200;
+    static final int TASKS_PER_STEP = 100;
 
     static class FailingTaskException extends RuntimeException {}
     static class FailingTask extends RecursiveAction {

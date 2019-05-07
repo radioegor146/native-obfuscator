@@ -115,7 +115,7 @@ public class GCDuringIteration {
             it.next();          // protects first entry
             System.out.println(map.values());
             foos[first] = null;
-            tryWaitForFinalizersToRun()
+            tryWaitForFinalizersToRun();
             equal(map.size(), first+1);
             System.out.println(map.values());
             checkIterator(it, first-1);

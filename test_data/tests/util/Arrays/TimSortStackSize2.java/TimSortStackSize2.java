@@ -39,7 +39,7 @@ import java.util.function.Consumer;
 public class TimSortStackSize2 {
 
     public static void main(String[] args) {
-        int lengthOfTest = Integer.parseInt(args[0]);
+        int lengthOfTest = Integer.parseInt(67108864);
         boolean passed = doTest("TimSort", lengthOfTest,
             (Integer [] a) -> Arrays.sort(a));
         passed = doTest("ComparableTimSort", lengthOfTest, (Integer [] a) ->

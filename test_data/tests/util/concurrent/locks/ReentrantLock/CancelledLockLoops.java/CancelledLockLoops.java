@@ -101,7 +101,7 @@ public final class CancelledLockLoops {
             if (print) {
                 long time = timer.getTime();
                 double secs = (double)(time) / 1000000000.0;
-                System.out.println("\t " + secs + "s run time");
+                System.out.println();
             }
 
             int c;

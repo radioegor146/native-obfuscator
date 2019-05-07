@@ -34,8 +34,7 @@ import java.util.ListIterator;
 import java.util.ConcurrentModificationException;
 
 public class ComodifiedRemove {
-    public static
-    void main(String[] args) {
+    public static void main(String[] args) {
         List list = new LinkedList();
         Object o1 = new Integer(1);
         list.add(o1);

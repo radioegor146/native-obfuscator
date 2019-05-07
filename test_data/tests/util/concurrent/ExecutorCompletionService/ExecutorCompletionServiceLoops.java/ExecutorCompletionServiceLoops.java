@@ -59,10 +59,8 @@ public class ExecutorCompletionServiceLoops {
         System.out.println("Warmup...");
         oneTest( base );
         Thread.sleep(100);
-        print = true;
 
         for (int i = 1; i <= max; i += (i+1) >>> 1) {
-            System.out.print("n: " + i * base);
             oneTest(i * base );
             Thread.sleep(100);
         }
@@ -106,14 +104,6 @@ public class ExecutorCompletionServiceLoops {
 
         long elapsed = System.nanoTime() - startTime;
         long tpi = elapsed/ iters;
-
-        if (print)
-            System.out.println("\t: " + LoopHelpers.rightJustify(tpi) + " ns per task");
-
-        if (r == 0) // avoid overoptimization
-            System.out.println("useless result: " + r);
-
-
     }
 
 }

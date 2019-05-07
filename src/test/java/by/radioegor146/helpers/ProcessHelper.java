@@ -37,7 +37,7 @@ public class ProcessHelper {
             System.err.println("Command line: \n" + commandLine);
             System.err.println("stdout: \n" + stdout);
             System.err.println("stderr: \n" + stderr);
-            throw new RuntimeException(processName + " has failed");
+            throw new RuntimeException(processName + (timeout ? "has timed out" : " has failed"));
         }
     }
 

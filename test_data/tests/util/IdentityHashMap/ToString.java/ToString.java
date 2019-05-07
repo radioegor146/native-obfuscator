@@ -37,8 +37,8 @@ public class ToString {
         Set<Map.Entry<String, String>> es = m.entrySet();
         m.put("beer", "good");
         Iterator<Map.Entry<String, String>> i = es.iterator();
-        System.out.println(i); // Used to throw exception
+        i.toString();
         i.next();
-        System.out.println(i);
+        i.toString();
     }
 }

@@ -105,8 +105,8 @@ public class DoubleAdderDemo {
             throw new Error(sum + " != " + total);
         double secs = (double)time / (1000L * 1000 * 1000);
         long rate = total * (1000L) / time;
-        System.out.printf("threads:%3d  Time: %7.3fsec  Incs per microsec: %4d\n",
-                          nthreads, secs, rate);
+        System.out.printf("threads:%3d\n",
+                          nthreads);
     }
 
     static long timeTasks(Phaser phaser) {

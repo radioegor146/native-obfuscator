@@ -2,20 +2,17 @@ package by.radioegor146;
 
 import by.radioegor146.helpers.ProcessHelper;
 import by.radioegor146.helpers.ProcessHelper.ProcessResult;
+import org.junit.jupiter.api.function.Executable;
+
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.junit.jupiter.api.function.Executable;
 
 public class ClassicTest implements Executable {
 
@@ -56,8 +53,11 @@ public class ClassicTest implements Executable {
             Path resultJar = tempOutput.resolve("test.jar");
 
             List<Path> javaFiles = new ArrayList<>();
+            List<Path> resourceFiles = new ArrayList<>();
             Files.find(testData, 1, (path, attr) -> attr.isRegularFile() && path.toString().endsWith(".java"))
                     .forEach(javaFiles::add);
+            Files.find(testData, 2, (path, attr) -> attr.isRegularFile() && !path.toString().endsWith(".java"))
+                    .forEach(resourceFiles::add);
 
             String mainClassName = javaFiles.stream()
                     .filter(uncheckedPredicate(p -> Files.lines(p).anyMatch(l -> l.matches(
@@ -67,6 +67,11 @@ public class ClassicTest implements Executable {
                     .findAny().orElseThrow(() -> new RuntimeException("Can't find class with main"));
 
             javaFiles.forEach(unchecked(p -> Files.copy(p, tempSource.resolve(p.getFileName()))));
+            resourceFiles.forEach(unchecked(p -> {
+                Path target = temp.resolve(testData.relativize(p));
+                Files.createDirectories(target.getParent());
+                Files.copy(p, target);
+            }));
 
             System.out.println("Compiling...");
 
@@ -76,9 +81,10 @@ public class ClassicTest implements Executable {
             ProcessHelper.run(temp, 10000, javacParameters)
                     .check("Compilation");
 
-            List<String> jarParameters = Arrays.asList(
+            List<String> jarParameters = new ArrayList<>(Arrays.asList(
                     "jar", "cvfe", idealJar.toString(), mainClassName,
-                    "-C", tempClasses.toString() + File.separator, ".");
+                    "-C", tempClasses.toString() + File.separator, "."));
+            resourceFiles.stream().map(Path::toString).forEach(jarParameters::add);
             ProcessHelper.run(temp, 10000,
                     jarParameters)
                     .check("Jar command");
@@ -121,13 +127,17 @@ public class ClassicTest implements Executable {
             System.out.println("Running test...");
 
             ProcessResult testRunResult = ProcessHelper.run(tempOutput, Math.max(300000, idealRunResult.execTime * 20),
-                    Arrays.asList("java", "-Djava.library.path=.", "-Dseed=1337", "-jar", resultJar.toString()));
+                    Arrays.asList("java",
+                            "-Djava.library.path=.",
+                            "-Dseed=1337",
+                            "-Dtest.src=" + temp.toString(),
+                            "-jar", resultJar.toString()));
             System.out.println(String.format("Took %dms", testRunResult.execTime));
             testRunResult.check("Test run");
 
             if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
                 // Some tests are random based
-                Pattern testResult = Pattern.compile("^Passed = \\d+, failed = (\\d+)$", Pattern.MULTILINE);
+                Pattern testResult = Pattern.compile("^Passed = \\d+,? failed = (\\d+)$", Pattern.MULTILINE);
                 Matcher matcher = testResult.matcher(testRunResult.stdout);
                 if(matcher.find()) {
                     if(!matcher.group(1).equals("0")) {

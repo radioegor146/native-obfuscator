@@ -53,12 +53,10 @@ public class Basic {
     private Awaiter awaiter(final CountDownLatch latch,
                             final CountDownLatch gate) {
         return new Awaiter() { public void run() {
-            System.out.println("without millis: " + latch.toString());
             gate.countDown();
 
             try {
                 latch.await();
-                System.out.println("without millis - ComingOut");
             }
             catch (Throwable result) { result(result); }}};
     }
@@ -67,12 +65,10 @@ public class Basic {
                             final CountDownLatch gate,
                             final long millis) {
         return new Awaiter() { public void run() {
-            System.out.println("with millis: "+latch.toString());
             gate.countDown();
 
             try {
                 latch.await(millis, TimeUnit.MILLISECONDS);
-                System.out.println("with millis - ComingOut");
             }
             catch (Throwable result) { result(result); }}};
     }
@@ -106,7 +102,6 @@ public class Basic {
             a[count] = factory2.getAwaiter(); a[count++].start();
             a[count] = factory2.getAwaiter(); a[count++].start();
             test.toTheStartingGate(gate);
-            System.out.println("Main Thread: " + latch.toString());
             latch.countDown();
             checkCount(latch, 2-i);
         }
@@ -136,7 +131,6 @@ public class Basic {
             a[count] = factory2.getAwaiter(); a[count++].start();
             a[count-1].interrupt();
             test.toTheStartingGate(gate);
-            System.out.println("Main Thread: " + latch.toString());
             latch.countDown();
             checkCount(latch, 2-i);
         }
@@ -168,7 +162,6 @@ public class Basic {
             a[count] = factory2.getAwaiter(); a[count++].start();
             a[count] = factory2.getAwaiter(); a[count++].start();
             test.toTheStartingGate(gate);
-            System.out.println("Main Thread: " + latch.toString());
             latch.countDown();
             checkCount(latch, 2-i);
         }
