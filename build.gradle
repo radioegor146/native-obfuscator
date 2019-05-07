@@ -1,4 +1,5 @@
 plugins {
+    id 'com.github.johnrengelman.shadow' version '5.0.0'
     id 'java'
     id 'eclipse'
     id 'idea'
@@ -23,26 +24,47 @@ repositories {
 dependencies {
     compile 'org.ow2.asm:asm:7.1'
     compile 'org.ow2.asm:asm-tree:7.1'
+
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.8.2'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: '2.8.2'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.8.2'
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
     testRuntime 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
 }
 
+shadowJar {
+    classifier null
+}
+
+assemble.dependsOn(shadowJar)
+
 jar {
     manifest.attributes("Main-Class": getProperty('mainClass'))
-    from(configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }) {
-        exclude "META-INF/*"
-        exclude "module-info.class"
-    }
+//    from(configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }) {
+////        exclude "META-INF/*"
+//        exclude "module-info.class"
+//    }
 }
 
 test {
     useJUnitPlatform()
+
     testLogging {
-        events "passed", "skipped", "failed"
+        events "started", "passed", "skipped", "failed"
     }
-    onOutput { desc, event ->
-        if (event.destination == org.gradle.api.tasks.testing.TestOutputEvent.Destination.StdErr)
-            logger.lifecycle "${desc.name} [STDERR]: ${event.message.replaceAll("[\n\r]", "")}"
+
+    beforeTest { descriptor ->
+        logger.lifecycle("travis_fold:start:${descriptor.name}")
+    }
+    
+    afterTest { descriptor ->
+        logger.lifecycle("travis_fold:end:${descriptor.name}")
+    }
+
+    onOutput { descriptor, event ->
+        logger.lifecycle "${descriptor.name} ${event.message.replaceAll("[\n\r]", "")}"
     }
 }
 

@@ -9,6 +9,8 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ru.gravit.launchserver.asm.ClassMetadataReader;
 import ru.gravit.launchserver.asm.SafeClassWriter;
 
@@ -19,7 +21,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,8 +29,6 @@ import java.util.Map;
 import java.util.jar.Attributes.Name;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.zip.ZipEntry;
@@ -37,7 +36,7 @@ import java.util.zip.ZipOutputStream;
 
 public class NativeObfuscator {
 
-    private final static Logger LOGGER = Logger.getLogger(NativeObfuscator.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(NativeObfuscator.class);
 
     private final Snippets snippets;
     private final StringPool stringPool;
@@ -104,7 +103,7 @@ public class NativeObfuscator {
         try (JarFile jar = new JarFile(jarFile);
              ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())))) {
 
-            LOGGER.log(Level.INFO, "Processing {0}...", jarFile);
+            logger.info("Processing {}...", jarFile);
 
             int nativeDirId = IntStream.iterate(0, i -> i + 1)
                     .filter(i -> jar.stream().noneMatch(x -> x.getName().startsWith("native" + i)))
@@ -140,12 +139,12 @@ public class NativeObfuscator {
                     classReader.accept(classNode, 0);
 
                     if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) || exclusions.contains(classNode.name)) {
-                        LOGGER.log(Level.INFO, "Skipping {0}", classNode.name);
+                        logger.info("Skipping {}", classNode.name);
                         Util.writeEntry(out, entry.getName(), src);
                         return;
                     }
 
-                    LOGGER.log(Level.INFO, "Processing {0}", classNode.name);
+                    logger.info("Processing {}", classNode.name);
 
                     if (classNode.methods.stream().noneMatch(x -> x.name.equals("<clinit>"))) {
                         classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC,
@@ -198,7 +197,7 @@ public class NativeObfuscator {
 
                     currentClassId++;
                 } catch (IOException ex) {
-                    LOGGER.log(Level.WARNING, "Error while processing " + entry.getName(), ex);
+                    logger.error("Error while processing {}", entry.getName(), ex);
                 }
             });
 
@@ -220,10 +219,10 @@ public class NativeObfuscator {
             ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             loaderClass.accept(classWriter);
             Util.writeEntry(out, "native" + nativeDirId + "/Loader.class", classWriter.toByteArray());
-            LOGGER.info("Jar file ready!");
+            logger.info("Jar file ready!");
             String mainClass = mf != null ? (String) mf.getMainAttributes().get(Name.MAIN_CLASS) : null;
             if (mainClass != null) {
-                LOGGER.info("Creating bootstrap classes...");
+                logger.info("Creating bootstrap classes...");
                 mf.getMainAttributes().put(Name.MAIN_CLASS, "native" + nativeDirId + "/Bootstrap");
                 ClassNode bootstrapClass = new ClassNode(Opcodes.ASM7);
                 bootstrapClass.sourceFile = "synthetic";
@@ -240,9 +239,9 @@ public class NativeObfuscator {
                 bootstrapClass.methods.add(mainMethod);
                 bootstrapClass.accept(classWriter);
                 Util.writeEntry(out, "native" + nativeDirId + "/Bootstrap.class", classWriter.toByteArray());
-                LOGGER.info("Created!");
+                logger.info("Created!");
             } else {
-                LOGGER.info("Main-Class not found - no bootstrap classes!");
+                logger.info("Main-Class not found - no bootstrap classes!");
             }
             out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
             if (mf != null)

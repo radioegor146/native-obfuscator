@@ -25,7 +25,6 @@ public class TestsGenerator {
         return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS)
                 .filter(Files::isDirectory)
                 .filter(TestsGenerator::hasJavaFiles)
-                .filter(p -> !p.toString().contains("DivideMcTests"))
                 .map(p -> DynamicTest.dynamicTest(p.getFileName().toString(), new ClassicTest(p)));
     }
 
