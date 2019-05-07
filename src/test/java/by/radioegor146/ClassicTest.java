@@ -56,7 +56,7 @@ public class ClassicTest implements Executable {
             List<Path> resourceFiles = new ArrayList<>();
             Files.find(testData, 1, (path, attr) -> attr.isRegularFile() && path.toString().endsWith(".java"))
                     .forEach(javaFiles::add);
-            Files.find(testData, 1, (path, attr) -> attr.isRegularFile() && !path.toString().endsWith(".java"))
+            Files.find(testData, 2, (path, attr) -> attr.isRegularFile() && !path.toString().endsWith(".java"))
                     .forEach(resourceFiles::add);
 
             String mainClassName = javaFiles.stream()
@@ -67,7 +67,11 @@ public class ClassicTest implements Executable {
                     .findAny().orElseThrow(() -> new RuntimeException("Can't find class with main"));
 
             javaFiles.forEach(unchecked(p -> Files.copy(p, tempSource.resolve(p.getFileName()))));
-            resourceFiles.forEach(unchecked(p -> Files.copy(p, temp.resolve(p.getFileName()))));
+            resourceFiles.forEach(unchecked(p -> {
+                Path target = temp.resolve(testData.relativize(p));
+                Files.createDirectories(target.getParent());
+                Files.copy(p, target);
+            }));
 
             System.out.println("Compiling...");
 
@@ -133,7 +137,7 @@ public class ClassicTest implements Executable {
 
             if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
                 // Some tests are random based
-                Pattern testResult = Pattern.compile("^Passed = \\d+, failed = (\\d+)$", Pattern.MULTILINE);
+                Pattern testResult = Pattern.compile("^Passed = \\d+,? failed = (\\d+)$", Pattern.MULTILINE);
                 Matcher matcher = testResult.matcher(testRunResult.stdout);
                 if(matcher.find()) {
                     if(!matcher.group(1).equals("0")) {
