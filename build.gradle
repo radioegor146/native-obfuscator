@@ -42,10 +42,6 @@ assemble.dependsOn(shadowJar)
 
 jar {
     manifest.attributes("Main-Class": getProperty('mainClass'))
-//    from(configurations.runtime.collect { it.isDirectory() ? it : zipTree(it) }) {
-////        exclude "META-INF/*"
-//        exclude "module-info.class"
-//    }
 }
 
 test {
@@ -56,11 +52,15 @@ test {
     }
 
     beforeTest { descriptor ->
-        logger.lifecycle("travis_fold:start:${descriptor.name}")
+        if(System.getenv("CI")) {
+            logger.lifecycle("travis_fold:start:${descriptor.name}")
+        }
     }
     
     afterTest { descriptor ->
-        logger.lifecycle("travis_fold:end:${descriptor.name}")
+        if(System.getenv("CI")) {
+            logger.lifecycle("travis_fold:end:${descriptor.name}")
+        }
     }
 
     onOutput { descriptor, event ->
