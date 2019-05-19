@@ -25,7 +25,7 @@ public class TestsGenerator {
         return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS)
                 .filter(Files::isDirectory)
                 .filter(TestsGenerator::hasJavaFiles)
-                .map(p -> DynamicTest.dynamicTest(p.getFileName().toString(), new ClassicTest(p)));
+                .map(p -> DynamicTest.dynamicTest(testDir.relativize(p).toString(), new ClassicTest(p)));
     }
 
     private static boolean hasJavaFiles(Path path) {
