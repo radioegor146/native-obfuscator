@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ClassicTest implements Executable {
 
@@ -54,17 +55,24 @@ public class ClassicTest implements Executable {
 
             List<Path> javaFiles = new ArrayList<>();
             List<Path> resourceFiles = new ArrayList<>();
-            Files.find(testData, 1, (path, attr) -> attr.isRegularFile() && path.toString().endsWith(".java"))
+            Files.find(testData, 10, (path, attr) -> true)
+                    .filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java"))
                     .forEach(javaFiles::add);
-            Files.find(testData, 2, (path, attr) -> attr.isRegularFile() && !path.toString().endsWith(".java"))
+            Files.find(testData, 10, (path, attr) -> attr.isDirectory() || !path.toString().endsWith(".java"))
+                    .filter(Files::isRegularFile)
                     .forEach(resourceFiles::add);
 
-            String mainClassName = javaFiles.stream()
-                    .filter(uncheckedPredicate(p -> Files.lines(p).anyMatch(l -> l.matches(
-                            ".*public(\\s+static)?\\s+void\\s+main.*"))))
+            Optional<String> mainClassOptional = javaFiles.stream()
+                    .filter(uncheckedPredicate(p -> Files.lines(p).collect(Collectors.joining("\n"))
+                            .matches("(?s).*public(\\s+static)?\\s+void\\s+main.*")))
                     .map(p -> p.getFileName().toString())
                     .map(f -> f.substring(0, f.lastIndexOf('.')))
-                    .findAny().orElseThrow(() -> new RuntimeException("Can't find class with main"));
+                    .findAny();
+
+            if(!mainClassOptional.isPresent()) {
+                System.out.println("Can't find main class");
+                return;
+            }
 
             javaFiles.forEach(unchecked(p -> Files.copy(p, tempSource.resolve(p.getFileName()))));
             resourceFiles.forEach(unchecked(p -> {
@@ -82,7 +90,7 @@ public class ClassicTest implements Executable {
                     .check("Compilation");
 
             List<String> jarParameters = new ArrayList<>(Arrays.asList(
-                    "jar", "cvfe", idealJar.toString(), mainClassName,
+                    "jar", "cvfe", idealJar.toString(), mainClassOptional.get(),
                     "-C", tempClasses.toString() + File.separator, "."));
             resourceFiles.stream().map(Path::toString).forEach(jarParameters::add);
             ProcessHelper.run(temp, 10000,
@@ -126,7 +134,9 @@ public class ClassicTest implements Executable {
 
             System.out.println("Running test...");
 
-            ProcessResult testRunResult = ProcessHelper.run(tempOutput, Math.max(300000, idealRunResult.execTime * 20),
+            // Travis kills build after 10 mins without output
+            long timeout = Math.min(570_000, Math.max(300_000, idealRunResult.execTime * 20));
+            ProcessResult testRunResult = ProcessHelper.run(tempOutput, timeout,
                     Arrays.asList("java",
                             "-Djava.library.path=.",
                             "-Dseed=1337",
