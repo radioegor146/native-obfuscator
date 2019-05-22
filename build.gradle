@@ -80,7 +80,7 @@ test {
                 System.out.print("\u001b[1;31m");
             }
             System.out.println("Test fail log");
-            System.out.println(testOutputs.get(descriptor.getName()).toString());
+            System.out.print(testOutputs.get(descriptor.getName()).toString());
             if (System.getenv("CI"))
                 System.out.println("travis_fold:end:fail_log");   
         }
