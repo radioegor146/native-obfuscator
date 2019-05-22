@@ -71,6 +71,13 @@ test {
         if (System.getenv("CI"))
             System.out.print("\u001b[1;33m");
         System.out.println(" in " + ((result.getEndTime()) - (result.getStartTime())) + "ms");
+        if (System.getenv("CI")) {
+            System.out.println("travis_fold:start:fail_log");
+            System.out.print("\u001b[1;31m");
+        }
+        System.out.println("Test log:");
+        if (System.getenv("CI"))
+            System.out.println("travis_fold:end:fail_log");   
     }
 
     /* onOutput { descriptor, event ->
