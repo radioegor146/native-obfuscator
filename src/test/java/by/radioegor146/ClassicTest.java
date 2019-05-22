@@ -116,11 +116,11 @@ public class ClassicTest implements Executable {
                 if (System.getProperty("sun.arch.data.model").equals("32")) {
                     arch = "x86";
                 }
-                ProcessHelper.run(tempCpp, 120000,
+                ProcessHelper.run(tempCpp, 240000,
                         Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
                         .check("CMake prepare");
             } else {
-                ProcessHelper.run(tempCpp, 120000,
+                ProcessHelper.run(tempCpp, 240000,
                         Arrays.asList("cmake", "."))
                         .check("CMake prepare");
             }
