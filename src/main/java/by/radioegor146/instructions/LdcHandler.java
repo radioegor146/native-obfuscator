@@ -15,14 +15,19 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             props.put("cst_ptr", context.getCachedStrings().getPointer(node.cst.toString()));
         } else if (cst instanceof Integer) {
             instructionName += "_INT";
-            props.put("cst", node.cst.toString());
+            int cstVal = (int) cst;
+            if (cstVal == Integer.MIN_VALUE) {
+                props.put("cst", "(jint) 2147483648U");
+            } else {
+                props.put("cst", node.cst.toString());
+            }
         } else if (cst instanceof Long) {
             instructionName += "_LONG";
             long cstVal = (long) cst;
             if (cstVal == Long.MIN_VALUE) {
                 props.put("cst", "(jlong) 9223372036854775808ULL");
             } else {
-                props.put("cst", node.cst + "LL");
+                props.put("cst", node.cst.toString() + "LL");
             }
         } else if (cst instanceof Float) {
             instructionName += "_FLOAT";

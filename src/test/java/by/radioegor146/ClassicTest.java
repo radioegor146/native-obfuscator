@@ -88,20 +88,20 @@ public class ClassicTest implements Executable {
             List<String> javacParameters = new ArrayList<>(Arrays.asList("javac", "-d", tempClasses.toString()));
             javaFiles.stream().map(Path::toString).forEach(javacParameters::add);
 
-            ProcessHelper.run(temp, 10000, javacParameters)
+            ProcessHelper.run(temp, 10_000, javacParameters)
                     .check("Compilation");
 
             List<String> jarParameters = new ArrayList<>(Arrays.asList(
                     "jar", "cvfe", idealJar.toString(), mainClassOptional.get(),
                     "-C", tempClasses.toString() + File.separator, "."));
             resourceFiles.stream().map(Path::toString).forEach(jarParameters::add);
-            ProcessHelper.run(temp, 10000,
+            ProcessHelper.run(temp, 10_000,
                     jarParameters)
                     .check("Jar command");
 
             System.out.println("Ideal...");
 
-            ProcessResult idealRunResult = ProcessHelper.run(temp, 300000,
+            ProcessResult idealRunResult = ProcessHelper.run(temp, 300_000,
                     Arrays.asList("java", "-Dseed=1337", "-jar", idealJar.toString()));
             System.out.println(String.format("Took %dms", idealRunResult.execTime));
             idealRunResult.check("Ideal run");
@@ -116,16 +116,16 @@ public class ClassicTest implements Executable {
                 if (System.getProperty("sun.arch.data.model").equals("32")) {
                     arch = "x86";
                 }
-                ProcessHelper.run(tempCpp, 240000,
+                ProcessHelper.run(tempCpp, 240_000,
                         Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
                         .check("CMake prepare");
             } else {
-                ProcessHelper.run(tempCpp, 240000,
+                ProcessHelper.run(tempCpp, 240_000,
                         Arrays.asList("cmake", "."))
                         .check("CMake prepare");
             }
 
-            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 120000,
+            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 240_000,
                     Arrays.asList("cmake", "--build", ".", "--config", "Release"));
             System.out.println(String.format("Took %dms", compileRunresult.execTime));
             compileRunresult.check("CMake build");

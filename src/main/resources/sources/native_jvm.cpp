@@ -177,7 +177,7 @@ namespace native_jvm::utils {
         int exponent;
         std::frexp(value, &exponent);
         if (std::isfinite(value) && exponent <= 31)
-            return (jlong) value;
+            return (jint) value;
         return std::signbit(value) ? std::numeric_limits<jint>::min() : std::numeric_limits<jint>::max();
     }
 
@@ -187,7 +187,7 @@ namespace native_jvm::utils {
         int exponent;
         std::frexp(value, &exponent);
         if (std::isfinite(value) && exponent <= 31)
-          return (jlong) value;
+          return (jint) value;
         return std::signbit(value) ? std::numeric_limits<jint>::min() : std::numeric_limits<jint>::max();
     }
 
