@@ -19,9 +19,11 @@ public class ClassicTest implements Executable {
 
     private Path testData;
     private Path temp;
+    private String testName;
 
-    ClassicTest(Path path) {
+    ClassicTest(Path path, String testName) {
         testData = path;
+        this.testName = testName;
     }
 
     private void clean() {
@@ -36,7 +38,7 @@ public class ClassicTest implements Executable {
     @Override
     public void execute() throws Throwable {
         try {
-            System.err.println("Running test " + testData.toFile().getName());
+            System.err.println("Running test \"" + testName + "\"");
             System.out.println("Preparing...");
 
             temp = Files.createTempDirectory(String.format("native-obfuscator-test-%s-", testData.toFile().getName()));

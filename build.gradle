@@ -81,6 +81,7 @@ test {
             }
             System.out.println("Test fail log");
             System.out.print(testOutputs.get(descriptor.getName()).toString());
+            testOutputs.remove(descriptor.getName());
             if (System.getenv("CI"))
                 System.out.println("travis_fold:end:fail_log");   
         }
