@@ -84,7 +84,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
 
         for (Map.Entry<String, Integer> string : strings.getCache().entrySet()) {
-            cppWriter.append("            if (jstring str = env->NewStringUTF(" + stringPool.get(string.getKey()) + ")) { if (jstring int_str = utils::get_interned(env, str)) { ")
+            cppWriter.append("        if (jstring str = env->NewStringUTF(" + stringPool.get(string.getKey()) + ")) { if (jstring int_str = utils::get_interned(env, str)) { ")
                     .append(String.format("cstrings[%d] = ", string.getValue()))
                     .append("(jstring) env->NewGlobalRef(int_str); env->DeleteLocalRef(str); env->DeleteLocalRef(int_str); } }\n");
         }
@@ -97,7 +97,14 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append("        JNINativeMethod __ngen_methods[] = {\n");
             cppWriter.append(nativeMethods);
             cppWriter.append("        };\n\n");
-            cppWriter.append("        jclass clazz = ").append(getGetterForType(className)).append(";\n");
+            cppWriter.append("        jclass clazz = nullptr;\n");
+            cppWriter.append("        {\n");
+            cppWriter.append("            jvmtiFrameInfo frame;\n");
+            cppWriter.append("            jint count;\n");
+            cppWriter.append("            if (jvmti_env->GetStackTrace(nullptr, 1, 1, &frame, &count) == JVMTI_ERROR_NONE && count == 1) {\n");
+            cppWriter.append("                char* method_name = nullptr; jvmti_env->GetMethodName(frame.method, &method_name, nullptr, nullptr); if (!strcmp(\"<clinit>\", method_name)) { jvmti_env->GetMethodDeclaringClass(frame.method, &clazz); } jvmti_env->Deallocate((unsigned char *) method_name);\n");
+            cppWriter.append("            }\n");
+            cppWriter.append("        }\n");
             cppWriter.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
             cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
                     .append(stringPool.get(className.replace("/", ".")))
