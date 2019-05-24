@@ -18,7 +18,7 @@ public class TestsGenerator {
 
     @TestFactory
     public Stream<DynamicTest> generateTests() throws URISyntaxException, IOException {
-        URL tests = TestsGenerator.class.getClassLoader().getResource("tests");
+        URL tests = TestsGenerator.class.getClassLoader().getResource("tests_current");
         Objects.requireNonNull(tests, "No tests dir in resources");
 
         Path testDir = Paths.get(tests.toURI());
