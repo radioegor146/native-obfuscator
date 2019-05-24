@@ -10,6 +10,7 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.objectweb.asm.tree.MethodInsnNode;
 
 public class MethodContext {
 
@@ -80,4 +81,7 @@ public class MethodContext {
         return obfuscator.getInvokeDynamics();
     }
 
+    public Map<String, MethodInsnNode> getMethodHandleInvokes() {
+        return obfuscator.getMethodHandleInvokes();
+    }
 }

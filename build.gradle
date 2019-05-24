@@ -95,7 +95,7 @@ test {
 }
 
 if (hasProperty('ide.eclipse'))
-processTestResources {
-    from 'test_data'
-}
+    processTestResources {
+        from 'test_data'
+    }
 

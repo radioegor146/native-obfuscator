@@ -1,6 +1,7 @@
 package by.radioegor146;
 
 import by.radioegor146.instructions.InvokeDynamicHandler;
+import by.radioegor146.instructions.MethodHandler;
 import by.radioegor146.source.CMakeFilesBuilder;
 import by.radioegor146.source.ClassSourceBuilder;
 import by.radioegor146.source.MainSourceBuilder;
@@ -51,6 +52,7 @@ public class NativeObfuscator {
     public List<String> exclusions = Collections.emptyList();
     private StringBuilder nativeMethods;
     private final Map<String, InvokeDynamicInsnNode> invokeDynamics;
+    private final Map<String, MethodInsnNode> methodHandleInvokes;
 
     private int currentClassId;
     private String nativeDir;
@@ -63,6 +65,7 @@ public class NativeObfuscator {
         cachedMethods = new NodeCache<>("(cmethods[%d])");
         cachedFields = new NodeCache<>("(cfields[%d])");
         invokeDynamics = new HashMap<>();
+        methodHandleInvokes = new HashMap<>();
         methodProcessor = new MethodProcessor(this);
     }
 
@@ -154,6 +157,7 @@ public class NativeObfuscator {
                     staticClassProvider.newClass();
 
                     invokeDynamics.clear();
+                    methodHandleInvokes.clear();
 
                     cachedClasses.clear();
                     cachedMethods.clear();
@@ -171,13 +175,14 @@ public class NativeObfuscator {
 
                             nativeMethods.append(context.nativeMethods);
 
-                            if((classNode.access & Opcodes.ACC_INTERFACE) > 0) {
+                            if ((classNode.access & Opcodes.ACC_INTERFACE) > 0) {
                                 method.access &= ~Opcodes.ACC_NATIVE;
                             }
                         }
 
                         invokeDynamics.forEach((key, value) -> InvokeDynamicHandler.processIndy(classNode, key, value));
-
+                        methodHandleInvokes.forEach((key, value) -> MethodHandler.processMethodHandleInvoke(classNode, key, value));
+                        
                         classNode.version = 52;
                         ClassWriter classWriter = new SafeClassWriter(metadataReader,
                                 Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -292,5 +297,9 @@ public class NativeObfuscator {
 
     public Map<String, InvokeDynamicInsnNode> getInvokeDynamics() {
         return invokeDynamics;
+    }
+    
+    public Map<String, MethodInsnNode> getMethodHandleInvokes() {
+        return methodHandleInvokes;
     }
 }
