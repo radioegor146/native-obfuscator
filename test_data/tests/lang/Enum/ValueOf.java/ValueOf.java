@@ -49,7 +49,6 @@ public class ValueOf {
         test(Silly127.class);
         test(Silly128.class);
         test(Silly129.class);
-        test(Silly500.class);
         test(Specialized.class);
 
         testMissingException();
