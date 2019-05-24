@@ -71,7 +71,7 @@ public class ClassicTest implements Executable {
                     .map(f -> f.substring(0, f.lastIndexOf('.')))
                     .findAny();
 
-            if(!mainClassOptional.isPresent()) {
+            if (!mainClassOptional.isPresent()) {
                 System.out.println("Can't find main class");
                 return;
             }
@@ -125,7 +125,7 @@ public class ClassicTest implements Executable {
                         .check("CMake prepare");
             }
 
-            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 240_000,
+            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 160_000,
                     Arrays.asList("cmake", "--build", ".", "--config", "Release"));
             System.out.println(String.format("Took %dms", compileRunresult.execTime));
             compileRunresult.check("CMake build");
@@ -136,7 +136,7 @@ public class ClassicTest implements Executable {
 
             System.out.println("Running test...");
 
-            long timeout = 230_000;
+            long timeout = 200_000;
             ProcessResult testRunResult = ProcessHelper.run(tempOutput, timeout,
                     Arrays.asList("java",
                             "-Djava.library.path=.",
