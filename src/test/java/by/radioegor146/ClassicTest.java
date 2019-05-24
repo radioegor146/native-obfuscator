@@ -136,7 +136,7 @@ public class ClassicTest implements Executable {
 
             System.out.println("Running test...");
 
-            long timeout = Math.min(250_000, idealRunResult.execTime * 20);
+            long timeout = 250_000;
             ProcessResult testRunResult = ProcessHelper.run(tempOutput, timeout,
                     Arrays.asList("java",
                             "-Djava.library.path=.",
