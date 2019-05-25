@@ -159,6 +159,7 @@ public class NativeObfuscator {
                     invokeDynamics.clear();
                     methodHandleInvokes.clear();
 
+                    cachedStrings.clear();
                     cachedClasses.clear();
                     cachedMethods.clear();
                     cachedFields.clear();

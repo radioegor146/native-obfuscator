@@ -31,7 +31,7 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             }
         } else if (cst instanceof Float) {
             instructionName += "_FLOAT";
-            props.put("cst", node.cst.toString());
+            props.put("cst", node.cst.toString() + "f");
             float cstVal = (float) cst;
             if (cst.toString().equals("NaN")) {
                 props.put("cst", "NAN");

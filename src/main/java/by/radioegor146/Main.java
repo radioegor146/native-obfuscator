@@ -17,7 +17,7 @@ public class Main {
     public static void main(String[] args) throws IOException {
         System.out.println("native-obfuscator v" + VERSION);
         if (args.length < 2) {
-            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory> [libraries dir] [exclusionsFile]");
+            System.err.println("java -jar native-obfuscator.jar <jar file> <output directory> [libraries dir] [exclusions file]");
             return;
         }
 
