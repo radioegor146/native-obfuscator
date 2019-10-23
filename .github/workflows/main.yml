@@ -10,8 +10,8 @@ jobs:
       with:
         java-version: 1.8
     - name: Install G++7
-      run: apt install g++-7
+      run: sudo apt install g++-7
     - name: Change to G++7
-      run: update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
+      run: sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
     - name: Build with Gradle
       run: ./gradlew build
