@@ -13,7 +13,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
@@ -68,7 +67,9 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
 
         int classId = context.getCachedClasses().getId(node.owner);
 
-        context.output.append(String.format("if (!cclasses[%d]) { cclasses_mtx[%d].lock(); if (!cclasses[%d]) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewGlobalRef(clazz); env->DeleteLocalRef(clazz); } } cclasses_mtx[%d].unlock(); %s } ",
+        context.output.append(String.format("if (!cclasses[%d] || env->IsSameObject(cclasses[%d], NULL)) { cclasses_mtx[%d].lock(); if (!cclasses[%d] || env->IsSameObject(cclasses[%d], NULL)) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewWeakGlobalRef(clazz); env->DeleteLocalRef(clazz); } } cclasses_mtx[%d].unlock(); %s } ",
+                classId,
+                classId,
                 classId,
                 classId,
                 classId,
@@ -106,7 +107,7 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
             localVarsPosition += arg.getSize();
         }
 
-        invokeWrapper.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, invoke.owner, invoke.name, invoke.desc));
+        invokeWrapper.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, invoke.owner, invoke.name, invoke.desc, false));
         invokeWrapper.instructions.add(new InsnNode(Type.getReturnType(newMethodDesc).getOpcode(Opcodes.IRETURN)));
         classNode.methods.add(invokeWrapper);
     }

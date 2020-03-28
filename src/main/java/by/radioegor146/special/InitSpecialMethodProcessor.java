@@ -30,7 +30,7 @@ public class InitSpecialMethodProcessor implements SpecialMethodProcessor {
             localVarsPosition += arg.getSize();
         }
         list.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, context.clazz.name,
-                "native_special_init" + context.methodIndex, context.method.desc));
+                "native_special_init" + context.methodIndex, context.method.desc, false));
         list.add(new InsnNode(Opcodes.RETURN));
         context.method.instructions = list;
     }
