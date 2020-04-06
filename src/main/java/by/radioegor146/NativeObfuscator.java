@@ -238,9 +238,9 @@ public class NativeObfuscator {
                 bootstrapClass.access = Opcodes.ACC_PUBLIC;
                 MethodNode mainMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, new String[0]);
                 mainMethod.instructions.add(new LdcInsnNode(projectName));
-                mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System", "loadLibrary", "(Ljava/lang/String;)V"));
+                mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System", "loadLibrary", "(Ljava/lang/String;)V", false));
                 mainMethod.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, mainClass.replace(".", "/"), "main", "([Ljava/lang/String;)V"));
+                mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, mainClass.replace(".", "/"), "main", "([Ljava/lang/String;)V", false));
                 mainMethod.instructions.add(new InsnNode(Opcodes.RETURN));
                 bootstrapClass.methods.add(mainMethod);
                 bootstrapClass.accept(classWriter);

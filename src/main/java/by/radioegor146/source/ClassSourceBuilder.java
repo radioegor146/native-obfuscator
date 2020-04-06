@@ -131,7 +131,8 @@ public class ClassSourceBuilder implements AutoCloseable {
         hppWriter.append("}\n\n#endif");
     }
 
-    private String getGetterForType(String desc) {
+    @SuppressWarnings("unused")
+	private String getGetterForType(String desc) {
         if (desc.startsWith("[")) {
             return "env->FindClass(" + stringPool.get(desc) + ")";
         }

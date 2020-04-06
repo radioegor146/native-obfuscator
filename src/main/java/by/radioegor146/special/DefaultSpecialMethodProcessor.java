@@ -36,7 +36,7 @@ public class DefaultSpecialMethodProcessor implements SpecialMethodProcessor {
             }
             list.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
                     context.obfuscator.getStaticClassProvider().getCurrentClassName(),
-                    context.nativeMethod.name, context.nativeMethod.desc));
+                    context.nativeMethod.name, context.nativeMethod.desc, false));
             list.add(new InsnNode(Type.getReturnType(context.method.desc).getOpcode(Opcodes.IRETURN)));
             context.method.instructions = list;
         }

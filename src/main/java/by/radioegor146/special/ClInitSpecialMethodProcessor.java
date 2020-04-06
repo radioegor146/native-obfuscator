@@ -23,9 +23,9 @@ public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
         instructions.clear();
         instructions.add(new LdcInsnNode(context.classIndex));
         instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, context.obfuscator.getNativeDir() + "/Loader",
-                "registerNativesForClass", "(I)V"));
+                "registerNativesForClass", "(I)V", false));
         instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, context.clazz.name,
-                "native_special_clinit" + context.methodIndex, context.method.desc));
+                "native_special_clinit" + context.methodIndex, context.method.desc, false));
 
         if (Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
             if (context.nativeMethod == null) {
@@ -33,7 +33,7 @@ public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
             }
             context.proxyMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
                     context.obfuscator.getStaticClassProvider().getCurrentClassName(),
-                    context.nativeMethod.name, context.nativeMethod.desc));
+                    context.nativeMethod.name, context.nativeMethod.desc, false));
             context.proxyMethod.instructions.add(new InsnNode(Opcodes.RETURN));
         }
         instructions.add(new InsnNode(Opcodes.RETURN));
