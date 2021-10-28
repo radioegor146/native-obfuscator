@@ -9,7 +9,7 @@ namespace native_jvm {
 
     reg_method reg_methods[$class_count];
 
-    void register_for_class(JNIEnv *env, jclass clazz, jint id) {
+    void register_for_class(JNIEnv *env, jint id, jclass clazz) {
         reg_methods[id](env, clazz);
     }
 
@@ -21,7 +21,7 @@ namespace native_jvm {
 $register_code
 
         char method_name[] = "registerNativesForClass";
-        char method_desc[] = "(I)V";
+        char method_desc[] = "(ILjava/lang/Class;)V";
         JNINativeMethod loader_methods[] = {
             { (char *) method_name, (char *) method_desc, (void *)&register_for_class }
         };

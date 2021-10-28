@@ -224,7 +224,7 @@ public class NativeObfuscator {
             loaderClass.version = 52;
             loaderClass.superName = "java/lang/Object";
             loaderClass.access = Opcodes.ACC_PUBLIC;
-            MethodNode registerNativesForClassMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_NATIVE, "registerNativesForClass", "(I)V", null, new String[0]);
+            MethodNode registerNativesForClassMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_NATIVE, "registerNativesForClass", "(ILjava/lang/Class;)V", null, new String[0]);
             loaderClass.methods.add(registerNativesForClassMethod);
             ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             loaderClass.accept(classWriter);
