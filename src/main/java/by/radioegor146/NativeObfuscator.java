@@ -170,6 +170,10 @@ public class NativeObfuscator {
                         classNode.sourceFile = cppBuilder.getCppFilename();
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
+                            if (exclusions.contains(String.format("%s#%s%s", classNode.name, method.name, method.signature))) {
+                                continue;
+                            }
+
                             MethodContext context = new MethodContext(this, method, i, classNode, currentClassId);
                             methodProcessor.processMethod(context);
                             instructions.append(context.output.toString().replace("\n", "\n    "));
