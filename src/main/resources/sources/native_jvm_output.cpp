@@ -5,17 +5,12 @@ $includes
 
 namespace native_jvm {
 
-    typedef void (* reg_method)(JNIEnv *,jvmtiEnv *);
+    typedef void (* reg_method)(JNIEnv *,jclass *);
 
     reg_method reg_methods[$class_count];
 
-    void register_for_class(JNIEnv *env, jclass, jint id) {
-        jvmtiEnv *jvmti_env = nullptr;
-        JavaVM *vm = nullptr;
-        env->GetJavaVM(&vm);
-        vm->GetEnv((void **)&jvmti_env, JVMTI_VERSION);
-
-        reg_methods[id](env, jvmti_env);
+    void register_for_class(JNIEnv *env, jclass clazz, jint id) {
+        reg_methods[id](env, clazz);
     }
 
     void prepare_lib(JNIEnv *env, jvmtiEnv *jvmti_env) {
