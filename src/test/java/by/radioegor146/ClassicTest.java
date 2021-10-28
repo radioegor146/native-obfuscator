@@ -17,9 +17,9 @@ import java.util.stream.Collectors;
 
 public class ClassicTest implements Executable {
 
-    private Path testData;
+    private final Path testData;
     private Path temp;
-    private String testName;
+    private final String testName;
 
     ClassicTest(Path path, String testName) {
         testData = path;
@@ -30,11 +30,16 @@ public class ClassicTest implements Executable {
         try {
             Files.walk(temp)
                     .sorted(Comparator.reverseOrder())
-                    .map(Path::toFile)
-                    .forEach(File::delete);
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException ignored) {
+                        }
+                    });
         } catch (IOException ignored) {}
     }
 
+    @SuppressWarnings("RedundantStringFormatCall")
     @Override
     public void execute() throws Throwable {
         try {
@@ -93,7 +98,7 @@ public class ClassicTest implements Executable {
 
             List<String> jarParameters = new ArrayList<>(Arrays.asList(
                     "jar", "cvfe", idealJar.toString(), mainClassOptional.get(),
-                    "-C", tempClasses.toString() + File.separator, "."));
+                    "-C", tempClasses + File.separator, "."));
             resourceFiles.stream().map(Path::toString).forEach(jarParameters::add);
             ProcessHelper.run(temp, 10_000,
                     jarParameters)
@@ -139,6 +144,7 @@ public class ClassicTest implements Executable {
             long timeout = 200_000;
             ProcessResult testRunResult = ProcessHelper.run(tempOutput, timeout,
                     Arrays.asList("java",
+                            "-Xcheck:jni",
                             "-Djava.library.path=.",
                             "-Dseed=1337",
                             "-Dtest.src=" + temp.toString(),
@@ -146,7 +152,7 @@ public class ClassicTest implements Executable {
             System.out.println(String.format("Took %dms", testRunResult.execTime));
             testRunResult.check("Test run");
 
-            /*if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
+            if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
                 // Some tests are random based
                 Pattern testResult = Pattern.compile("^Passed = \\d+,? failed = (\\d+)$", Pattern.MULTILINE);
                 Matcher matcher = testResult.matcher(testRunResult.stdout);
@@ -157,7 +163,7 @@ public class ClassicTest implements Executable {
                 } else {
                     fail(testRunResult, idealRunResult);
                 }
-            }*/
+            }
 
             System.out.println("OK");
         } catch (IOException | RuntimeException e) {

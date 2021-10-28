@@ -9,7 +9,7 @@ namespace native_jvm {
 
     reg_method reg_methods[$class_count];
 
-    void register_for_class(JNIEnv *env, jint id, jclass clazz) {
+    void register_for_class(JNIEnv *env, jclass, jint id, jclass clazz) {
         reg_methods[id](env, clazz);
     }
 
