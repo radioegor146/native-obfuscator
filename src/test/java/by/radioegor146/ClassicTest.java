@@ -144,7 +144,6 @@ public class ClassicTest implements Executable {
             long timeout = 200_000;
             ProcessResult testRunResult = ProcessHelper.run(tempOutput, timeout,
                     Arrays.asList("java",
-                            "-Xcheck:jni",
                             "-Djava.library.path=.",
                             "-Dseed=1337",
                             "-Dtest.src=" + temp.toString(),
