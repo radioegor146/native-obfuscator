@@ -80,7 +80,7 @@ public class ClassSourceBuilder implements AutoCloseable {
     public void registerMethods(NodeCache<String> strings, NodeCache<String> classes, String nativeMethods,
                                 InterfaceStaticClassProvider staticClassProvider) throws IOException {
 
-        cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass *clazz) {\n");
+        cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass clazz) {\n");
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
 
         for (Map.Entry<String, Integer> string : strings.getCache().entrySet()) {
@@ -119,7 +119,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("}");
 
 
-        hppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass *clazz);\n");
+        hppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass clazz);\n");
         hppWriter.append("}\n\n#endif");
     }
 

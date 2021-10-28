@@ -5,7 +5,7 @@ $includes
 
 namespace native_jvm {
 
-    typedef void (* reg_method)(JNIEnv *,jclass *);
+    typedef void (* reg_method)(JNIEnv *,jclass);
 
     reg_method reg_methods[$class_count];
 
