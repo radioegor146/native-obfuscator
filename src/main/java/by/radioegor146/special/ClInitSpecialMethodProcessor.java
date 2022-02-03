@@ -36,7 +36,6 @@ public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
             instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
                     context.obfuscator.getStaticClassProvider().getCurrentClassName(),
                     context.nativeMethod.name, context.nativeMethod.desc, false));
-            instructions.add(new InsnNode(Opcodes.RETURN));
         } else {
             instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, context.clazz.name,
                     "native_special_clinit" + context.methodIndex, context.method.desc, false));
