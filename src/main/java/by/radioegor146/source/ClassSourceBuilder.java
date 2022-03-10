@@ -108,9 +108,9 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append("        JNINativeMethod __ngen_static_iface_methods[] = {\n");
             cppWriter.append(staticClassProvider.getMethods());
             cppWriter.append("        };\n\n");
-            cppWriter.append("        jclass clazz = utils::find_class_wo_static(env, ")
+            cppWriter.append("        jclass iface_methods_clazz = utils::find_class_wo_static(env, ")
                     .append(stringPool.get(staticClassProvider.getCurrentClassName().replace("/", "."))).append(");\n");
-            cppWriter.append("        if (clazz) env->RegisterNatives(clazz, __ngen_static_iface_methods, sizeof(__ngen_static_iface_methods) / sizeof(__ngen_static_iface_methods[0]));\n");
+            cppWriter.append("        if (iface_methods_clazz) env->RegisterNatives(iface_methods_clazz, __ngen_static_iface_methods, sizeof(__ngen_static_iface_methods) / sizeof(__ngen_static_iface_methods[0]));\n");
             cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
                     .append(stringPool.get(className.replace("/", ".")))
                     .append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
