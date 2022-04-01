@@ -27,11 +27,11 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             if (cstVal == Long.MIN_VALUE) {
                 props.put("cst", "(jlong) 9223372036854775808ULL");
             } else {
-                props.put("cst", node.cst.toString() + "LL");
+                props.put("cst", node.cst + "LL");
             }
         } else if (cst instanceof Float) {
             instructionName += "_FLOAT";
-            props.put("cst", node.cst.toString() + "f");
+            props.put("cst", node.cst + "f");
             float cstVal = (float) cst;
             if (cst.toString().equals("NaN")) {
                 props.put("cst", "NAN");

@@ -13,7 +13,7 @@ import org.objectweb.asm.Opcodes;
 
 public class ClassMetadataReader {
 
-    private class CheckSuperClassVisitor extends ClassVisitor {
+    private static class CheckSuperClassVisitor extends ClassVisitor {
 
         String superClassName;
 
@@ -103,8 +103,7 @@ public class ClassMetadataReader {
         classPath.forEach((file) -> {
             try {
                 file.close();
-            } catch (IOException ex) {
-
+            } catch (IOException ignored) {
             }
         });
     }

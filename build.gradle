@@ -49,6 +49,8 @@ HashMap<String, StringBuilder> testOutputs = new HashMap<>();
 test {
     useJUnitPlatform()
 
+    maxParallelForks = Math.max(Runtime.runtime.availableProcessors(), 32)
+
     testLogging {
         events = []
     }
@@ -76,14 +78,15 @@ test {
         System.out.println(" in " + ((result.getEndTime()) - (result.getStartTime())) + "ms");
         if (result.getResultType() == TestResult.ResultType.FAILURE) {
             if (System.getenv("CI")) {
-                System.out.println("travis_fold:start:fail_log");
+                // System.out.println("travis_fold:start:fail_log");
                 System.out.print("\u001b[1;31m");
             }
             System.out.println("Test fail log");
             System.out.print(testOutputs.get(descriptor.getName()).toString());
             testOutputs.remove(descriptor.getName());
-            if (System.getenv("CI"))
-                System.out.println("travis_fold:end:fail_log");   
+            if (System.getenv("CI")) {
+                // System.out.println("travis_fold:end:fail_log");
+            }
         }
     }
 

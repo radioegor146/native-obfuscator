@@ -84,7 +84,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
 
         for (Map.Entry<String, Integer> string : strings.getCache().entrySet()) {
-            cppWriter.append("        if (jstring str = env->NewStringUTF(" + stringPool.get(string.getKey()) + ")) { if (jstring int_str = utils::get_interned(env, str)) { ")
+            cppWriter.append("        if (jstring str = env->NewStringUTF(").append(stringPool.get(string.getKey())).append(")) { if (jstring int_str = utils::get_interned(env, str)) { ")
                     .append(String.format("cstrings[%d] = ", string.getValue()))
                     .append("(jstring) env->NewGlobalRef(int_str); env->DeleteLocalRef(str); env->DeleteLocalRef(int_str); } }\n");
         }

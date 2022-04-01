@@ -10,8 +10,8 @@ import java.util.Properties;
 
 public class Snippets {
 
-    private Properties snippets;
-    private StringPool stringPool;
+    private final Properties snippets;
+    private final StringPool stringPool;
 
     public Snippets(StringPool stringPool) {
         this.stringPool = stringPool;

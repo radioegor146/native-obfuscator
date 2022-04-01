@@ -23,11 +23,11 @@ public class ProcessHelper {
         }
 
         public void check(String processName) {
-            if(!timeout && exitCode == 0) {
+            if (!timeout && exitCode == 0) {
                 return;
             }
 
-            if(timeout) {
+            if (timeout) {
                 System.err.println(processName + " has timed out");
             } else {
                 System.err.println(processName + " has failed");
@@ -45,12 +45,12 @@ public class ProcessHelper {
 
     private static void readStream(InputStream is, Consumer<String> consumer) {
         executor.submit(() -> {
-            try(InputStreamReader isr = new InputStreamReader(is);
-                BufferedReader reader = new BufferedReader(isr)) {
+            try (InputStreamReader isr = new InputStreamReader(is);
+                 BufferedReader reader = new BufferedReader(isr)) {
 
                 int count;
                 char[] buf = new char[1 << 10];
-                while((count = reader.read(buf)) != -1) {
+                while ((count = reader.read(buf)) != -1) {
                     consumer.accept(String.copyValueOf(buf, 0, count));
                 }
             } catch (IOException e) {
@@ -66,8 +66,11 @@ public class ProcessHelper {
         ProcessResult result = new ProcessResult();
         result.commandLine = String.join(" ", command);
 
-        readStream(process.getInputStream(), c -> result.stdout += c);
-        readStream(process.getErrorStream(), c -> result.stderr += c);
+        StringBuilder stdoutBuilder = new StringBuilder();
+        StringBuilder stderrBuilder = new StringBuilder();
+
+        readStream(process.getInputStream(), stdoutBuilder::append);
+        readStream(process.getErrorStream(), stderrBuilder::append);
 
         try {
             if (!process.waitFor(timeLimit, TimeUnit.MILLISECONDS)) {
@@ -75,8 +78,11 @@ public class ProcessHelper {
                 process.destroyForcibly();
             }
             process.waitFor();
-        } catch (InterruptedException ignored) {}
+        } catch (InterruptedException ignored) {
+        }
 
+        result.stdout = stdoutBuilder.toString();
+        result.stderr = stderrBuilder.toString();
         result.execTime = System.currentTimeMillis() - startTime;
         result.exitCode = process.exitValue();
 

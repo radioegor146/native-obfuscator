@@ -135,7 +135,41 @@ namespace native_jvm::utils {
 
     void init_utils(JNIEnv *env);
 
-    jobjectArray create_multidim_array(JNIEnv *env, jint count, jint *sizes, const char *class_name, int line);
+    jobjectArray create_multidim_array(JNIEnv *env, jint count, jint required_count, jint *sizes, const char *class_name, int line);
+
+    template <int sort>
+    jarray create_array_value(JNIEnv* env, jint size);
+
+    template <int sort>
+    jarray create_multidim_array_value(JNIEnv *env, jint count, jint required_count, jint *sizes, const char *name, int line) {
+        if (required_count == 0)
+            return nullptr;
+        if (*sizes < 0) {
+            throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
+            return nullptr;
+        }
+        if (count == 1) {
+            return create_array_value<sort>(env, *sizes);
+        }
+        jobjectArray result_array = nullptr;
+        if (jclass clazz = env->FindClass((std::string(count - 1, '[') + std::string(name)).c_str())) {
+            result_array = env->NewObjectArray(*sizes, clazz, nullptr);
+            env->DeleteLocalRef(clazz);
+        }
+        else
+            return nullptr;
+
+        for (jint i = 0; i < *sizes; i++) {
+            jarray inner_array = create_multidim_array_value<sort>(env, count - 1, required_count - 1, sizes + 1, name, line);
+            if (env->ExceptionCheck())
+                return nullptr;
+            env->SetObjectArrayElement(result_array, i, inner_array);
+            if (env->ExceptionCheck())
+                return nullptr;
+            env->DeleteLocalRef(inner_array);
+        }
+        return result_array;
+    }
 
     jclass find_class_wo_static(JNIEnv *env, const char *class_name);
 

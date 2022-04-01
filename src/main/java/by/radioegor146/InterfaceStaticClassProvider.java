@@ -10,8 +10,8 @@ import java.util.List;
 
 public class InterfaceStaticClassProvider {
 
-    private String nativeDir;
-    private List<ClassNode> readyClasses;
+    private final String nativeDir;
+    private final List<ClassNode> readyClasses;
 
     private ClassNode currentClass;
     private StringBuilder methods;

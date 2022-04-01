@@ -2,6 +2,8 @@ package by.radioegor146;
 
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -17,6 +19,7 @@ import java.util.stream.Stream;
 public class TestsGenerator {
 
     @TestFactory
+    @Execution(ExecutionMode.CONCURRENT)
     public Stream<DynamicTest> generateTests() throws URISyntaxException, IOException {
         URL tests = TestsGenerator.class.getClassLoader().getResource("tests");
         Objects.requireNonNull(tests, "No tests dir in resources");

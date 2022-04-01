@@ -54,8 +54,8 @@ public class MethodProcessor {
             1, 1, 1, 2, 2, 0, 0, 0, 0
     };
 
-    private NativeObfuscator obfuscator;
-    private InstructionHandlerContainer<?>[] handlers;
+    private final NativeObfuscator obfuscator;
+    private final InstructionHandlerContainer<?>[] handlers;
 
     public MethodProcessor(NativeObfuscator obfuscator) {
         this.obfuscator = obfuscator;

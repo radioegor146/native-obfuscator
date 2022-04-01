@@ -4,8 +4,8 @@ import by.radioegor146.Util;
 
 public class MainSourceBuilder {
 
-    private StringBuilder includes;
-    private StringBuilder registerMethods;
+    private final StringBuilder includes;
+    private final StringBuilder registerMethods;
 
     public MainSourceBuilder() {
         includes = new StringBuilder();

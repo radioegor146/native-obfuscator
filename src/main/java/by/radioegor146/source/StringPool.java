@@ -73,7 +73,7 @@ public class StringPool {
     public String build() {
         List<Byte> bytes = new ArrayList<>();
         pool.entrySet().stream()
-                .sorted(Comparator.comparing(Map.Entry::getValue))
+                .sorted(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
                 .forEach(string -> {
                     for (byte b : getModifiedUtf8Bytes(string)) {
