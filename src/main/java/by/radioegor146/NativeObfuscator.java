@@ -67,8 +67,9 @@ public class NativeObfuscator {
         methodProcessor = new MethodProcessor(this);
     }
 
-    public void process(Path inputJarPath, Path outputDir, List<Path> libs,
+    public void process(Path inputJarPath, Path outputDir, List<Path> inputLibs,
                         List<String> blackList, List<String> whiteList, String plainLibName) throws IOException {
+        List<Path> libs = new ArrayList<>(inputLibs);
         libs.add(inputJarPath);
         this.blackList = blackList;
         this.whiteList = whiteList;
