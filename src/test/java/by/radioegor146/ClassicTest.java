@@ -113,7 +113,8 @@ public class ClassicTest implements Executable {
 
             System.out.println("Processing...");
 
-            new NativeObfuscator().process(idealJar, tempOutput, new ArrayList<>(), Collections.emptyList());
+            new NativeObfuscator().process(idealJar, tempOutput, Collections.emptyList(), Collections.emptyList(),
+                    Collections.emptyList(), "native_library");
 
             System.out.println("Compiling CPP code...");
             if (System.getProperty("os.name").toLowerCase().contains("windows")) {

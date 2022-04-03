@@ -89,8 +89,7 @@ public class NativeObfuscator {
         Util.copyResource("sources/native_jvm_output.hpp", cppDir);
         Util.copyResource("sources/string_pool.hpp", cppDir);
 
-        String projectName = String.format("native_jvm_classes_%s",
-                inputJarPath.getFileName().toString().replaceAll("[$#.\\s/]", "_"));
+        String projectName = "native_library";
 
         CMakeFilesBuilder cMakeBuilder = new CMakeFilesBuilder(projectName);
         cMakeBuilder.addMainFile("native_jvm.hpp");
