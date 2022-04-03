@@ -171,10 +171,10 @@ public class NativeObfuscator {
                         classNode.sourceFile = cppBuilder.getCppFilename();
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
-                            if (blackList.contains(String.format("%s#%s%s", classNode.name, method.name, method.signature))) {
+                            if (blackList.contains(String.format("%s#%s!%s", classNode.name, method.name, method.signature))) {
                                 continue;
                             }
-                            if (whiteList != null && !whiteList.contains(String.format("%s#%s%s",
+                            if (whiteList != null && !whiteList.contains(String.format("%s#%s!%s",
                                     classNode.name, method.name, method.signature))) {
                                 continue;
                             }
