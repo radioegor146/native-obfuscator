@@ -1,6 +1,5 @@
 package by.radioegor146;
 
-import by.radioegor146.compiletime.LoaderUnpack;
 import by.radioegor146.instructions.InvokeDynamicHandler;
 import by.radioegor146.instructions.MethodHandler;
 import by.radioegor146.source.CMakeFilesBuilder;
@@ -26,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.jar.Attributes.Name;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
@@ -48,7 +46,8 @@ public class NativeObfuscator {
     private final NodeCache<CachedMethodInfo> cachedMethods;
     private final NodeCache<CachedFieldInfo> cachedFields;
 
-    public List<String> exclusions = Collections.emptyList();
+    public List<String> blackList = Collections.emptyList();
+    public List<String> whiteList = null;
     private StringBuilder nativeMethods;
     private final Map<String, InvokeDynamicInsnNode> invokeDynamics;
     private final Map<String, MethodInsnNode> methodHandleInvokes;
@@ -68,9 +67,11 @@ public class NativeObfuscator {
         methodProcessor = new MethodProcessor(this);
     }
 
-    public void process(Path inputJarPath, Path outputDir, List<Path> libs, List<String> exclusions, String plainLibName) throws IOException {
+    public void process(Path inputJarPath, Path outputDir, List<Path> libs,
+                        List<String> blackList, List<String> whiteList, String plainLibName) throws IOException {
         libs.add(inputJarPath);
-        this.exclusions = exclusions;
+        this.blackList = blackList;
+        this.whiteList = whiteList;
         ClassMetadataReader metadataReader = new ClassMetadataReader(libs.stream().map(x -> {
             try {
                 return new JarFile(x.toFile());
@@ -140,7 +141,8 @@ public class NativeObfuscator {
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
 
-                    if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) || exclusions.contains(classNode.name)) {
+                    if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) ||
+                            blackList.contains(classNode.name) || (whiteList != null && !whiteList.contains(classNode.name))) {
                         logger.info("Skipping {}", classNode.name);
                         Util.writeEntry(out, entry.getName(), src);
                         return;
@@ -169,7 +171,11 @@ public class NativeObfuscator {
                         classNode.sourceFile = cppBuilder.getCppFilename();
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
-                            if (exclusions.contains(String.format("%s#%s%s", classNode.name, method.name, method.signature))) {
+                            if (blackList.contains(String.format("%s#%s%s", classNode.name, method.name, method.signature))) {
+                                continue;
+                            }
+                            if (whiteList != null && !whiteList.contains(String.format("%s#%s%s",
+                                    classNode.name, method.name, method.signature))) {
                                 continue;
                             }
 

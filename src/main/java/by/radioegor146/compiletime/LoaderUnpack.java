@@ -37,6 +37,8 @@ public class LoaderUnpack {
             osTypeName = "linux.so";
         } else if (osName.contains("win")) {
             osTypeName = "windows.dll";
+        } else if (osName.contains("mac")) {
+            osTypeName = "macos.dylib";
         } else {
             osTypeName = "raw" + osName;
         }

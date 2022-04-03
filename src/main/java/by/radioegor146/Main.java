@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -31,8 +30,11 @@ public class Main {
         @CommandLine.Option(names = {"-l", "--libraries"}, description = "Directory for dependent libraries")
         private File librariesDirectory;
 
-        @CommandLine.Option(names = {"-x", "--exclusions-list"}, description = "File with list of exclusions for transpilation")
-        private File exclusionsListFile;
+        @CommandLine.Option(names = {"-b", "--black-list"}, description = "File with list of blacklist classes/methods for transpilation")
+        private File blackListFile;
+
+        @CommandLine.Option(names = {"-w", "--white-list"}, description = "File with list of whitelist classes/methods for transpilation")
+        private File whiteListFile;
 
         @CommandLine.Option(names = {"--plain-lib-name"}, description = "Plain library name for LoaderPlain")
         private String libraryName;
@@ -46,13 +48,18 @@ public class Main {
                         .forEach(libs::add);
             }
 
-            List<String> exclusionsList = new ArrayList<>();
-            if (exclusionsListFile != null) {
-                exclusionsList = Files.readAllLines(exclusionsListFile.toPath(), StandardCharsets.UTF_8);
+            List<String> blackList = new ArrayList<>();
+            if (blackListFile != null) {
+                blackList = Files.readAllLines(blackListFile.toPath(), StandardCharsets.UTF_8);
+            }
+
+            List<String> whiteList = null;
+            if (whiteListFile != null) {
+                whiteList = Files.readAllLines(whiteListFile.toPath(), StandardCharsets.UTF_8);
             }
 
             new NativeObfuscator().process(jarFile.toPath(), Paths.get(outputDirectory),
-                    libs, exclusionsList, libraryName);
+                    libs, blackList, whiteList, libraryName);
 
             return 0;
         }
