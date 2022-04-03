@@ -24,6 +24,9 @@ repositories {
 dependencies {
     compile 'org.ow2.asm:asm:7.1'
     compile 'org.ow2.asm:asm-tree:7.1'
+    compile 'org.ow2.asm:asm-commons:7.1'
+
+    compile 'info.picocli:picocli:4.6.3'
 
     compile 'org.slf4j:slf4j-api:1.7.25'
     compile 'org.apache.logging.log4j:log4j-core:2.8.2'

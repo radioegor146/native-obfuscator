@@ -1,5 +1,6 @@
 package by.radioegor146;
 
+import by.radioegor146.compiletime.LoaderUnpack;
 import by.radioegor146.instructions.InvokeDynamicHandler;
 import by.radioegor146.instructions.MethodHandler;
 import by.radioegor146.source.CMakeFilesBuilder;
@@ -9,6 +10,8 @@ import by.radioegor146.source.StringPool;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.commons.ClassRemapper;
+import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,11 +25,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.jar.Attributes.Name;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -69,7 +68,7 @@ public class NativeObfuscator {
         methodProcessor = new MethodProcessor(this);
     }
 
-    public void process(Path inputJarPath, Path outputDir, List<Path> libs, List<String> exclusions) throws IOException {
+    public void process(Path inputJarPath, Path outputDir, List<Path> libs, List<String> exclusions, String plainLibName) throws IOException {
         libs.add(inputJarPath);
         this.exclusions = exclusions;
         ClassMetadataReader metadataReader = new ClassMetadataReader(libs.stream().map(x -> {
@@ -217,42 +216,48 @@ public class NativeObfuscator {
                 Util.writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
             }
 
-            Manifest mf = jar.getManifest();
-            ClassNode loaderClass = new ClassNode();
-            loaderClass.sourceFile = "synthetic";
-            loaderClass.name = "native" + nativeDirId + "/Loader";
-            loaderClass.version = 52;
-            loaderClass.superName = "java/lang/Object";
-            loaderClass.access = Opcodes.ACC_PUBLIC;
-            MethodNode registerNativesForClassMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_NATIVE, "registerNativesForClass", "(ILjava/lang/Class;)V", null, new String[0]);
-            loaderClass.methods.add(registerNativesForClassMethod);
-            ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-            loaderClass.accept(classWriter);
-            Util.writeEntry(out, "native" + nativeDirId + "/Loader.class", classWriter.toByteArray());
-            logger.info("Jar file ready!");
-            String mainClass = mf != null ? (String) mf.getMainAttributes().get(Name.MAIN_CLASS) : null;
-            if (mainClass != null) {
-                logger.info("Creating bootstrap classes...");
-                mf.getMainAttributes().put(Name.MAIN_CLASS, "native" + nativeDirId + "/Bootstrap");
-                ClassNode bootstrapClass = new ClassNode(Opcodes.ASM7);
-                bootstrapClass.sourceFile = "synthetic";
-                bootstrapClass.name = "native" + nativeDirId + "/Bootstrap";
-                bootstrapClass.version = 52;
-                bootstrapClass.superName = "java/lang/Object";
-                bootstrapClass.access = Opcodes.ACC_PUBLIC;
-                MethodNode mainMethod = new MethodNode(Opcodes.ASM7, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "main", "([Ljava/lang/String;)V", null, new String[0]);
-                mainMethod.instructions.add(new LdcInsnNode(projectName));
-                mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System", "loadLibrary", "(Ljava/lang/String;)V", false));
-                mainMethod.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                mainMethod.instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, mainClass.replace(".", "/"), "main", "([Ljava/lang/String;)V", false));
-                mainMethod.instructions.add(new InsnNode(Opcodes.RETURN));
-                bootstrapClass.methods.add(mainMethod);
-                bootstrapClass.accept(classWriter);
-                Util.writeEntry(out, "native" + nativeDirId + "/Bootstrap.class", classWriter.toByteArray());
-                logger.info("Created!");
+            String loaderClassName = "native" + nativeDirId + "/Loader";
+
+            ClassNode loaderClass;
+
+            if (plainLibName == null) {
+                ClassReader loaderClassReader = new ClassReader(Objects.requireNonNull(NativeObfuscator.class
+                        .getResourceAsStream("compiletime/LoaderUnpack.class")));
+                loaderClass = new ClassNode(Opcodes.ASM7);
+                loaderClassReader.accept(loaderClass, 0);
+                loaderClass.sourceFile = "synthetic";
+                System.out.println("/native" + nativeDirId + "/");
             } else {
-                logger.info("Main-Class not found - no bootstrap classes!");
+                ClassReader loaderClassReader = new ClassReader(Objects.requireNonNull(NativeObfuscator.class
+                        .getResourceAsStream("compiletime/LoaderPlain.class")));
+                loaderClass = new ClassNode(Opcodes.ASM7);
+                loaderClassReader.accept(loaderClass, 0);
+                loaderClass.sourceFile = "synthetic";
+                loaderClass.methods.forEach(method -> {
+                    for (int i = 0; i < method.instructions.size(); i++) {
+                        AbstractInsnNode insnNode = method.instructions.get(i);
+                        if (insnNode instanceof LdcInsnNode && ((LdcInsnNode) insnNode).cst instanceof String &&
+                                ((LdcInsnNode) insnNode).cst.equals("%LIB_NAME%")) {
+                            ((LdcInsnNode) insnNode).cst = plainLibName;
+                        }
+                    }
+                });
             }
+
+            ClassNode resultLoaderClass = new ClassNode(Opcodes.ASM7);
+            String originalLoaderClassName = loaderClass.name;
+            loaderClass.accept(new ClassRemapper(resultLoaderClass, new Remapper() {
+                @Override
+                public String map(String internalName) {
+                    return internalName.equals(originalLoaderClassName) ? loaderClassName : internalName;
+                }
+            }));
+
+            ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            resultLoaderClass.accept(classWriter);
+            Util.writeEntry(out, loaderClassName + ".class", classWriter.toByteArray());
+            logger.info("Jar file ready!");
+            Manifest mf = jar.getManifest();
             out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
             if (mf != null)
                 mf.write(out);
