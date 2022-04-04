@@ -168,7 +168,6 @@ public class NativeObfuscator {
                     try (ClassSourceBuilder cppBuilder = new ClassSourceBuilder(cppOutput, classNode.name, stringPool)) {
                         StringBuilder instructions = new StringBuilder();
 
-                        classNode.sourceFile = cppBuilder.getCppFilename();
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
                             if (blackList.contains(String.format("%s#%s!%s", classNode.name, method.name, method.signature))) {

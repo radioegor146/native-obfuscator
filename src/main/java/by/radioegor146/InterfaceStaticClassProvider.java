@@ -54,7 +54,7 @@ public class InterfaceStaticClassProvider {
     }
 
     private ClassNode getCurrentClass() {
-        if(currentClass == null) {
+        if (currentClass == null) {
             methods = new StringBuilder();
             currentClass = new ClassNode();
             currentClass.version = 52;

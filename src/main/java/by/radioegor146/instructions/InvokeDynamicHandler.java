@@ -84,7 +84,7 @@ public class InvokeDynamicHandler extends GenericInstructionHandler<InvokeDynami
         }
 
         indyWrapper.instructions.add(new InvokeDynamicInsnNode(indy.name, indy.desc, indy.bsm, indy.bsmArgs));
-        indyWrapper.instructions.add(new InsnNode(Opcodes.ARETURN));
+        indyWrapper.instructions.add(new InsnNode(Type.getReturnType(indy.desc).getOpcode(Opcodes.IRETURN)));
         classNode.methods.add(indyWrapper);
     }
 

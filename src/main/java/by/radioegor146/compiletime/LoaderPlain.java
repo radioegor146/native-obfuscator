@@ -4,6 +4,6 @@ public class LoaderPlain {
     public static native void registerNativesForClass(int index, Class<?> clazz);
 
     static {
-        System.load("%LIB_NAME%");
+        System.loadLibrary("%LIB_NAME%");
     }
 }
