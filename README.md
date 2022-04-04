@@ -5,6 +5,8 @@ Currently, supports only Java 8
 
 Warning: blacklist/whitelist usage is recommended, because this tool slows down code significantly (like do not obfuscate full minecraft .jar)
 
+Also, this tool does not particulary obfuscates your code, it just transpiles it to native. Remember to use protectors like VMProtect, Themida or obfuscator-llvm (in case of clang usage)
+
 ---
 
 ### To run this tool you need to have this installed:
@@ -99,9 +101,10 @@ to the directory of .jar file that this tool will output in `stdout` (by default
 #### Basic usage:
 1. Transpile your code using `java -jar native-obfuscator.jar <input jar> <output directory>`
 2. Run `cmake .` in result `cpp` directory
-3. Run `cmake --build . --config Release` in result `cpp` directory to build .so/.dll file
-4. Copy result .dll/.so from `build/libs/` to the specified in previous paragraph path.
-5. Run created .jar `java -jar <output jar>` and enjoy!
+3. Add changes to .cpp code if necessary
+4. Run `cmake --build . --config Release` in result `cpp` directory to build .so/.dll file
+5. Copy result .dll/.so from `build/libs/` to the specified in previous paragraph path.
+6. Run created .jar `java -jar <output jar>` and enjoy!
 
 ---
 
