@@ -10,11 +10,7 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class MethodProcessor {
@@ -85,9 +81,12 @@ public class MethodProcessor {
 
     private SpecialMethodProcessor getSpecialMethodProcessor(String name) {
         switch (name) {
-            case "<init>": return new InitSpecialMethodProcessor();
-            case "<clinit>": return new ClInitSpecialMethodProcessor();
-            default: return new DefaultSpecialMethodProcessor();
+            case "<init>":
+                return new InitSpecialMethodProcessor();
+            case "<clinit>":
+                return new ClInitSpecialMethodProcessor();
+            default:
+                return new DefaultSpecialMethodProcessor();
         }
     }
 
@@ -104,7 +103,7 @@ public class MethodProcessor {
         if (desc.endsWith(";")) {
             desc = desc.substring(1, desc.length() - 1);
         }
-        return "utils::find_class_wo_static(env, " + context.getStringPool().get(desc.replace("/", ".")) + ")";
+        return "utils::find_class_wo_static(env, classloader, " + context.getCachedStrings().getPointer(desc.replace('/', '.')) + ")";
     }
 
     public void processMethod(MethodContext context) {
@@ -120,10 +119,10 @@ public class MethodProcessor {
 
         SpecialMethodProcessor specialMethodProcessor = getSpecialMethodProcessor(method.name);
 
-        output.append("// ").append(method.name).append(method.desc).append("\n");
+        output.append("// ").append(Util.escapeCommentString(method.name)).append(Util.escapeCommentString(method.desc)).append("\n");
 
         String methodName = specialMethodProcessor.preProcess(context);
-        methodName = "__ngen_" + methodName.replace("/", "_");
+        methodName = "__ngen_" + methodName.replace('/', '_');
         methodName = Util.escapeCppNameString(methodName);
 
         boolean isStatic = Util.getFlag(method.access, Opcodes.ACC_STATIC);
@@ -169,15 +168,34 @@ public class MethodProcessor {
 
         output.append(") {").append("\n");
 
+        if (!isStatic) {
+            output.append("    jclass clazz = utils::get_class_from_object(env, obj);\n");
+            output.append("    if (env->ExceptionCheck()) { ").append(String.format("return (%s) 0;",
+                    CPP_TYPES[context.ret.getSort()])).append(" }\n");
+        }
+        output.append("    jobject classloader = utils::get_classloader_from_class(env, clazz);\n");
+        output.append("    if (env->ExceptionCheck()) { ").append(String.format("return (%s) 0;",
+                CPP_TYPES[context.ret.getSort()])).append(" }\n");
+        output.append("    if (classloader == nullptr) { env->FatalError(").append(context.getStringPool()
+                .get("classloader == null")).append(String.format("); return (%s) 0; }\n", CPP_TYPES[context.ret.getSort()]));
+        output.append("\n");
+        output.append("    jobject lookup = nullptr;\n");
+
         if (method.tryCatchBlocks != null) {
+            for (TryCatchBlockNode tryCatch : method.tryCatchBlocks) {
+                context.getLabelPool().getName(tryCatch.start.getLabel());
+                context.getLabelPool().getName(tryCatch.end.getLabel());
+                context.getLabelPool().getName(tryCatch.handler.getLabel());
+            }
             Set<String> classesForTryCatches = method.tryCatchBlocks.stream().filter((tryCatchBlock) -> (tryCatchBlock.type != null)).map(x -> x.type)
                     .collect(Collectors.toSet());
             classesForTryCatches.forEach((clazz) -> {
                 int classId = context.getCachedClasses().getId(clazz);
 
+                context.output.append(String.format("    // try-catch-class %s\n", Util.escapeCommentString(clazz)));
                 context.output.append(String.format("    if (!cclasses[%d] || env->IsSameObject(cclasses[%d], NULL)) { cclasses_mtx[%d].lock(); "
-                        + "if (!cclasses[%d] || env->IsSameObject(cclasses[%d], NULL)) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewWeakGlobalRef(clazz); env->DeleteLocalRef(clazz); } } "
-                        + "cclasses_mtx[%d].unlock(); if (env->ExceptionCheck()) { return (%s) 0; } }\n",
+                                + "if (!cclasses[%d] || env->IsSameObject(cclasses[%d], NULL)) { if (jclass clazz = %s) { cclasses[%d] = (jclass) env->NewWeakGlobalRef(clazz); env->DeleteLocalRef(clazz); } } "
+                                + "cclasses_mtx[%d].unlock(); if (env->ExceptionCheck()) { return (%s) 0; } }\n",
                         classId,
                         classId,
                         classId,
@@ -218,8 +236,8 @@ public class MethodProcessor {
         for (int instruction = 0; instruction < method.instructions.size(); ++instruction) {
             AbstractInsnNode node = method.instructions.get(instruction);
 
-            if(method.name.equals("<init>") && context.invokeSpecialId == -1) {
-                if(node.getOpcode() == Opcodes.INVOKESPECIAL) {
+            if (method.name.equals("<init>") && context.invokeSpecialId == -1) {
+                if (node.getOpcode() == Opcodes.INVOKESPECIAL) {
                     context.invokeSpecialId = instruction;
                 }
                 continue;
@@ -238,7 +256,7 @@ public class MethodProcessor {
     }
 
     public static String nameFromNode(MethodNode m, ClassNode cn) {
-    	return cn.name + '#' + m.name + '!' + m.desc;
+        return cn.name + '#' + m.name + '!' + m.desc;
     }
 
 }

@@ -21,19 +21,21 @@ public abstract class GenericInstructionHandler<T extends AbstractInsnNode> impl
         StringBuilder tryCatch = new StringBuilder("\n");
         if (context.tryCatches.size() > 0) {
             tryCatch.append(String.format("    %s\n", context.getSnippets().getSnippet("TRYCATCH_START")));
-            for (int i = context.tryCatches.size() - 1; i >= 0; i--) {
-                TryCatchBlockNode tryCatchBlock = context.tryCatches.get(i);
+            for (TryCatchBlockNode tryCatchBlock : context.method.tryCatchBlocks) {
+                if (!context.tryCatches.contains(tryCatchBlock)) {
+                    continue;
+                }
                 if (tryCatchBlock.type == null) {
                     tryCatch.append("    ").append(context.getSnippets().getSnippet("TRYCATCH_ANY_L", Util.createMap(
                             "rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()],
-                            "handler_block", tryCatchBlock.handler.getLabel().toString()
+                            "handler_block", context.getLabelPool().getName(tryCatchBlock.handler.getLabel())
                     ))).append("\n");
                     break;
                 } else {
                     tryCatch.append("    ").append(context.getSnippets().getSnippet("TRYCATCH_CHECK", Util.createMap(
                             "rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()],
                             "exception_class_ptr", context.getCachedClasses().getPointer(tryCatchBlock.type),
-                            "handler_block", tryCatchBlock.handler.getLabel().toString()
+                            "handler_block", context.getLabelPool().getName(tryCatchBlock.handler.getLabel())
                     ))).append("\n");
                 }
             }
@@ -48,11 +50,13 @@ public abstract class GenericInstructionHandler<T extends AbstractInsnNode> impl
         props.put("line", String.valueOf(context.line));
         props.put("trycatchhandler", tryCatch.toString());
         props.put("rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()]);
-        trimmedTryCatchBlock = tryCatch.toString().trim().replace("\n", " ");
+        trimmedTryCatchBlock = tryCatch.toString().trim().replace('\n', ' ');
 
         process(context, node);
 
-        context.output.append(context.obfuscator.getSnippets().getSnippet(instructionName, props));
+        if (instructionName != null) {
+            context.output.append(context.obfuscator.getSnippets().getSnippet(instructionName, props));
+        }
         context.output.append("\n");
     }
 

@@ -7,9 +7,8 @@ import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 import org.objectweb.asm.tree.MethodInsnNode;
 
 public class MethodContext {
@@ -31,10 +30,12 @@ public class MethodContext {
     public int invokeSpecialId;
     public List<Integer> stack;
     public List<Integer> locals;
-    public List<TryCatchBlockNode> tryCatches;
+    public Set<TryCatchBlockNode> tryCatches;
 
     public MethodNode proxyMethod;
     public MethodNode nativeMethod;
+
+    private final LabelPool labelPool = new LabelPool();
 
     public MethodContext(NativeObfuscator obfuscator, MethodNode method, int methodIndex, ClassNode clazz,
                          int classIndex) {
@@ -50,7 +51,7 @@ public class MethodContext {
         this.line = this.invokeSpecialId = -1;
         this.stack = new ArrayList<>();
         this.locals = new ArrayList<>();
-        this.tryCatches = new ArrayList<>();
+        this.tryCatches = new HashSet<>();
     }
 
     public NodeCache<String> getCachedStrings() {
@@ -77,11 +78,15 @@ public class MethodContext {
         return obfuscator.getStringPool();
     }
 
-    public Map<String, InvokeDynamicInsnNode> getInvokeDynamics() {
+    public Map<NativeObfuscator.InvokeDynamicInfo, InvokeDynamicInsnNode> getInvokeDynamics() {
         return obfuscator.getInvokeDynamics();
     }
 
     public Map<String, MethodInsnNode> getMethodHandleInvokes() {
         return obfuscator.getMethodHandleInvokes();
+    }
+
+    public LabelPool getLabelPool() {
+        return labelPool;
     }
 }

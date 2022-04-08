@@ -1,6 +1,6 @@
 package by.radioegor146;
 
-import by.radioegor146.instructions.InvokeDynamicHandler;
+import by.radioegor146.bytecode.Preprocessor;
 import by.radioegor146.instructions.MethodHandler;
 import by.radioegor146.source.CMakeFilesBuilder;
 import by.radioegor146.source.ClassSourceBuilder;
@@ -21,9 +21,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -49,7 +51,39 @@ public class NativeObfuscator {
     public List<String> blackList = Collections.emptyList();
     public List<String> whiteList = null;
     private StringBuilder nativeMethods;
-    private final Map<String, InvokeDynamicInsnNode> invokeDynamics;
+
+    public static class InvokeDynamicInfo {
+        private final String methodName;
+        private final int index;
+
+        public InvokeDynamicInfo(String methodName, int index) {
+            this.methodName = methodName;
+            this.index = index;
+        }
+
+        public String getMethodName() {
+            return methodName;
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            InvokeDynamicInfo that = (InvokeDynamicInfo) o;
+            return index == that.index && Objects.equals(methodName, that.methodName);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(methodName, index);
+        }
+    }
+
+    private final Map<InvokeDynamicInfo, InvokeDynamicInsnNode> invokeDynamics;
     private final Map<String, MethodInsnNode> methodHandleInvokes;
 
     private int currentClassId;
@@ -68,7 +102,7 @@ public class NativeObfuscator {
     }
 
     public void process(Path inputJarPath, Path outputDir, List<Path> inputLibs,
-                        List<String> blackList, List<String> whiteList, String plainLibName) throws IOException {
+                        List<String> blackList, List<String> whiteList, String plainLibName, Platform platform) throws IOException {
         List<Path> libs = new ArrayList<>(inputLibs);
         libs.add(inputJarPath);
         this.blackList = blackList;
@@ -104,7 +138,8 @@ public class NativeObfuscator {
 
         File jarFile = inputJarPath.toAbsolutePath().toFile();
         try (JarFile jar = new JarFile(jarFile);
-             ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())))) {
+             ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())));
+             ZipOutputStream outDebug = new ZipOutputStream(Files.newOutputStream(outputDir.resolve("debug-" + jarFile.getName())))) {
 
             logger.info("Processing {}...", jarFile);
 
@@ -138,15 +173,38 @@ public class NativeObfuscator {
                     nativeMethods = new StringBuilder();
 
                     ClassReader classReader = new ClassReader(src);
-                    ClassNode classNode = new ClassNode(Opcodes.ASM7);
-                    classReader.accept(classNode, 0);
+                    ClassNode rawClassNode = new ClassNode(Opcodes.ASM7);
+                    classReader.accept(rawClassNode, 0);
 
-                    if (classNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) ||
-                            blackList.contains(classNode.name) || (whiteList != null && !whiteList.contains(classNode.name))) {
-                        logger.info("Skipping {}", classNode.name);
+                    if (rawClassNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) ||
+                            blackList.contains(rawClassNode.name) || (whiteList != null && !whiteList.contains(rawClassNode.name))) {
+                        logger.info("Skipping {}", rawClassNode.name);
                         Util.writeEntry(out, entry.getName(), src);
+                        Util.writeEntry(outDebug, entry.getName(), src);
                         return;
                     }
+
+                    logger.info("Preprocessing {}", rawClassNode.name);
+
+                    rawClassNode.methods.stream().filter(MethodProcessor::shouldProcess)
+                            .forEach(methodNode -> methodNode.instructions.insertBefore(methodNode.instructions.get(0),
+                                    new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Thread",
+                                            "dumpStack", "()V")));
+
+                    {
+                        ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7);
+                        rawClassNode.accept(preprocessorClassWriter);
+                        Util.writeEntry(outDebug, entry.getName(), preprocessorClassWriter.toByteArray());
+                    }
+
+                    rawClassNode.methods.stream().filter(MethodProcessor::shouldProcess)
+                            .forEach(methodNode -> Preprocessor.preprocess(rawClassNode, methodNode, platform));
+
+                    ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                    rawClassNode.accept(preprocessorClassWriter);
+                    classReader = new ClassReader(preprocessorClassWriter.toByteArray());
+                    ClassNode classNode = new ClassNode(Opcodes.ASM7);
+                    classReader.accept(classNode, 0);
 
                     logger.info("Processing {}", classNode.name);
 
@@ -189,7 +247,7 @@ public class NativeObfuscator {
                             }
                         }
 
-                        invokeDynamics.forEach((key, value) -> InvokeDynamicHandler.processIndy(classNode, key, value));
+                        // invokeDynamics.forEach((key, value) -> InvokeDynamicHandler.processIndy(classNode, key, value));
                         methodHandleInvokes.forEach((key, value) -> MethodHandler.processMethodHandleInvoke(classNode, key, value));
                         
                         classNode.version = 52;
@@ -221,7 +279,7 @@ public class NativeObfuscator {
                 Util.writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
             }
 
-            String loaderClassName = "native" + nativeDirId + "/Loader";
+            String loaderClassName = nativeDir + "/Loader";
 
             ClassNode loaderClass;
 
@@ -231,7 +289,7 @@ public class NativeObfuscator {
                 loaderClass = new ClassNode(Opcodes.ASM7);
                 loaderClassReader.accept(loaderClass, 0);
                 loaderClass.sourceFile = "synthetic";
-                System.out.println("/native" + nativeDirId + "/");
+                System.out.println("/" + nativeDir + "/");
             } else {
                 ClassReader loaderClassReader = new ClassReader(Objects.requireNonNull(NativeObfuscator.class
                         .getResourceAsStream("compiletime/LoaderPlain.class")));
@@ -261,11 +319,16 @@ public class NativeObfuscator {
             ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             resultLoaderClass.accept(classWriter);
             Util.writeEntry(out, loaderClassName + ".class", classWriter.toByteArray());
+
             logger.info("Jar file ready!");
             Manifest mf = jar.getManifest();
-            out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
-            if (mf != null)
+            if (mf != null) {
+                out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
                 mf.write(out);
+                outDebug.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
+                mf.write(outDebug);
+            }
+            new MethodHandle().invokeWithArguments()
             out.closeEntry();
             metadataReader.close();
         }
@@ -310,7 +373,7 @@ public class NativeObfuscator {
         return nativeDir;
     }
 
-    public Map<String, InvokeDynamicInsnNode> getInvokeDynamics() {
+    public Map<InvokeDynamicInfo, InvokeDynamicInsnNode> getInvokeDynamics() {
         return invokeDynamics;
     }
     

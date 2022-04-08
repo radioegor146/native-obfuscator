@@ -4,10 +4,12 @@ import by.radioegor146.CachedMethodInfo;
 import by.radioegor146.MethodContext;
 import by.radioegor146.MethodProcessor;
 import by.radioegor146.Util;
+import by.radioegor146.bytecode.PreprocessorUtils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.MethodInsnNode;
 
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -20,7 +22,9 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
 
     @Override
     protected void process(MethodContext context, MethodInsnNode node) {
-        if (node.owner.equals("java/lang/invoke/MethodHandle") && (node.name.equals("invokeExact") || node.name.equals("invoke")) && node.getOpcode() == Opcodes.INVOKEVIRTUAL) {
+        if (node.owner.equals("java/lang/invoke/MethodHandle") &&
+                (node.name.equals("invokeExact") || node.name.equals("invoke")) &&
+                node.getOpcode() == Opcodes.INVOKEVIRTUAL) {
             String newMethodName = String.format("methodhandle$%s$%s", node.name, String.valueOf(node.desc.hashCode()).replace("-", ""));
             List<Type> args = new ArrayList<>();
             args.add(Type.getType("Ljava/lang/invoke/MethodHandle;"));
@@ -32,6 +36,23 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
             node.owner = context.clazz.name;
             node.desc = newDesc;
             node.setOpcode(Opcodes.INVOKESTATIC);
+        }
+
+        if (PreprocessorUtils.isLookupLocal(node)) {
+            context.output.append("if (lookup == nullptr) { lookup = utils::get_lookup(env, clazz); ")
+                    .append(trimmedTryCatchBlock).append(" } cstack.pushref(lookup);");
+            instructionName = null;
+            return;
+        }
+        if (PreprocessorUtils.isClassLoaderLocal(node)) {
+            context.output.append("cstack.pushref(classloader);");
+            instructionName = null;
+            return;
+        }
+        if (PreprocessorUtils.isClassLocal(node)) {
+            context.output.append("cstack.pushref(clazz);");
+            instructionName = null;
+            return;
         }
 
         Type returnType = Type.getReturnType(node.desc);

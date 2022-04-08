@@ -7,6 +7,36 @@ import org.objectweb.asm.tree.LdcInsnNode;
 
 public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
 
+    public static String getIntString(int value) {
+        return value == Integer.MIN_VALUE ? "(jint) 2147483648U" : String.valueOf(value);
+    }
+
+    public static String getLongValue(long value) {
+        return value == Long.MIN_VALUE ? "(jlong) 9223372036854775808ULL" : String.valueOf(value) + "LL";
+    }
+
+    public static String getFloatValue(float value) {
+        if (Float.isNaN(value)) {
+            return "NAN";
+        } else if (value == Float.POSITIVE_INFINITY) {
+            return "HUGE_VALF";
+        } else if (value == Float.NEGATIVE_INFINITY) {
+            return "-HUGE_VALF";
+        }
+        return value + "f";
+    }
+
+    public static String getDoubleValue(double value) {
+        if (Double.isNaN(value)) {
+            return "NAN";
+        } else if (value == Double.POSITIVE_INFINITY) {
+            return "HUGE_VAL";
+        } else if (value == Double.NEGATIVE_INFINITY) {
+            return "-HUGE_VAL";
+        }
+        return String.valueOf(value);
+    }
+
     @Override
     protected void process(MethodContext context, LdcInsnNode node) {
         Object cst = node.cst;
@@ -15,42 +45,16 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             props.put("cst_ptr", context.getCachedStrings().getPointer(node.cst.toString()));
         } else if (cst instanceof Integer) {
             instructionName += "_INT";
-            int cstVal = (int) cst;
-            if (cstVal == Integer.MIN_VALUE) {
-                props.put("cst", "(jint) 2147483648U");
-            } else {
-                props.put("cst", node.cst.toString());
-            }
+            props.put("cst", getIntString((Integer) cst));
         } else if (cst instanceof Long) {
             instructionName += "_LONG";
-            long cstVal = (long) cst;
-            if (cstVal == Long.MIN_VALUE) {
-                props.put("cst", "(jlong) 9223372036854775808ULL");
-            } else {
-                props.put("cst", node.cst + "LL");
-            }
+            props.put("cst", getLongValue((Long) cst));
         } else if (cst instanceof Float) {
             instructionName += "_FLOAT";
-            props.put("cst", node.cst + "f");
-            float cstVal = (float) cst;
-            if (cst.toString().equals("NaN")) {
-                props.put("cst", "NAN");
-            } else if (cstVal == Float.POSITIVE_INFINITY) {
-                props.put("cst", "HUGE_VALF");
-            } else if (cstVal == Float.NEGATIVE_INFINITY) {
-                props.put("cst", "-HUGE_VALF");
-            }
+            props.put("cst", getFloatValue((Float) node.cst));
         } else if (cst instanceof Double) {
             instructionName += "_DOUBLE";
-            props.put("cst", node.cst.toString());
-            double cstVal = (double) cst;
-            if (cst.toString().equals("NaN")) {
-                props.put("cst", "NAN");
-            } else if (cstVal == Double.POSITIVE_INFINITY) {
-                props.put("cst", "HUGE_VAL");
-            } else if (cstVal == Double.NEGATIVE_INFINITY) {
-                props.put("cst", "-HUGE_VAL");
-            }
+            props.put("cst", getDoubleValue((Double) node.cst));
         } else if (cst instanceof Type) {
             instructionName += "_CLASS";
 

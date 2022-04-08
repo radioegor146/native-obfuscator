@@ -1,6 +1,7 @@
 package by.radioegor146.source;
 
 import by.radioegor146.InterfaceStaticClassProvider;
+import by.radioegor146.MethodProcessor;
 import by.radioegor146.NodeCache;
 import by.radioegor146.Util;
 
@@ -38,7 +39,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("#include \"../string_pool.hpp\"\n");
         cppWriter.append("#include \"").append(getHppFilename()).append("\"\n");
         cppWriter.append("\n");
-        cppWriter.append("// ").append(className).append("\n");
+        cppWriter.append("// ").append(Util.escapeCommentString(className)).append("\n");
         cppWriter.append("namespace native_jvm::classes::__ngen_").append(filename).append(" {\n\n");
         cppWriter.append("    char *string_pool;\n\n");
 
@@ -66,7 +67,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         hppWriter.append("\n");
         hppWriter.append("#define ").append(filename.concat("_hpp").toUpperCase()).append("_GUARD\n");
         hppWriter.append("\n");
-        hppWriter.append("// ").append(className).append("\n");
+        hppWriter.append("// ").append(Util.escapeCommentString(className)).append("\n");
         hppWriter.append("namespace native_jvm::classes::__ngen_")
                 .append(filename)
                 .append(" {\n\n");
@@ -82,6 +83,10 @@ public class ClassSourceBuilder implements AutoCloseable {
 
         cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass clazz) {\n");
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
+
+        if (!staticClassProvider.isEmpty()) {
+            strings.getPointer(staticClassProvider.getCurrentClassName().replace('/', '.'));
+        }
 
         for (Map.Entry<String, Integer> string : strings.getCache().entrySet()) {
             cppWriter.append("        if (jstring str = env->NewStringUTF(").append(stringPool.get(string.getKey())).append(")) { if (jstring int_str = utils::get_interned(env, str)) { ")
@@ -99,7 +104,7 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append("        };\n\n");
             cppWriter.append("        if (clazz) env->RegisterNatives(clazz, __ngen_methods, sizeof(__ngen_methods) / sizeof(__ngen_methods[0]));\n");
             cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
-                    .append(stringPool.get(className.replace("/", ".")))
+                    .append(stringPool.get(className.replace('/', '.')))
                     .append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
             cppWriter.append("\n");
         }
@@ -108,11 +113,11 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append("        JNINativeMethod __ngen_static_iface_methods[] = {\n");
             cppWriter.append(staticClassProvider.getMethods());
             cppWriter.append("        };\n\n");
-            cppWriter.append("        jclass iface_methods_clazz = utils::find_class_wo_static(env, ")
-                    .append(stringPool.get(staticClassProvider.getCurrentClassName().replace("/", "."))).append(");\n");
+            cppWriter.append("        jclass iface_methods_clazz = utils::find_class_wo_static(env, classloader, ")
+                    .append(strings.getPointer(staticClassProvider.getCurrentClassName().replace('/', '.'))).append(");\n");
             cppWriter.append("        if (iface_methods_clazz) env->RegisterNatives(iface_methods_clazz, __ngen_static_iface_methods, sizeof(__ngen_static_iface_methods) / sizeof(__ngen_static_iface_methods[0]));\n");
             cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
-                    .append(stringPool.get(className.replace("/", ".")))
+                    .append(stringPool.get(className.replace('/', '.')))
                     .append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
         }
         cppWriter.append("    }\n");
@@ -131,7 +136,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         if (desc.endsWith(";")) {
             desc = desc.substring(1, desc.length() - 1);
         }
-        return "utils::find_class_wo_static(env, " + stringPool.get(desc.replace("/", ".")) + ")";
+        return "utils::find_class_wo_static(env, classloader, " + stringPool.get(desc.replace('/', '.')) + ")";
     }
 
     public String getFilename() {

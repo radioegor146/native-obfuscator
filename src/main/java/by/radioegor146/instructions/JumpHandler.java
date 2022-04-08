@@ -7,6 +7,6 @@ public class JumpHandler extends GenericInstructionHandler<JumpInsnNode> {
 
     @Override
     protected void process(MethodContext context, JumpInsnNode node) {
-        props.put("label", String.valueOf(node.label.getLabel()));
+        props.put("label", String.valueOf(context.getLabelPool().getName(node.label.getLabel())));
     }
 }

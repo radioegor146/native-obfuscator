@@ -117,7 +117,7 @@ public class Util {
         Matcher m = Pattern.compile("([^a-zA-Z_0-9])").matcher(value);
         StringBuffer sb = new StringBuffer(value.length());
         while (m.find()) {
-            m.appendReplacement(sb, String.valueOf((int) m.group(1).charAt(0)));
+            m.appendReplacement(sb, String.format("u%d", (int) m.group(1).charAt(0)));
         }
         m.appendTail(sb);
         String output = sb.toString();
@@ -125,6 +125,19 @@ public class Util {
             output = "_" + output;
         }
         return output;
+    }
+
+    public static String escapeCommentString(String value) {
+        StringBuilder result = new StringBuilder();
+        for (char c : value.toCharArray()) {
+            if (c >= 32 && c <= 126) {
+                result.append(c);
+                continue;
+            }
+            String charString = Integer.toHexString(c);
+            result.append("\\u").append("0000".substring(charString.length())).append(charString);
+        }
+        return result.toString();
     }
 
     private static String unicodify(String string) {

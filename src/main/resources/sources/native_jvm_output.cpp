@@ -13,7 +13,7 @@ namespace native_jvm {
         reg_methods[id](env, clazz);
     }
 
-    void prepare_lib(JNIEnv *env, jvmtiEnv *jvmti_env) {
+    void prepare_lib(JNIEnv *env) {
         utils::init_utils(env);
         if (env->ExceptionCheck())
             return;
@@ -31,9 +31,7 @@ $register_code
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env = nullptr;
-    jvmtiEnv *jvmti_env = nullptr;
     vm->GetEnv((void **)&env, JNI_VERSION_1_8);
-    vm->GetEnv((void **)&jvmti_env, JVMTI_VERSION);
-    native_jvm::prepare_lib(env, jvmti_env);
+    native_jvm::prepare_lib(env);
     return JNI_VERSION_1_8;
 }

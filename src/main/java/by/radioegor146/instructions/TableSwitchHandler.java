@@ -30,13 +30,13 @@ public class TableSwitchHandler extends GenericInstructionHandler<TableSwitchIns
     private static String getPart(MethodContext context, int index, Label label) {
         return context.getSnippets().getSnippet("TABLESWITCH_PART", Util.createMap(
                 "index", index,
-                "label", label
+                "label", context.getLabelPool().getName(label)
         ));
     }
 
     private static String getDefault(MethodContext context, Label label) {
         return context.getSnippets().getSnippet("TABLESWITCH_DEFAULT", Util.createMap(
-                "label", label
+                "label", context.getLabelPool().getName(label)
         ));
     }
 }

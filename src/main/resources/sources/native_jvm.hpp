@@ -1,5 +1,4 @@
 #include "jni.h"
-#include "jvmti.h"
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -137,15 +136,18 @@ namespace native_jvm::utils {
 
     void throw_re(JNIEnv *env, const char *exception_class, const char *error, int line);
 
-    jobjectArray create_multidim_array(JNIEnv *env, jint count, jint required_count, jint *sizes, const char *class_name, int line);
+    jobjectArray create_multidim_array(JNIEnv *env, jobject classloader, jint count, jint required_count,
+        jint *sizes, const char *class_name, int line);
 
     template <int sort>
     jarray create_array_value(JNIEnv* env, jint size);
 
     template <int sort>
     jarray create_multidim_array_value(JNIEnv *env, jint count, jint required_count, jint *sizes, const char *name, int line) {
-        if (required_count == 0)
+        if (required_count == 0) {
+            env->FatalError("required_count == 0");
             return nullptr;
+        }
         if (*sizes < 0) {
             throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
             return nullptr;
@@ -156,6 +158,9 @@ namespace native_jvm::utils {
         jobjectArray result_array = nullptr;
         if (jclass clazz = env->FindClass((std::string(count - 1, '[') + std::string(name)).c_str())) {
             result_array = env->NewObjectArray(*sizes, clazz, nullptr);
+            if (env->ExceptionCheck()) {
+                return nullptr;
+            }
             env->DeleteLocalRef(clazz);
         }
         else
@@ -163,17 +168,27 @@ namespace native_jvm::utils {
 
         for (jint i = 0; i < *sizes; i++) {
             jarray inner_array = create_multidim_array_value<sort>(env, count - 1, required_count - 1, sizes + 1, name, line);
-            if (env->ExceptionCheck())
+            if (env->ExceptionCheck()) {
+                env->DeleteLocalRef(result_array);
                 return nullptr;
+            }
             env->SetObjectArrayElement(result_array, i, inner_array);
-            if (env->ExceptionCheck())
-                return nullptr;
             env->DeleteLocalRef(inner_array);
+            if (env->ExceptionCheck()) {
+                env->DeleteLocalRef(result_array);
+                return nullptr;
+            }
         }
         return result_array;
     }
 
-    jclass find_class_wo_static(JNIEnv *env, const char *class_name);
+    jclass find_class_wo_static(JNIEnv *env, jobject classloader, jstring class_name);
+
+    jclass get_class_from_object(JNIEnv *env, jobject object);
+
+    jobject get_classloader_from_class(JNIEnv *env, jclass clazz);
+
+    jobject get_lookup(JNIEnv *env, jclass clazz);
 
     void bastore(JNIEnv *env, jarray array, jint index, jint value);
     jbyte baload(JNIEnv *env, jarray array, jint index);

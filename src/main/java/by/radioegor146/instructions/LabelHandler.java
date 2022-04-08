@@ -8,7 +8,7 @@ public class LabelHandler extends GenericInstructionHandler<LabelNode> {
 
     @Override
     public void accept(MethodContext context, LabelNode node) {
-        Util.reverse(context.method.tryCatchBlocks.stream().filter(x -> x.start.equals(node)))
+        context.method.tryCatchBlocks.stream().filter(x -> x.start.equals(node))
                 .forEachOrdered(context.tryCatches::add);
         context.method.tryCatchBlocks.stream().filter(x -> x.end.equals(node))
                 .forEachOrdered(context.tryCatches::remove);
@@ -18,7 +18,7 @@ public class LabelHandler extends GenericInstructionHandler<LabelNode> {
     	} catch (UnsupportedOperationException ex) {
     		// ignored
     	}
-        context.output.append(String.format("%s: %s\n", node.getLabel(), trimmedTryCatchBlock));
+        context.output.append(String.format("%s: %s\n", context.getLabelPool().getName(node.getLabel()), trimmedTryCatchBlock));
     }
 
     @Override

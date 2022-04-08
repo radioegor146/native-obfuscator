@@ -39,6 +39,10 @@ public class Main {
         @CommandLine.Option(names = {"--plain-lib-name"}, description = "Plain library name for LoaderPlain")
         private String libraryName;
 
+        @CommandLine.Option(names = {"-p", "--platform"}, defaultValue = "hotspot",
+                description = "Target platform: hotspot - standard standalone HotSpot JRE, std_java - java standard (as for Android)")
+        private Platform platform;
+
         @Override
         public Integer call() throws Exception {
             List<Path> libs = new ArrayList<>();
@@ -59,13 +63,14 @@ public class Main {
             }
 
             new NativeObfuscator().process(jarFile.toPath(), Paths.get(outputDirectory),
-                    libs, blackList, whiteList, libraryName);
+                    libs, blackList, whiteList, libraryName, platform);
 
             return 0;
         }
     }
 
     public static void main(String[] args) throws IOException {
-        System.exit(new CommandLine(new NativeObfuscatorRunner()).execute(args));
+        System.exit(new CommandLine(new NativeObfuscatorRunner())
+                .setCaseInsensitiveEnumValuesAllowed(true).execute(args));
     }
 }
