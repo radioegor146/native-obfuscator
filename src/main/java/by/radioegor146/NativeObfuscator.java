@@ -328,7 +328,6 @@ public class NativeObfuscator {
                 outDebug.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
                 mf.write(outDebug);
             }
-            new MethodHandle().invokeWithArguments()
             out.closeEntry();
             metadataReader.close();
         }
