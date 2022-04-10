@@ -8,7 +8,6 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -133,38 +132,11 @@ public class IndyPreprocessor implements IPreprocessor {
         LabelNode bootstrapEnd = new LabelNode(new Label());
         LabelNode bsmeStart = new LabelNode(new Label());
         LabelNode invokeStart = new LabelNode(new Label());
+
         InsnList bootstrapInstructions = new InsnList();
         bootstrapInstructions.add(bootstrapStart); // 0
-        Type[] arguments = Type.getArgumentTypes(invokeDynamicInsnNode.desc);
-        bootstrapInstructions.add(new LdcInsnNode(arguments.length)); // 1
-        bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object")); // 1
-        {
-            int index = arguments.length;
-            for (Type argument : Util.reverse(Arrays.stream(arguments)).collect(Collectors.toList())) {
-                index--;
-                if (argument.getSize() == 1) {
-                    if (argument.getSort() != Type.ARRAY && argument.getSort() != Type.OBJECT) {
-                        bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
-                        bootstrapInstructions.add(getBoxingInsnNode(argument)); // 2
-                        bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
-                    }
-                } else if (argument.getSize() == 2) {
-                    bootstrapInstructions.add(new InsnNode(Opcodes.DUP_X2)); // 3
-                    bootstrapInstructions.add(new InsnNode(Opcodes.POP)); // 2
-                    bootstrapInstructions.add(getBoxingInsnNode(argument)); // 2
-                    bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
-                }
-                bootstrapInstructions.add(new InsnNode(Opcodes.DUP)); // 3
-                bootstrapInstructions.add(new InsnNode(Opcodes.DUP2_X1)); // 5
-                bootstrapInstructions.add(new InsnNode(Opcodes.POP2)); // 3
-                bootstrapInstructions.add(new LdcInsnNode(index)); // 4
-                bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 4
-                bootstrapInstructions.add(new InsnNode(Opcodes.AASTORE)); // 1
-            }
-        }
-        // 1
         switch (platform) {
-            case STD_JAVA:
+            case STD_JAVA: {
                 Type[] bsmArguments = Type.getArgumentTypes(invokeDynamicInsnNode.bsm.getDesc());
                 if (bsmArguments.length < 3 || !bsmArguments[0].getDescriptor().equals("Ljava/lang/invoke/MethodHandles$Lookup;") ||
                         !bsmArguments[1].getDescriptor().equals("Ljava/lang/String;") ||
@@ -179,6 +151,35 @@ public class IndyPreprocessor implements IPreprocessor {
                     methodNode.instructions.insert(invokeDynamicInsnNode, resultInstructions);
                     methodNode.instructions.remove(invokeDynamicInsnNode);
                     return;
+                }
+
+
+                Type[] arguments = Type.getArgumentTypes(invokeDynamicInsnNode.desc);
+                bootstrapInstructions.add(new LdcInsnNode(arguments.length)); // 1
+                bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object")); // 1
+                {
+                    int index = arguments.length;
+                    for (Type argument : Util.reverse(Arrays.stream(arguments)).collect(Collectors.toList())) {
+                        index--;
+                        if (argument.getSize() == 1) {
+                            if (argument.getSort() != Type.ARRAY && argument.getSort() != Type.OBJECT) {
+                                bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
+                                bootstrapInstructions.add(getBoxingInsnNode(argument)); // 2
+                                bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
+                            }
+                        } else if (argument.getSize() == 2) {
+                            bootstrapInstructions.add(new InsnNode(Opcodes.DUP_X2)); // 3
+                            bootstrapInstructions.add(new InsnNode(Opcodes.POP)); // 2
+                            bootstrapInstructions.add(getBoxingInsnNode(argument)); // 2
+                            bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
+                        }
+                        bootstrapInstructions.add(new InsnNode(Opcodes.DUP)); // 3
+                        bootstrapInstructions.add(new InsnNode(Opcodes.DUP2_X1)); // 5
+                        bootstrapInstructions.add(new InsnNode(Opcodes.POP2)); // 3
+                        bootstrapInstructions.add(new LdcInsnNode(index)); // 4
+                        bootstrapInstructions.add(new InsnNode(Opcodes.SWAP)); // 4
+                        bootstrapInstructions.add(new InsnNode(Opcodes.AASTORE)); // 1
+                    }
                 }
 
                 bootstrapInstructions.add(PreprocessorUtils.LOOKUP_LOCAL.get()); // 2
@@ -214,8 +215,9 @@ public class IndyPreprocessor implements IPreprocessor {
                 bootstrapInstructions.add(new MethodInsnNode(Opcodes.INVOKEINTERFACE, "java/lang/invoke/CallSite",
                         "getTarget", "()Ljava/lang/invoke/MethodHandle;")); // 2
                 bootstrapInstructions.add(new JumpInsnNode(Opcodes.GOTO, invokeStart)); // 2
-                break;
-            case HOTSPOT:
+            }
+            break;
+            case HOTSPOT: {
                 bootstrapInstructions.add(new InsnNode(Opcodes.ICONST_1));
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
                 bootstrapInstructions.add(new InsnNode(Opcodes.DUP));
@@ -278,22 +280,38 @@ public class IndyPreprocessor implements IPreprocessor {
                 bootstrapInstructions.add(methodHandleReady); // 1
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/invoke/MethodHandle"));
                 bootstrapInstructions.add(new JumpInsnNode(Opcodes.GOTO, invokeStart)); // 2
-                break;
+            }
+            break;
         }
         bootstrapInstructions.add(bootstrapEnd);
 
         InsnList invokeInstructions = new InsnList();
         invokeInstructions.add(invokeStart);
-        invokeInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
-        invokeInstructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/MethodHandle",
-                "invokeWithArguments", "([Ljava/lang/Object;)Ljava/lang/Object;")); // 1
-        Type returnType = Type.getReturnType(invokeDynamicInsnNode.desc);
-        if (returnType.getSort() == Type.OBJECT) {
-            invokeInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, returnType.getInternalName())); // 1
-        } else if (returnType.getSort() == Type.ARRAY) {
-            invokeInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, returnType.getDescriptor())); // 1
-        } else {
-            invokeInstructions.add(getUnboxingTypeInsn(returnType));
+        switch (platform) {
+            case HOTSPOT: {
+                invokeInstructions.add(PreprocessorUtils.INVOKE_REVERSE.apply(invokeDynamicInsnNode.desc));
+                Type returnType = Type.getReturnType(invokeDynamicInsnNode.desc);
+                if (returnType.getSort() == Type.OBJECT) {
+                    invokeInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, returnType.getInternalName())); // 1
+                } else if (returnType.getSort() == Type.ARRAY) {
+                    invokeInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, returnType.getDescriptor())); // 1
+                }
+                break;
+            }
+            case STD_JAVA: {
+                invokeInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
+                invokeInstructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/MethodHandle",
+                        "invokeWithArguments", "([Ljava/lang/Object;)Ljava/lang/Object;")); // 1
+                Type returnType = Type.getReturnType(invokeDynamicInsnNode.desc);
+                if (returnType.getSort() == Type.OBJECT) {
+                    invokeInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, returnType.getInternalName())); // 1
+                } else if (returnType.getSort() == Type.ARRAY) {
+                    invokeInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, returnType.getDescriptor())); // 1
+                } else {
+                    invokeInstructions.add(getUnboxingTypeInsn(returnType));
+                }
+                break;
+            }
         }
 
         InsnList bsmeInstructions = new InsnList();

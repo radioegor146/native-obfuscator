@@ -1,5 +1,6 @@
 #include "native_jvm.hpp"
 #include "native_jvm_output.hpp"
+#include "string_pool.hpp"
 
 $includes
 
@@ -18,7 +19,12 @@ namespace native_jvm {
         if (env->ExceptionCheck())
             return;
 
+        char* string_pool = string_pool::get_pool();
+
 $register_code
+
+        if (env->ExceptionCheck())
+            return;
 
         char method_name[] = "registerNativesForClass";
         char method_desc[] = "(ILjava/lang/Class;)V";

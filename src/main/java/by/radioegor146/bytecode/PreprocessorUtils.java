@@ -1,9 +1,14 @@
 package by.radioegor146.bytecode;
 
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class PreprocessorUtils {
@@ -18,6 +23,13 @@ public class PreprocessorUtils {
     public static final Supplier<AbstractInsnNode> CLASS_LOCAL = () -> new MethodInsnNode(Opcodes.INVOKESTATIC,
             "native/magic/1/class/obfuscator" + MAGIC_CONST, "a",
             "()Ljava/lang/Class;");
+    public static final Function<String, AbstractInsnNode> INVOKE_REVERSE =
+            desc -> {
+                List<Type> argumentTypes = new ArrayList<>(Arrays.asList(Type.getArgumentTypes(desc)));
+                argumentTypes.add(Type.getObjectType("java/lang/invoke/MethodHandle"));
+                return new MethodInsnNode(Opcodes.INVOKESTATIC, "native/magic/1/invoke/obfuscator" + MAGIC_CONST, "a",
+                        Type.getMethodDescriptor(Type.getReturnType(desc), argumentTypes.toArray(new Type[0])));
+            };
 
     private static boolean areMethodNodesEqual(MethodInsnNode methodInsnNode, MethodInsnNode realMethodInsnNode) {
         if (methodInsnNode.getType() != realMethodInsnNode.getType()) {
@@ -51,6 +63,15 @@ public class PreprocessorUtils {
 
     public static boolean isClassLocal(AbstractInsnNode abstractInsnNode) {
         return compareSuppliers(abstractInsnNode, CLASS_LOCAL);
+    }
+
+    public static boolean isInvokeReverse(AbstractInsnNode abstractInsnNode) {
+        if (!(abstractInsnNode instanceof MethodInsnNode)) {
+            return false;
+        }
+        MethodInsnNode methodInsnNode = (MethodInsnNode) abstractInsnNode;
+        MethodInsnNode realMethodInsnNode = (MethodInsnNode) INVOKE_REVERSE.apply("()V");
+        return methodInsnNode.owner.equals(realMethodInsnNode.owner);
     }
 
     private PreprocessorUtils() {

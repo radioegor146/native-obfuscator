@@ -17,10 +17,7 @@ import org.slf4j.LoggerFactory;
 import ru.gravit.launchserver.asm.ClassMetadataReader;
 import ru.gravit.launchserver.asm.SafeClassWriter;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -83,8 +80,7 @@ public class NativeObfuscator {
         }
     }
 
-    private final Map<InvokeDynamicInfo, InvokeDynamicInsnNode> invokeDynamics;
-    private final Map<String, MethodInsnNode> methodHandleInvokes;
+    private BootstrapMethodsPool bootstrapMethodsPool;
 
     private int currentClassId;
     private String nativeDir;
@@ -96,8 +92,6 @@ public class NativeObfuscator {
         cachedClasses = new NodeCache<>("(cclasses[%d])");
         cachedMethods = new NodeCache<>("(cmethods[%d])");
         cachedFields = new NodeCache<>("(cfields[%d])");
-        invokeDynamics = new HashMap<>();
-        methodHandleInvokes = new HashMap<>();
         methodProcessor = new MethodProcessor(this);
     }
 
@@ -148,6 +142,8 @@ public class NativeObfuscator {
                     .findFirst().orElseThrow(RuntimeException::new);
             nativeDir = "native" + nativeDirId;
 
+            bootstrapMethodsPool = new BootstrapMethodsPool(nativeDir + "/bootstrap");
+
             staticClassProvider = new InterfaceStaticClassProvider(nativeDir);
 
             jar.stream().forEach(entry -> {
@@ -187,21 +183,11 @@ public class NativeObfuscator {
                     logger.info("Preprocessing {}", rawClassNode.name);
 
                     rawClassNode.methods.stream().filter(MethodProcessor::shouldProcess)
-                            .forEach(methodNode -> methodNode.instructions.insertBefore(methodNode.instructions.get(0),
-                                    new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Thread",
-                                            "dumpStack", "()V")));
-
-                    {
-                        ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7);
-                        rawClassNode.accept(preprocessorClassWriter);
-                        Util.writeEntry(outDebug, entry.getName(), preprocessorClassWriter.toByteArray());
-                    }
-
-                    rawClassNode.methods.stream().filter(MethodProcessor::shouldProcess)
                             .forEach(methodNode -> Preprocessor.preprocess(rawClassNode, methodNode, platform));
 
                     ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     rawClassNode.accept(preprocessorClassWriter);
+                    Util.writeEntry(outDebug, entry.getName(), preprocessorClassWriter.toByteArray());
                     classReader = new ClassReader(preprocessorClassWriter.toByteArray());
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
@@ -214,9 +200,6 @@ public class NativeObfuscator {
                     }
 
                     staticClassProvider.newClass();
-
-                    invokeDynamics.clear();
-                    methodHandleInvokes.clear();
 
                     cachedStrings.clear();
                     cachedClasses.clear();
@@ -247,9 +230,6 @@ public class NativeObfuscator {
                             }
                         }
 
-                        // invokeDynamics.forEach((key, value) -> InvokeDynamicHandler.processIndy(classNode, key, value));
-                        methodHandleInvokes.forEach((key, value) -> MethodHandler.processMethodHandleInvoke(classNode, key, value));
-                        
                         classNode.version = 52;
                         ClassWriter classWriter = new SafeClassWriter(metadataReader,
                                 Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -277,6 +257,49 @@ public class NativeObfuscator {
                 ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 ifaceStaticClass.accept(classWriter);
                 Util.writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
+            }
+
+            for (ClassNode bootstrapClass : bootstrapMethodsPool.getClasses()) {
+                String bootstrapClassFileName = "data_" + Util.escapeCppNameString(bootstrapClass.name.replace('/', '_'));
+
+                cMakeBuilder.addClassFile("output/" + bootstrapClassFileName + ".hpp");
+                cMakeBuilder.addClassFile("output/" + bootstrapClassFileName + ".cpp");
+
+                mainSourceBuilder.addHeader(bootstrapClassFileName + ".hpp");
+                mainSourceBuilder.registerDefine(stringPool.get(bootstrapClass.name), bootstrapClassFileName);
+
+                ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                bootstrapClass.accept(classWriter);
+                byte[] rawData = classWriter.toByteArray();
+                Util.writeEntry(outDebug, bootstrapClass.name + ".class", rawData);
+                List<Byte> data = new ArrayList<>(rawData.length);
+                for (byte b : rawData) {
+                    data.add(b);
+                }
+
+                try (BufferedWriter hppWriter = Files.newBufferedWriter(cppOutput.resolve(bootstrapClassFileName + ".hpp")))
+                {
+                    hppWriter.append("#include \"../native_jvm.hpp\"\n\n");
+                    hppWriter.append("#ifndef ").append(bootstrapClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
+                    hppWriter.append("#define ").append(bootstrapClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
+                    hppWriter.append("namespace native_jvm::data::__ngen_").append(bootstrapClassFileName).append(" {\n");
+                    hppWriter.append("    const jbyte* get_class_data();\n");
+                    hppWriter.append("    const jsize get_class_data_length();\n");
+                    hppWriter.append("}\n\n");
+                    hppWriter.append("#endif\n");
+                }
+
+                try (BufferedWriter cppWriter = Files.newBufferedWriter(cppOutput.resolve(bootstrapClassFileName + ".cpp"))) {
+                    cppWriter.append("#include \"").append(bootstrapClassFileName).append(".hpp\"\n\n");
+                    cppWriter.append("namespace native_jvm::data::__ngen_").append(bootstrapClassFileName).append(" {\n");
+                    cppWriter.append("    static const jbyte class_data[").append(String.valueOf(data.size())).append("] = { ");
+                    cppWriter.append(data.stream().map(String::valueOf).collect(Collectors.joining(", ")));
+                    cppWriter.append("};\n");
+                    cppWriter.append("    static const jsize class_data_length = ").append(String.valueOf(data.size())).append(";\n\n");
+                    cppWriter.append("    const jbyte* get_class_data() { return class_data; }\n");
+                    cppWriter.append("    const jsize get_class_data_length() { return class_data_length; }\n");
+                    cppWriter.append("}\n");
+                }
             }
 
             String loaderClassName = nativeDir + "/Loader";
@@ -372,11 +395,7 @@ public class NativeObfuscator {
         return nativeDir;
     }
 
-    public Map<InvokeDynamicInfo, InvokeDynamicInsnNode> getInvokeDynamics() {
-        return invokeDynamics;
-    }
-    
-    public Map<String, MethodInsnNode> getMethodHandleInvokes() {
-        return methodHandleInvokes;
+    public BootstrapMethodsPool getBootstrapMethodsPool() {
+        return bootstrapMethodsPool;
     }
 }

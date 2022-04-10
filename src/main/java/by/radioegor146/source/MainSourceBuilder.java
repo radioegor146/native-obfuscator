@@ -22,6 +22,15 @@ public class MainSourceBuilder {
                 classId, escapedClassName));
     }
 
+    public void registerDefine(String stringPooledClassName, String classFileName) {
+        registerMethods.append(String.format(
+                "        env->DeleteLocalRef(env->DefineClass(%s, nullptr, native_jvm::data::__ngen_%s::get_class_data(), native_jvm::data::__ngen_%s::get_class_data_length()));\n",
+                stringPooledClassName,
+                classFileName,
+                classFileName
+        ));
+    }
+
     public String build(String nativeDir, int classCount) {
         String template = Util.readResource("sources/native_jvm_output.cpp");
         return Util.dynamicFormat(template, Util.createMap(

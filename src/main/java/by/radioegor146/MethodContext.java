@@ -78,14 +78,6 @@ public class MethodContext {
         return obfuscator.getStringPool();
     }
 
-    public Map<NativeObfuscator.InvokeDynamicInfo, InvokeDynamicInsnNode> getInvokeDynamics() {
-        return obfuscator.getInvokeDynamics();
-    }
-
-    public Map<String, MethodInsnNode> getMethodHandleInvokes() {
-        return obfuscator.getMethodHandleInvokes();
-    }
-
     public LabelPool getLabelPool() {
         return labelPool;
     }

@@ -1,43 +1,36 @@
 package by.radioegor146.instructions;
 
-import by.radioegor146.CachedMethodInfo;
-import by.radioegor146.MethodContext;
-import by.radioegor146.MethodProcessor;
-import by.radioegor146.Util;
+import by.radioegor146.*;
 import by.radioegor146.bytecode.PreprocessorUtils;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.*;
 
-import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.VarInsnNode;
+import java.util.stream.Stream;
 
 public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
 
+    private static Type simplifyType(Type type) {
+        switch (type.getSort()) {
+            case Type.OBJECT:
+            case Type.ARRAY:
+                return Type.getObjectType("java/lang/Object");
+            case Type.METHOD:
+                throw new RuntimeException();
+        }
+        return type;
+    }
+
+    private static String simplifyDesc(String desc) {
+        return Type.getMethodType(simplifyType(Type.getReturnType(desc)), Arrays.stream(Type.getArgumentTypes(desc))
+                .map(MethodHandler::simplifyType).toArray(Type[]::new)).getDescriptor();
+    }
+
     @Override
     protected void process(MethodContext context, MethodInsnNode node) {
-        if (node.owner.equals("java/lang/invoke/MethodHandle") &&
-                (node.name.equals("invokeExact") || node.name.equals("invoke")) &&
-                node.getOpcode() == Opcodes.INVOKEVIRTUAL) {
-            String newMethodName = String.format("methodhandle$%s$%s", node.name, String.valueOf(node.desc.hashCode()).replace("-", ""));
-            List<Type> args = new ArrayList<>();
-            args.add(Type.getType("Ljava/lang/invoke/MethodHandle;"));
-            args.addAll(Arrays.asList(Type.getArgumentTypes(node.desc)));
-            String newDesc = Type.getMethodDescriptor(Type.getReturnType(node.desc), args.toArray(new Type[0]));
-            context.getMethodHandleInvokes().put(newDesc, node);
-            node = (MethodInsnNode) node.clone(null);
-            node.name = newMethodName;
-            node.owner = context.clazz.name;
-            node.desc = newDesc;
-            node.setOpcode(Opcodes.INVOKESTATIC);
-        }
-
         if (PreprocessorUtils.isLookupLocal(node)) {
             context.output.append("if (lookup == nullptr) { lookup = utils::get_lookup(env, clazz); ")
                     .append(trimmedTryCatchBlock).append(" } cstack.pushref(lookup);");
@@ -53,6 +46,75 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
             context.output.append("cstack.pushref(clazz);");
             instructionName = null;
             return;
+        }
+        if (PreprocessorUtils.isInvokeReverse(node)) {
+            // stack - args, mh
+            String methodDesc = simplifyDesc(node.desc);
+            Type[] methodArguments = Type.getArgumentTypes(methodDesc);
+            methodArguments[methodArguments.length - 1] = Type.getObjectType("java/lang/invoke/MethodHandle");
+            methodDesc = Type.getMethodDescriptor(Type.getReturnType(methodDesc), methodArguments);
+            String mhDesc = simplifyDesc(Type.getMethodType(Type.getReturnType(node.desc),
+                    Util.reverse(Util.reverse(Arrays.stream(Type.getArgumentTypes(node.desc)))
+                            .skip(1)).toArray(Type[]::new)).getDescriptor());
+
+            BootstrapMethodsPool.BootstrapMethod bootstrapMethod = context.obfuscator.getBootstrapMethodsPool()
+                    .getMethod("invokereverse", methodDesc, method -> {
+                        method.visibleAnnotations = new ArrayList<>();
+                        method.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
+                        int methodHandleIndex = 0;
+                        for (Type argument : Type.getArgumentTypes(mhDesc)) {
+                            methodHandleIndex += argument.getSize();
+                        }
+                        method.instructions.add(new VarInsnNode(Opcodes.ALOAD, methodHandleIndex));
+                        int index = 0;
+                        for (Type argument : Type.getArgumentTypes(mhDesc)) {
+                            method.instructions.add(new VarInsnNode(argument.getOpcode(Opcodes.ILOAD), index));
+                            index += argument.getSize();
+                        }
+                        method.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL,
+                                "java/lang/invoke/MethodHandle", "invoke", mhDesc));
+                        method.instructions.add(new InsnNode(Type.getReturnType(mhDesc).getOpcode(Opcodes.IRETURN)));
+                    });
+
+            node = (MethodInsnNode) node.clone(null);
+            node.name = bootstrapMethod.getMethodNode().name;
+            node.owner = bootstrapMethod.getClassNode().name;
+            node.desc = bootstrapMethod.getMethodNode().desc;
+            node.setOpcode(Opcodes.INVOKESTATIC);
+        }
+        if (node.owner.equals("java/lang/invoke/MethodHandle") &&
+                (node.name.equals("invokeExact") || node.name.equals("invoke")) &&
+                node.getOpcode() == Opcodes.INVOKEVIRTUAL) {
+            // stack - mh, args
+            String methodDesc = simplifyDesc(Type.getMethodType(Type.getReturnType(node.desc),
+                    Stream.concat(Arrays.stream(new Type[]{
+                            Type.getObjectType("java/lang/invoke/MethodHandle")
+                    }), Arrays.stream(Type.getArgumentTypes(node.desc))).toArray(Type[]::new)).getDescriptor());
+            Type[] methodArguments = Type.getArgumentTypes(methodDesc);
+            methodArguments[0] = Type.getObjectType("java/lang/invoke/MethodHandle");
+            methodDesc = Type.getMethodDescriptor(Type.getReturnType(methodDesc), methodArguments);
+            String mhDesc = simplifyDesc(node.desc);
+
+            BootstrapMethodsPool.BootstrapMethod bootstrapMethod = context.obfuscator.getBootstrapMethodsPool()
+                    .getMethod("mhinvoke", methodDesc, method -> {
+                        method.visibleAnnotations = new ArrayList<>();
+                        method.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
+                        method.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                        int index = 1;
+                        for (Type argument : Type.getArgumentTypes(mhDesc)) {
+                            method.instructions.add(new VarInsnNode(argument.getOpcode(Opcodes.ILOAD), index));
+                            index += argument.getSize();
+                        }
+                        method.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL,
+                                "java/lang/invoke/MethodHandle", "invoke", mhDesc));
+                        method.instructions.add(new InsnNode(Type.getReturnType(mhDesc).getOpcode(Opcodes.IRETURN)));
+                    });
+
+            node = (MethodInsnNode) node.clone(null);
+            node.name = bootstrapMethod.getMethodNode().name;
+            node.owner = bootstrapMethod.getClassNode().name;
+            node.desc = bootstrapMethod.getMethodNode().desc;
+            node.setOpcode(Opcodes.INVOKESTATIC);
         }
 
         Type returnType = Type.getReturnType(node.desc);
@@ -115,7 +177,7 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
 
         props.put("args", argsBuilder.toString());
     }
-    
+
     public static void processMethodHandleInvoke(ClassNode classNode, String newMethodDesc, MethodInsnNode invoke) {
         String newMethodName = String.format("methodhandle$%s$%s", invoke.name, String.valueOf(invoke.desc.hashCode()).replace("-", ""));
         MethodNode invokeWrapper = new MethodNode(Opcodes.ASM7,

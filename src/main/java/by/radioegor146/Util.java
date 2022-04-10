@@ -134,8 +134,7 @@ public class Util {
                 result.append(c);
                 continue;
             }
-            String charString = Integer.toHexString(c);
-            result.append("\\u").append("0000".substring(charString.length())).append(charString);
+            result.append("\\u").append(String.format("%04x", (int) c));
         }
         return result.toString();
     }
