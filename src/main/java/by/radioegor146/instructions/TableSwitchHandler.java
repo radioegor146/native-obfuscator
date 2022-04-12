@@ -39,4 +39,9 @@ public class TableSwitchHandler extends GenericInstructionHandler<TableSwitchIns
                 "label", context.getLabelPool().getName(label)
         ));
     }
+
+    @Override
+    public String insnToString(MethodContext context, TableSwitchInsnNode node) {
+        return "TABLESWITCH";
+    }
 }

@@ -10,4 +10,9 @@ public class IincHandler extends GenericInstructionHandler<IincInsnNode> {
         props.put("incr", String.valueOf(node.incr));
         props.put("var", String.valueOf(node.var));
     }
+
+    @Override
+    public String insnToString(MethodContext context, IincInsnNode node) {
+        return String.format("IINC %d %d", node.var, node.incr);
+    }
 }

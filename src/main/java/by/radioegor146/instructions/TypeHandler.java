@@ -2,6 +2,7 @@ package by.radioegor146.instructions;
 
 import by.radioegor146.MethodContext;
 import by.radioegor146.MethodProcessor;
+import by.radioegor146.Util;
 import org.objectweb.asm.tree.TypeInsnNode;
 
 public class TypeHandler extends GenericInstructionHandler<TypeInsnNode> {
@@ -23,5 +24,10 @@ public class TypeHandler extends GenericInstructionHandler<TypeInsnNode> {
                 trimmedTryCatchBlock));
 
         props.put("desc_ptr", context.getCachedClasses().getPointer(node.desc));
+    }
+
+    @Override
+    public String insnToString(MethodContext context, TypeInsnNode node) {
+        return String.format("%s %s", Util.getOpcodeString(node.getOpcode()), node.desc);
     }
 }

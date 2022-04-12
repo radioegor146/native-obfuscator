@@ -1,6 +1,7 @@
 package by.radioegor146.instructions;
 
 import by.radioegor146.MethodContext;
+import by.radioegor146.Util;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.IntInsnNode;
 
@@ -12,5 +13,10 @@ public class IntHandler extends GenericInstructionHandler<IntInsnNode> {
         if (node.getOpcode() == Opcodes.NEWARRAY) {
             instructionName += "_" + node.operand;
         }
+    }
+
+    @Override
+    public String insnToString(MethodContext context, IntInsnNode node) {
+        return String.format("%s %d", Util.getOpcodeString(node.getOpcode()), node.operand);
     }
 }

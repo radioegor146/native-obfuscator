@@ -194,4 +194,9 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
         invokeWrapper.instructions.add(new InsnNode(Type.getReturnType(newMethodDesc).getOpcode(Opcodes.IRETURN)));
         classNode.methods.add(invokeWrapper);
     }
+
+    @Override
+    public String insnToString(MethodContext context, MethodInsnNode node) {
+        return String.format("%s %s.%s%s", Util.getOpcodeString(node.getOpcode()), node.owner, node.name, node.desc);
+    }
 }

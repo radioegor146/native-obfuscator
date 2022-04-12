@@ -242,11 +242,59 @@ public class MethodProcessor {
                 }
                 continue;
             }
-
+            context.output.append("    // ").append(Util.escapeCommentString(handlers[node.getType()]
+                    .insnToString(context, node))).append("\n");
             handlers[node.getType()].accept(context, node);
         }
 
         output.append(String.format("    return (%s) 0;\n", CPP_TYPES[context.ret.getSort()]));
+
+        boolean hasAddedNewBlocks = true;
+
+        Set<CatchesBlock> proceedBlocks = new HashSet<>();
+
+        while (hasAddedNewBlocks) {
+            hasAddedNewBlocks = false;
+            for (CatchesBlock catchBlock : new ArrayList<>(context.catches.keySet())) {
+                if (proceedBlocks.contains(catchBlock)) {
+                    continue;
+                }
+                proceedBlocks.add(catchBlock);
+                output.append("    ").append(context.catches.get(catchBlock)).append(": ");
+                CatchesBlock.CatchBlock currentCatchBlock = catchBlock.getCatches().get(0);
+                if (currentCatchBlock.getClazz() == null) {
+                    output.append(context.getSnippets().getSnippet("TRYCATCH_ANY_L", Util.createMap(
+                            "handler_block", context.getLabelPool().getName(currentCatchBlock.getHandler().getLabel())
+                    )));
+                    output.append("\n");
+                    continue;
+                }
+                output.append(context.getSnippets().getSnippet("TRYCATCH_CHECK_STACK", Util.createMap(
+                        "exception_class_ptr", context.getCachedClasses().getPointer(currentCatchBlock.getClazz()),
+                        "handler_block", context.getLabelPool().getName(currentCatchBlock.getHandler().getLabel())
+                )));
+                output.append("\n");
+                if (catchBlock.getCatches().size() == 1) {
+                    output.append("    ");
+                    output.append(context.getSnippets().getSnippet("TRYCATCH_END_STACK", Util.createMap(
+                            "rettype", CPP_TYPES[context.ret.getSort()]
+                    )));
+                    output.append("\n");
+                    continue;
+                }
+                CatchesBlock nextCatchesBlock = new CatchesBlock(catchBlock.getCatches().stream().skip(1).collect(Collectors.toList()));
+                if (context.catches.get(nextCatchesBlock) == null) {
+                    context.catches.put(nextCatchesBlock, String.format("L_CATCH_%d", context.catches.size()));
+                    hasAddedNewBlocks = true;
+                }
+                output.append("    ");
+                output.append(context.getSnippets().getSnippet("TRYCATCH_ANY_L", Util.createMap(
+                        "handler_block", context.catches.get(nextCatchesBlock)
+                )));
+                output.append("\n");
+            }
+        }
+
         output.append("}\n\n");
 
         method.localVariables.clear();

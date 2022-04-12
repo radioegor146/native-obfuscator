@@ -16,4 +16,8 @@ public class InstructionHandlerContainer<T extends AbstractInsnNode> {
     public void accept(MethodContext context, AbstractInsnNode node) {
         handler.accept(context, clazz.cast(node));
     }
+
+    public String insnToString(MethodContext context, AbstractInsnNode node) {
+        return handler.insnToString(context, clazz.cast(node));
+    }
 }

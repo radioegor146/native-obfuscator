@@ -31,6 +31,7 @@ public class MethodContext {
     public List<Integer> stack;
     public List<Integer> locals;
     public Set<TryCatchBlockNode> tryCatches;
+    public Map<CatchesBlock, String> catches;
 
     public MethodNode proxyMethod;
     public MethodNode nativeMethod;
@@ -52,6 +53,7 @@ public class MethodContext {
         this.stack = new ArrayList<>();
         this.locals = new ArrayList<>();
         this.tryCatches = new HashSet<>();
+        this.catches = new HashMap<>();
     }
 
     public NodeCache<String> getCachedStrings() {

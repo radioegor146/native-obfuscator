@@ -13,12 +13,19 @@ public class LabelHandler extends GenericInstructionHandler<LabelNode> {
         context.method.tryCatchBlocks.stream().filter(x -> x.end.equals(node))
                 .forEachOrdered(context.tryCatches::remove);
 
+
+
     	try {
     		super.accept(context, node);
     	} catch (UnsupportedOperationException ex) {
     		// ignored
     	}
         context.output.append(String.format("%s: %s\n", context.getLabelPool().getName(node.getLabel()), trimmedTryCatchBlock));
+    }
+
+    @Override
+    public String insnToString(MethodContext context, LabelNode node) {
+        return String.format("LABEL %s", context.getLabelPool().getName(node.getLabel()));
     }
 
     @Override

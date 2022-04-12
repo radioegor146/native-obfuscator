@@ -7,7 +7,11 @@ public class LineNumberHandler implements InstructionTypeHandler<LineNumberNode>
     @Override
     public void accept(MethodContext context, LineNumberNode node) {
         context.line = node.line;
-        context.output.append(String.format("    // L %d:\n", context.line));
+    }
+
+    @Override
+    public String insnToString(MethodContext context, LineNumberNode node) {
+        return String.format("Line %d", node.line);
     }
 
 }

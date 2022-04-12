@@ -1,13 +1,14 @@
 package by.radioegor146.instructions;
 
+import by.radioegor146.CatchesBlock;
 import by.radioegor146.MethodContext;
 import by.radioegor146.MethodProcessor;
 import by.radioegor146.Util;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public abstract class GenericInstructionHandler<T extends AbstractInsnNode> implements InstructionTypeHandler<T> {
 
@@ -18,40 +19,36 @@ public abstract class GenericInstructionHandler<T extends AbstractInsnNode> impl
     @Override
     public void accept(MethodContext context, T node) {
         props = new HashMap<>();
-        StringBuilder tryCatch = new StringBuilder("\n");
-        if (context.tryCatches.size() > 0) {
-            tryCatch.append(String.format("    %s\n", context.getSnippets().getSnippet("TRYCATCH_START")));
-            for (TryCatchBlockNode tryCatchBlock : context.method.tryCatchBlocks) {
-                if (!context.tryCatches.contains(tryCatchBlock)) {
-                    continue;
-                }
-                if (tryCatchBlock.type == null) {
-                    tryCatch.append("    ").append(context.getSnippets().getSnippet("TRYCATCH_ANY_L", Util.createMap(
-                            "rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()],
-                            "handler_block", context.getLabelPool().getName(tryCatchBlock.handler.getLabel())
-                    ))).append("\n");
-                    break;
-                } else {
-                    tryCatch.append("    ").append(context.getSnippets().getSnippet("TRYCATCH_CHECK", Util.createMap(
-                            "rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()],
-                            "exception_class_ptr", context.getCachedClasses().getPointer(tryCatchBlock.type),
-                            "handler_block", context.getLabelPool().getName(tryCatchBlock.handler.getLabel())
-                    ))).append("\n");
-                }
+        List<TryCatchBlockNode> tryCatchBlockNodeList = new ArrayList<>();
+        for (TryCatchBlockNode tryCatchBlock : context.method.tryCatchBlocks) {
+            if (!context.tryCatches.contains(tryCatchBlock)) {
+                continue;
             }
-            tryCatch.append("    ").append(context.getSnippets().getSnippet("TRYCATCH_END",
-                    Util.createMap("rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()])));
-        } else {
-            tryCatch.append("    ").append(context.getSnippets().getSnippet("TRYCATCH_EMPTY",
-                    Util.createMap("rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()])));
+            if (tryCatchBlockNodeList.stream().noneMatch(tryCatchBlockNode ->
+                    Objects.equals(tryCatchBlockNode.type, tryCatchBlock.type))) {
+                tryCatchBlockNodeList.add(tryCatchBlock);
+            }
         }
-        context.output.append("    ");
         instructionName = MethodProcessor.INSTRUCTIONS.getOrDefault(node.getOpcode(), "NOTFOUND");
         props.put("line", String.valueOf(context.line));
+        StringBuilder tryCatch = new StringBuilder("\n");
+        tryCatch.append("    ");
+        if (tryCatchBlockNodeList.size() > 0) {
+            String tryCatchLabelName = context.catches.computeIfAbsent(new CatchesBlock(tryCatchBlockNodeList.stream().map(item ->
+                    new CatchesBlock.CatchBlock(item.type, item.handler)).collect(Collectors.toList())),
+                    key -> String.format("L_CATCH_%d", context.catches.size()));
+            tryCatch.append(context.getSnippets().getSnippet("TRYCATCH_START"));
+            tryCatch.append("goto ").append(tryCatchLabelName).append("; }");
+        } else {
+            tryCatch.append(context.getSnippets().getSnippet("TRYCATCH_EMPTY", Util.createMap(
+                    "rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()]
+            )));
+        }
         props.put("trycatchhandler", tryCatch.toString());
         props.put("rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()]);
         trimmedTryCatchBlock = tryCatch.toString().trim().replace('\n', ' ');
 
+        context.output.append("    ");
         process(context, node);
 
         if (instructionName != null) {

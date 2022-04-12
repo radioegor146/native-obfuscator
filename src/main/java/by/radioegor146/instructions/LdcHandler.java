@@ -75,4 +75,9 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
             throw new UnsupportedOperationException();
         }
     }
+
+    @Override
+    public String insnToString(MethodContext context, LdcInsnNode node) {
+        return String.format("LDC %s", node.cst);
+    }
 }

@@ -2,11 +2,13 @@ package by.radioegor146.instructions;
 
 import by.radioegor146.MethodContext;
 import by.radioegor146.MethodProcessor;
+import by.radioegor146.Util;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.FrameNode;
 import org.objectweb.asm.tree.LabelNode;
 
+import java.util.Arrays;
 import java.util.function.Consumer;
 
 public class FrameHandler implements InstructionTypeHandler<FrameNode> {
@@ -87,5 +89,12 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
             context.output.append("\n");
         }
         context.output.append("    utils::clear_refs(env, refs);\n");
+    }
+
+    @Override
+    public String insnToString(MethodContext context, FrameNode node) {
+        return String.format("FRAME %s L: %s S: %s", Util.getOpcodesString(node.type, "F_"),
+                node.local == null ? "null" : Arrays.toString(node.local.toArray(new Object[0])),
+                node.stack == null ? "null" : Arrays.toString(node.stack.toArray(new Object[0])));
     }
 }

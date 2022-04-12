@@ -39,4 +39,9 @@ public class LookupSwitchHandler extends GenericInstructionHandler<LookupSwitchI
                 "label", context.getLabelPool().getName(label)
         ));
     }
+
+    @Override
+    public String insnToString(MethodContext context, LookupSwitchInsnNode node) {
+        return "LOOKUPSWITCH";
+    }
 }

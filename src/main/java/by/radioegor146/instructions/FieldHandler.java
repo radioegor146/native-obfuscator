@@ -3,6 +3,7 @@ package by.radioegor146.instructions;
 import by.radioegor146.CachedFieldInfo;
 import by.radioegor146.MethodContext;
 import by.radioegor146.MethodProcessor;
+import by.radioegor146.Util;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.FieldInsnNode;
@@ -43,5 +44,10 @@ public class FieldHandler extends GenericInstructionHandler<FieldInsnNode> {
                 context.getStringPool().get(node.name),
                 context.getStringPool().get(node.desc),
                 trimmedTryCatchBlock));
+    }
+
+    @Override
+    public String insnToString(MethodContext context, FieldInsnNode node) {
+        return String.format("%s %s.%s %s", Util.getOpcodeString(node.getOpcode()), node.owner, node.name, node.desc);
     }
 }

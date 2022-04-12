@@ -5,4 +5,6 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 
 public interface InstructionTypeHandler<T extends AbstractInsnNode> {
     void accept(MethodContext context, T node);
+
+    String insnToString(MethodContext context, T node);
 }
