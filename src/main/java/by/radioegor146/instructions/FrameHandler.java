@@ -70,7 +70,7 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
             context.output.append("    ");
             for (int type : context.stack) {
                 if (type == 0) {
-                    context.output.append("refs.erase(cstack.refs[").append(currentSp).append("]); ");
+                    context.output.append("refs.erase(cstack").append(currentSp).append(".l); ");
                 }
                 currentSp += Math.max(1, type);
             }

@@ -33,18 +33,17 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
     protected void process(MethodContext context, MethodInsnNode node) {
         if (PreprocessorUtils.isLookupLocal(node)) {
             context.output.append("if (lookup == nullptr) { lookup = utils::get_lookup(env, clazz); ")
-                    .append(trimmedTryCatchBlock).append(" } cstack.pushref(lookup);");
+                    .append(trimmedTryCatchBlock).append(" } cstack").append(context.stackPointer).append(".l = lookup;");
             instructionName = null;
             return;
         }
         if (PreprocessorUtils.isClassLoaderLocal(node)) {
-            context.output.append("cstack.pushref(classloader);");
+            context.output.append("cstack").append(context.stackPointer).append(".l = classloader;");
             instructionName = null;
             return;
         }
-        Opcodes
         if (PreprocessorUtils.isClassLocal(node)) {
-            context.output.append("cstack.pushref(clazz);");
+            context.output.append("cstack").append(context.stackPointer).append(".l = clazz;");
             instructionName = null;
             return;
         }
