@@ -16,6 +16,7 @@ public class MultiANewArrayHandler extends GenericInstructionHandler<MultiANewAr
             props.put("sort", String.valueOf(elementType.getSort()));
             instructionName = "MULTIANEWARRAY_VALUE";
         }
+        // TODO
     }
 
     @Override

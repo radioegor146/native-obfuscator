@@ -42,6 +42,7 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
             instructionName = null;
             return;
         }
+        Opcodes
         if (PreprocessorUtils.isClassLocal(node)) {
             context.output.append("cstack.pushref(clazz);");
             instructionName = null;
@@ -124,10 +125,14 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
         StringBuilder argsBuilder = new StringBuilder();
         List<Integer> argOffsets = new ArrayList<>();
 
-        int stackOffset = -1;
+        int stackOffset = context.stackPointer;
         for (Type argType : args) {
-            argOffsets.add(stackOffset);
             stackOffset -= argType.getSize();
+        }
+        int argumentOffset = stackOffset;
+        for (Type argType : args) {
+            argOffsets.add(argumentOffset);
+            argumentOffset += argType.getSize();
         }
 
         boolean isStatic = node.getOpcode() == Opcodes.INVOKESTATIC;
@@ -135,14 +140,11 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
 
         for (int i = 0; i < argOffsets.size(); i++) {
             argsBuilder.append(", ").append(context.getSnippets().getSnippet("INVOKE_ARG_" + args[i].getSort(),
-                    Util.createMap("index", argOffsets.get(i) - objectOffset)));
+                    Util.createMap("index", argOffsets.get(i))));
         }
 
-        if (!isStatic || args.length > 0) {
-            int count = -(stackOffset + 1) + objectOffset;
-            context.output.append(context.getSnippets().getSnippet("INVOKE_POPCNT",
-                    Util.createMap("count", count))).append(" ");
-        }
+        props.put("objectstackindex", String.valueOf(stackOffset));
+        props.put("returnstackindex", String.valueOf(stackOffset - objectOffset));
 
         if (isStatic || node.getOpcode() == Opcodes.INVOKESPECIAL) {
             props.put("class_ptr", context.getCachedClasses().getPointer(node.owner));

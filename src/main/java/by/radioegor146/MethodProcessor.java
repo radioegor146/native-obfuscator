@@ -209,7 +209,14 @@ public class MethodProcessor {
         }
 
         if (method.maxStack > 0) {
-            output.append(String.format("    utils::jvm_stack<%d> cstack;\n", method.maxStack));
+            output.append("    jvalue ");
+            for (int i = 0; i < method.maxStack; i++) {
+                output.append(String.format("cstack%s", i));
+                if (i != method.maxStack - 1) {
+                    output.append(", ");
+                }
+            }
+            output.append(";\n");
         }
 
         if (method.maxLocals > 0) {

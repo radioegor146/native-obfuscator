@@ -49,7 +49,7 @@ public abstract class GenericInstructionHandler<T extends AbstractInsnNode> impl
         trimmedTryCatchBlock = tryCatch.toString().trim().replace('\n', ' ');
 
         for (int i = -5; i <= 5; i++) {
-            props.put("stackindex" + (i >= 0 ? i : "m" + i), String.valueOf(context.stackPointer + i));
+            props.put("stackindex" + (i >= 0 ? i : "m" + (-i)), String.valueOf(context.stackPointer + i));
         }
 
         context.output.append("    ");
