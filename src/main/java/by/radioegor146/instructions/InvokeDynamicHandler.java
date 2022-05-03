@@ -74,7 +74,7 @@ public class InvokeDynamicHandler extends GenericInstructionHandler<InvokeDynami
 
     public static void processIndy(ClassNode classNode, String methodName, InvokeDynamicInsnNode indy) {
         MethodNode indyWrapper = new MethodNode(Opcodes.ASM7,
-                Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC,
+                Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC,
                 methodName, indy.desc, null, new String[0]);
 
         int localVarsPosition = 0;
