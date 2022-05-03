@@ -16,7 +16,7 @@ public class InvokeDynamicHandler extends GenericInstructionHandler<InvokeDynami
     @Override
     protected void process(MethodContext context, InvokeDynamicInsnNode node) {
         String indyMethodName = String.format("invokedynamic$%s$%d",
-                context.method.name,
+                context.method.name.replace('<', '_').replace('>', '_'),
                 context.getInvokeDynamics().size());
         context.getInvokeDynamics().put(indyMethodName, node);
 
