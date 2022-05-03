@@ -199,4 +199,13 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
     public String insnToString(MethodContext context, MethodInsnNode node) {
         return String.format("%s %s.%s%s", Util.getOpcodeString(node.getOpcode()), node.owner, node.name, node.desc);
     }
+
+    @Override
+    public int getNewStackPointer(MethodInsnNode node, int currentStackPointer) {
+        if (node.getOpcode() != Opcodes.INVOKESTATIC) {
+            currentStackPointer -= 1;
+        }
+        return currentStackPointer - Arrays.stream(Type.getArgumentTypes(node.desc)).mapToInt(Type::getSize).sum()
+                + Type.getReturnType(node.desc).getSize();
+    }
 }

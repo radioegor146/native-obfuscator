@@ -97,36 +97,6 @@ namespace native_jvm::utils {
         }
     };
 
-    template <std::size_t N>
-    struct local_vars {
-        jobject refs[N];
-        jint data[N];
-
-        jlong get2(jint index) {
-            return *(jlong *)(&data[index]);
-        }
-
-        void set2(jint index, jlong value) {
-            *(jlong *)(&data[index]) = value;
-        }
-
-        jint get(jint index) {
-            return data[index];
-        }
-
-        void set(jint index, jint value) {
-            data[index] = value;
-        }
-
-        jobject getref(jint index) {
-            return refs[index];
-        }
-
-        void setref(jint index, jobject ref) {
-            refs[index] = ref;
-        }
-    };
-
     jint cfi(jfloat f);
     jfloat cif(jint f);
     jlong cdl(jdouble f);

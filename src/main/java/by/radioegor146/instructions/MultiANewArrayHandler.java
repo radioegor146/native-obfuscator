@@ -22,4 +22,9 @@ public class MultiANewArrayHandler extends GenericInstructionHandler<MultiANewAr
     public String insnToString(MethodContext context, MultiANewArrayInsnNode node) {
         return String.format("MULTIANEWARRAY %d %s", node.dims, node.desc);
     }
+
+    @Override
+    public int getNewStackPointer(MultiANewArrayInsnNode node, int currentStackPointer) {
+        return currentStackPointer - node.dims;
+    }
 }

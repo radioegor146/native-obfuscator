@@ -14,4 +14,9 @@ public class LineNumberHandler implements InstructionTypeHandler<LineNumberNode>
         return String.format("Line %d", node.line);
     }
 
+    @Override
+    public int getNewStackPointer(LineNumberNode node, int currentStackPointer) {
+        return currentStackPointer;
+    }
+
 }

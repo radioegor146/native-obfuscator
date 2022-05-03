@@ -48,6 +48,10 @@ public abstract class GenericInstructionHandler<T extends AbstractInsnNode> impl
         props.put("rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()]);
         trimmedTryCatchBlock = tryCatch.toString().trim().replace('\n', ' ');
 
+        for (int i = -5; i <= 5; i++) {
+            props.put("stackindex" + (i >= 0 ? i : "m" + i), String.valueOf(context.stackPointer + i));
+        }
+
         context.output.append("    ");
         process(context, node);
 

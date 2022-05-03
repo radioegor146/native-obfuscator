@@ -29,6 +29,11 @@ public class LabelHandler extends GenericInstructionHandler<LabelNode> {
     }
 
     @Override
+    public int getNewStackPointer(LabelNode node, int currentStackPointer) {
+        return currentStackPointer;
+    }
+
+    @Override
     protected void process(MethodContext context, LabelNode node) {
     	throw new UnsupportedOperationException("break at super.process()");
     }

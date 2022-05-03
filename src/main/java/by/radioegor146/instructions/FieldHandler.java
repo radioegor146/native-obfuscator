@@ -50,4 +50,18 @@ public class FieldHandler extends GenericInstructionHandler<FieldInsnNode> {
     public String insnToString(MethodContext context, FieldInsnNode node) {
         return String.format("%s %s.%s %s", Util.getOpcodeString(node.getOpcode()), node.owner, node.name, node.desc);
     }
+
+    @Override
+    public int getNewStackPointer(FieldInsnNode node, int currentStackPointer) {
+        if (node.getOpcode() == Opcodes.GETFIELD || node.getOpcode() == Opcodes.PUTFIELD) {
+            currentStackPointer -= 1;
+        }
+        if (node.getOpcode() == Opcodes.GETSTATIC || node.getOpcode() == Opcodes.GETFIELD) {
+            currentStackPointer += Type.getType(node.desc).getSize();
+        }
+        if (node.getOpcode() == Opcodes.PUTSTATIC || node.getOpcode() == Opcodes.PUTFIELD) {
+            currentStackPointer -= Type.getType(node.desc).getSize();
+        }
+        return currentStackPointer;
+    }
 }

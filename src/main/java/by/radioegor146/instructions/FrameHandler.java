@@ -82,7 +82,7 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
             context.output.append("    ");
             for (int type : context.locals) {
                 if (type == 0) {
-                    context.output.append("refs.erase(clocals.refs[").append(currentLp).append("]); ");
+                    context.output.append("refs.erase(clocal").append(currentLp).append(".l); ");
                 }
                 currentLp += Math.max(1, type);
             }
@@ -96,5 +96,23 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
         return String.format("FRAME %s L: %s S: %s", Util.getOpcodesString(node.type, "F_"),
                 node.local == null ? "null" : Arrays.toString(node.local.toArray(new Object[0])),
                 node.stack == null ? "null" : Arrays.toString(node.stack.toArray(new Object[0])));
+    }
+
+    @Override
+    public int getNewStackPointer(FrameNode node, int currentStackPointer) {
+        switch (node.type) {
+            case Opcodes.F_APPEND:
+            case Opcodes.F_SAME:
+            case Opcodes.F_CHOP:
+                return 0;
+            case Opcodes.F_NEW:
+            case Opcodes.F_FULL:
+                return node.stack.stream().mapToInt(argument -> Math.max(1, argument instanceof Integer ?
+                        MethodProcessor.STACK_TO_STACK[(int) argument] : MethodProcessor.TYPE_TO_STACK[Type.OBJECT])).sum();
+            case Opcodes.F_SAME1:
+                return node.stack.stream().limit(1).mapToInt(argument -> Math.max(1, argument instanceof Integer ?
+                        MethodProcessor.STACK_TO_STACK[(int) argument] : MethodProcessor.TYPE_TO_STACK[Type.OBJECT])).sum();
+        }
+        throw new RuntimeException();
     }
 }

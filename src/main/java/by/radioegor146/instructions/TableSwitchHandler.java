@@ -44,4 +44,9 @@ public class TableSwitchHandler extends GenericInstructionHandler<TableSwitchIns
     public String insnToString(MethodContext context, TableSwitchInsnNode node) {
         return "TABLESWITCH";
     }
+
+    @Override
+    public int getNewStackPointer(TableSwitchInsnNode node, int currentStackPointer) {
+        return currentStackPointer - 1;
+    }
 }

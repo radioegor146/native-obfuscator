@@ -44,4 +44,9 @@ public class LookupSwitchHandler extends GenericInstructionHandler<LookupSwitchI
     public String insnToString(MethodContext context, LookupSwitchInsnNode node) {
         return "LOOKUPSWITCH";
     }
+
+    @Override
+    public int getNewStackPointer(LookupSwitchInsnNode node, int currentStackPointer) {
+        return currentStackPointer - 1;
+    }
 }

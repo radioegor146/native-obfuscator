@@ -213,7 +213,14 @@ public class MethodProcessor {
         }
 
         if (method.maxLocals > 0) {
-            output.append(String.format("    utils::local_vars<%d> clocals;\n", method.maxLocals));
+            output.append("    jvalue ");
+            for (int i = 0; i < method.maxLocals; i++) {
+                output.append(String.format("clocal%s", i));
+                if (i != method.maxLocals - 1) {
+                    output.append(", ");
+                }
+            }
+            output.append(";\n");
         }
 
         output.append("    std::unordered_set<jobject> refs;\n");
@@ -233,6 +240,8 @@ public class MethodProcessor {
 
         context.argTypes.forEach(t -> context.locals.add(TYPE_TO_STACK[t.getSort()]));
 
+        context.stackPointer = 0;
+
         for (int instruction = 0; instruction < method.instructions.size(); ++instruction) {
             AbstractInsnNode node = method.instructions.get(instruction);
 
@@ -243,8 +252,10 @@ public class MethodProcessor {
                 continue;
             }
             context.output.append("    // ").append(Util.escapeCommentString(handlers[node.getType()]
-                    .insnToString(context, node))).append("\n");
+                    .insnToString(context, node))).append("; Stack: ").append(context.stackPointer).append("\n");
             handlers[node.getType()].accept(context, node);
+            context.stackPointer = handlers[node.getType()].getNewStackPointer(node, context.stackPointer);
+            context.output.append("    // New stack: ").append(context.stackPointer).append("\n");
         }
 
         output.append(String.format("    return (%s) 0;\n", CPP_TYPES[context.ret.getSort()]));

@@ -1,6 +1,7 @@
 package by.radioegor146;
 
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 import java.io.*;
 import java.lang.reflect.Field;

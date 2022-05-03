@@ -36,6 +36,8 @@ public class MethodContext {
     public MethodNode proxyMethod;
     public MethodNode nativeMethod;
 
+    public int stackPointer;
+
     private final LabelPool labelPool = new LabelPool();
 
     public MethodContext(NativeObfuscator obfuscator, MethodNode method, int methodIndex, ClassNode clazz,

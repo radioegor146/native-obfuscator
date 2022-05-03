@@ -20,4 +20,8 @@ public class InstructionHandlerContainer<T extends AbstractInsnNode> {
     public String insnToString(MethodContext context, AbstractInsnNode node) {
         return handler.insnToString(context, clazz.cast(node));
     }
+
+    public int getNewStackPointer(AbstractInsnNode node, int stackPointer) {
+        return handler.getNewStackPointer(clazz.cast(node), stackPointer);
+    }
 }

@@ -14,4 +14,9 @@ public class InvokeDynamicHandler extends GenericInstructionHandler<InvokeDynami
     public String insnToString(MethodContext context, InvokeDynamicInsnNode node) {
         throw new RuntimeException("Indy should be handled at bytecode side");
     }
+
+    @Override
+    public int getNewStackPointer(InvokeDynamicInsnNode node, int currentStackPointer) {
+        throw new RuntimeException("Indy should be handled at bytecode side");
+    }
 }

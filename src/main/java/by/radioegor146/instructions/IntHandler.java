@@ -19,4 +19,16 @@ public class IntHandler extends GenericInstructionHandler<IntInsnNode> {
     public String insnToString(MethodContext context, IntInsnNode node) {
         return String.format("%s %d", Util.getOpcodeString(node.getOpcode()), node.operand);
     }
+
+    @Override
+    public int getNewStackPointer(IntInsnNode node, int currentStackPointer) {
+        switch (node.getOpcode()) {
+            case Opcodes.BIPUSH:
+            case Opcodes.SIPUSH:
+                return currentStackPointer + 1;
+            case Opcodes.NEWARRAY:
+                return currentStackPointer;
+        }
+        throw new RuntimeException();
+    }
 }

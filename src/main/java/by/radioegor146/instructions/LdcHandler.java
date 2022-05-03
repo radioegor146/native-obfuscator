@@ -80,4 +80,12 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
     public String insnToString(MethodContext context, LdcInsnNode node) {
         return String.format("LDC %s", node.cst);
     }
+
+    @Override
+    public int getNewStackPointer(LdcInsnNode node, int currentStackPointer) {
+        if (node.cst instanceof Double || node.cst instanceof Long) {
+            return currentStackPointer + 2;
+        }
+        return currentStackPointer + 1;
+    }
 }
