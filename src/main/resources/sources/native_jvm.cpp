@@ -40,6 +40,11 @@ namespace native_jvm::utils {
 
     jclass boolean_array_class;
     jmethodID string_intern_method;
+    jclass no_class_def_found_class;
+    jmethodID ncdf_init_method;
+    jclass throwable_class;
+    jmethodID get_message_method;
+    jmethodID init_cause_method;
 
     void init_utils(JNIEnv *env) {
         jclass clazz = env->FindClass("[Z");
@@ -55,6 +60,30 @@ namespace native_jvm::utils {
         if (env->ExceptionCheck())
             return;
         env->DeleteLocalRef(string_clazz);
+        jclass _no_class_def_found_class = env->FindClass("java/lang/NoClassDefFoundError");
+        if (env->ExceptionCheck())
+            return;
+        no_class_def_found_class = (jclass) env->NewGlobalRef(_no_class_def_found_class);
+        env->DeleteLocalRef(_no_class_def_found_class);
+
+        ncdf_init_method = env->GetMethodID(no_class_def_found_class, "<init>", "(Ljava/lang/String;)V");
+        if (env->ExceptionCheck())
+            return;
+
+        jclass _throwable_class = env->FindClass("java/lang/Throwable");
+        if (env->ExceptionCheck())
+            return;
+        throwable_class = (jclass) env->NewGlobalRef(_throwable_class);
+        env->DeleteLocalRef(_throwable_class);
+
+        get_message_method = env->GetMethodID(throwable_class, "getMessage", "()Ljava/lang/String;");
+        if (env->ExceptionCheck())
+            return;
+
+        init_cause_method = env->GetMethodID(throwable_class, "initCause",
+                                            "(Ljava/lang/Throwable;)Ljava/lang/Throwable;");
+        if (env->ExceptionCheck())
+            return;
     }
 
     template <>
@@ -160,8 +189,40 @@ namespace native_jvm::utils {
             load_class_method,
             class_name_string
         );
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(classloader);
+            env->DeleteLocalRef(classloader_class);
+            env->DeleteLocalRef(class_name_string);
+            jthrowable exception = env->ExceptionOccurred();
+            env->ExceptionClear();
+            jobject details = env->CallObjectMethod(
+                exception,
+                get_message_method
+            );
+            if (env->ExceptionCheck()) {
+                env->DeleteLocalRef(exception);
+                return nullptr;
+            }
+            jobject new_exception = env->NewObject(no_class_def_found_class,
+                ncdf_init_method,
+                details);
+            if (env->ExceptionCheck()) {
+                env->DeleteLocalRef(exception);
+                env->DeleteLocalRef(details);
+                return nullptr;
+            }
+            env->CallVoidMethod(new_exception, init_cause_method, exception);
+            if (env->ExceptionCheck()) {
+                env->DeleteLocalRef(new_exception);
+                env->DeleteLocalRef(exception);
+                env->DeleteLocalRef(details);
+                return nullptr;
+            }
+            env->Throw((jthrowable) new_exception);
+            env->DeleteLocalRef(exception);
+            env->DeleteLocalRef(details);
             return nullptr;
+        }
         env->DeleteLocalRef(classloader);
         env->DeleteLocalRef(classloader_class);
         env->DeleteLocalRef(class_name_string);
