@@ -71,6 +71,12 @@ Transpiles .jar file into .cpp files and generates output .jar file
 
 `-l <librariesDirectory>` - directory where dependant libraries should be, optional, but preferable
 
+`-p <platform>` - JVM platform on what library will be executed
+
+Two options are available:
+    - hotspot: will use HotSpot JVM internals and should work with most obfuscators (even with stack trace checking as well)
+    - std_java: will use only minor JVM internals that are available on Android as well. Use only this option if you want to run your library on Android
+
 `-w <whiteList>` - path to .txt file for whitelist of methods and classes if required
 
 `-b <blackList>` - path to .txt file for blacklist of methods and classes if required
@@ -96,7 +102,7 @@ x64-macos.dylib
 arm64-linux.so
 arm64-windows.dll
 ```
-to the directory of .jar file that this tool will output in `stdout` (by default `native0/`)
+to the directory of .jar file that this tool will print in `stdout` (by default `native0/`)
 
 #### Basic usage:
 1. Transpile your code using `java -jar native-obfuscator.jar <input jar> <output directory>`
