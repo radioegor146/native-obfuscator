@@ -5,129 +5,42 @@
 #include <cstdio>
 #include <unordered_set>
 #include <mutex>
+#include <initializer_list>
 
 #ifndef NATIVE_JVM_HPP_GUARD
 
 #define NATIVE_JVM_HPP_GUARD
 
 namespace native_jvm::utils {
-    
-    template <std::size_t N>
-    struct jvm_stack {
-        jobject refs[N];
-        jint data[N];
-        jint sptr = 0;
-
-        void push2(jlong value) {
-            *(jlong *)(&data[sptr]) = value;
-            sptr += 2;
-        }
-
-        jlong pop2() {
-            sptr -= 2;
-            return *(jlong *)(&data[sptr]);
-        }
-
-        void push(jint value) {
-            data[sptr] = value;
-            sptr++;
-        }
-
-        jint pop() {
-            sptr--;
-            return data[sptr];
-        }
-
-        void pushref(jobject value) {
-            refs[sptr] = value;
-            sptr++;
-        }
-
-        jobject popref() {
-            sptr--;
-            return refs[sptr];
-        }
-
-        void popcnt(int cnt) {
-            sptr -= cnt;
-        }
-
-        jint fetch(int sd) {
-            return data[sptr - sd - 1];
-        }
-
-        jlong fetch2(int sd) {
-            return *(jlong *)(&data[sptr - 2 * sd - 2]);
-        }
-
-        jlong fetch2raw(int sd) {
-            return *(jlong *)(&data[sptr - sd - 1]);    
-        }
-
-        jobject fetchref(int sd) {
-            return refs[sptr - sd - 1];
-        }
-
-        void set(int sd, jint value) {
-            data[sptr - sd - 1] = value;
-        }
-
-        void set2(int sd, jlong value) {
-            *(jlong *)(&data[sptr - 2 * sd - 2]) = value;
-        }
-
-        void set2raw(int sd, jlong value) {
-            *(jlong *)(&data[sptr - sd - 1]) = value;    
-        }
-
-        void setref(int sd, jobject value) {
-            refs[sptr - sd - 1] = value;
-        }
-
-        jint *getptr(int sd) {
-            return data + (sptr - sd - 1);
-        }
-
-        jlong *getptr2(int sd) {
-            return (jlong *)(data + (sptr - 2 * sd - 2));
-        }
-
-        void clear() {
-            sptr = 0;
-        }
-    };
-
-    jint cfi(jfloat f);
-    jfloat cif(jint f);
-    jlong cdl(jdouble f);
-    jdouble cld(jlong f);
 
     void init_utils(JNIEnv *env);
 
     void throw_re(JNIEnv *env, const char *exception_class, const char *error, int line);
 
     jobjectArray create_multidim_array(JNIEnv *env, jobject classloader, jint count, jint required_count,
-        jint *sizes, const char *class_name, int line);
+        const char *class_name, int line, std::initializer_list<jint> sizes, int dim_index = 0);
 
     template <int sort>
     jarray create_array_value(JNIEnv* env, jint size);
 
     template <int sort>
-    jarray create_multidim_array_value(JNIEnv *env, jint count, jint required_count, jint *sizes, const char *name, int line) {
+    jarray create_multidim_array_value(JNIEnv *env, jint count, jint required_count,
+        const char *name, int line, std::initializer_list<jint> sizes, int dim_index = 0) {
         if (required_count == 0) {
             env->FatalError("required_count == 0");
             return nullptr;
         }
-        if (*sizes < 0) {
+        jint current_size = sizes.begin()[dim_index];
+        if (current_size < 0) {
             throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
             return nullptr;
         }
         if (count == 1) {
-            return create_array_value<sort>(env, *sizes);
+            return create_array_value<sort>(env, current_size);
         }
         jobjectArray result_array = nullptr;
         if (jclass clazz = env->FindClass((std::string(count - 1, '[') + std::string(name)).c_str())) {
-            result_array = env->NewObjectArray(*sizes, clazz, nullptr);
+            result_array = env->NewObjectArray(current_size, clazz, nullptr);
             if (env->ExceptionCheck()) {
                 return nullptr;
             }
@@ -136,8 +49,13 @@ namespace native_jvm::utils {
         else
             return nullptr;
 
-        for (jint i = 0; i < *sizes; i++) {
-            jarray inner_array = create_multidim_array_value<sort>(env, count - 1, required_count - 1, sizes + 1, name, line);
+        if (required_count == 1) {
+            return result_array;
+        }
+
+        for (jint i = 0; i < current_size; i++) {
+            jarray inner_array = create_multidim_array_value<sort>(env, count - 1, required_count - 1,
+                name, line, sizes, dim_index + 1);
             if (env->ExceptionCheck()) {
                 env->DeleteLocalRef(result_array);
                 return nullptr;
@@ -162,11 +80,6 @@ namespace native_jvm::utils {
 
     void bastore(JNIEnv *env, jarray array, jint index, jint value);
     jbyte baload(JNIEnv *env, jarray array, jint index);
-
-    jlong cast_dl(jdouble value);
-    jlong cast_fl(jfloat value);
-    jint cast_di(jdouble value);
-    jint cast_fi(jfloat value);
 
     void clear_refs(JNIEnv *env, std::unordered_set<jobject> &refs);
 

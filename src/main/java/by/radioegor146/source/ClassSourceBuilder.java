@@ -84,10 +84,6 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass clazz) {\n");
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
 
-        if (!staticClassProvider.isEmpty()) {
-            strings.getPointer(staticClassProvider.getCurrentClassName().replace('/', '.'));
-        }
-
         for (Map.Entry<String, Integer> string : strings.getCache().entrySet()) {
             cppWriter.append("        if (jstring str = env->NewStringUTF(").append(stringPool.get(string.getKey())).append(")) { if (jstring int_str = utils::get_interned(env, str)) { ")
                     .append(String.format("cstrings[%d] = ", string.getValue()))
@@ -110,6 +106,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         }
 
         if (!staticClassProvider.isEmpty()) {
+            cppWriter.append("        jobject classloader = utils::get_classloader_from_class(env, clazz);\n");
             cppWriter.append("        JNINativeMethod __ngen_static_iface_methods[] = {\n");
             cppWriter.append(staticClassProvider.getMethods());
             cppWriter.append("        };\n\n");

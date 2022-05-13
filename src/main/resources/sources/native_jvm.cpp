@@ -4,41 +4,6 @@
 
 namespace native_jvm::utils {
 
-    union __fi_conv { 
-        jfloat m_jfloat; 
-        jint m_jint; 
-    };
-
-    jint cfi(jfloat f) { 
-        __fi_conv fi; 
-        fi.m_jfloat = f;
-        return fi.m_jint; 
-    }
-
-    jfloat cif(jint i) { 
-        __fi_conv fi; 
-        fi.m_jint = i; 
-        return fi.m_jfloat; 
-    }
-
-
-    union __dl_conv { 
-        jdouble m_jdouble; 
-        jlong m_jlong; 
-    };
-
-    jlong cdl(jdouble d) { 
-        __dl_conv dl; 
-        dl.m_jdouble = d; 
-        return dl.m_jlong;
-    }
-
-    jdouble cld(jlong l) { 
-        __dl_conv dl; 
-        dl.m_jlong = l; 
-        return dl.m_jdouble; 
-    }
-
     jclass boolean_array_class;
     jmethodID string_intern_method;
     jclass class_class;
@@ -177,12 +142,13 @@ namespace native_jvm::utils {
     }
 
     jobjectArray create_multidim_array(JNIEnv *env, jobject classloader, jint count, jint required_count,
-        jint *sizes, const char *class_name, int line) {
+        const char *class_name, int line, std::initializer_list<jint> sizes, int dim_index) {
         if (required_count == 0) {
             env->FatalError("required_count == 0");
             return nullptr;
         }
-        if (*sizes < 0) {
+        jint current_size = sizes.begin()[dim_index];
+        if (current_size < 0) {
             throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
             return nullptr;
         }
@@ -196,7 +162,7 @@ namespace native_jvm::utils {
             if (env->ExceptionCheck()) {
                 return nullptr;
             }
-            result_array = env->NewObjectArray(*sizes, clazz, nullptr);
+            result_array = env->NewObjectArray(current_size, clazz, nullptr);
             if (env->ExceptionCheck()) {
                 return nullptr;
             }
@@ -204,7 +170,7 @@ namespace native_jvm::utils {
         }
         std::string clazz_name = std::string(count - 1, '[') + "L" + std::string(class_name) + ";";
         if (jclass clazz = env->FindClass(clazz_name.c_str())) {
-            result_array = env->NewObjectArray(*sizes, clazz, nullptr);
+            result_array = env->NewObjectArray(current_size, clazz, nullptr);
             if (env->ExceptionCheck()) {
                 return nullptr;
             }
@@ -213,9 +179,13 @@ namespace native_jvm::utils {
             return nullptr;
         }
 
-        for (jint i = 0; i < *sizes; i++) {
+        if (required_count == 1) {
+            return result_array;
+        }
+
+        for (jint i = 0; i < current_size; i++) {
             jobjectArray inner_array = create_multidim_array(env, classloader, count - 1, required_count - 1,
-                sizes + 1, class_name, line);
+                class_name, line, sizes, dim_index + 1);
             if (env->ExceptionCheck()) {
                 env->DeleteLocalRef(result_array);
                 return nullptr;
@@ -317,46 +287,6 @@ namespace native_jvm::utils {
             return nullptr;
         }
         return lookup;
-    }
-
-    jlong cast_dl(jdouble value) {
-        if (std::isnan(value))
-            return 0;
-        int exponent;
-        std::frexp(value, &exponent);
-        if (std::isfinite(value) && exponent <= 63)
-            return (jlong) value;
-        return std::signbit(value) ? std::numeric_limits<jlong>::min() : std::numeric_limits<jlong>::max();
-    }
-
-    jlong cast_fl(jfloat value) {
-        if (std::isnan(value))
-            return 0;
-        int exponent;
-        std::frexp(value, &exponent);
-        if (std::isfinite(value) && exponent <= 63)
-            return (jlong) value;
-        return std::signbit(value) ? std::numeric_limits<jlong>::min() : std::numeric_limits<jlong>::max();
-    }
-
-    jint cast_di(jdouble value) {
-        if (std::isnan(value))
-            return 0;
-        int exponent;
-        std::frexp(value, &exponent);
-        if (std::isfinite(value) && exponent <= 31)
-            return (jint) value;
-        return std::signbit(value) ? std::numeric_limits<jint>::min() : std::numeric_limits<jint>::max();
-    }
-
-    jint cast_fi(jfloat value) {
-        if (std::isnan(value))
-          return 0;
-        int exponent;
-        std::frexp(value, &exponent);
-        if (std::isfinite(value) && exponent <= 31)
-          return (jint) value;
-        return std::signbit(value) ? std::numeric_limits<jint>::min() : std::numeric_limits<jint>::max();
     }
 
     void clear_refs(JNIEnv *env, std::unordered_set<jobject> &refs) {

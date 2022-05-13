@@ -38,7 +38,7 @@ public abstract class GenericInstructionHandler<T extends AbstractInsnNode> impl
                     new CatchesBlock.CatchBlock(item.type, item.handler)).collect(Collectors.toList())),
                     key -> String.format("L_CATCH_%d", context.catches.size()));
             tryCatch.append(context.getSnippets().getSnippet("TRYCATCH_START"));
-            tryCatch.append("goto ").append(tryCatchLabelName).append("; }");
+            tryCatch.append(" goto ").append(tryCatchLabelName).append("; }");
         } else {
             tryCatch.append(context.getSnippets().getSnippet("TRYCATCH_EMPTY", Util.createMap(
                     "rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()]

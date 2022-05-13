@@ -3,6 +3,8 @@ public class Issue52 {
     public static void test1() {
         int[][] array = new int[12][2];
         int[][][] array1 = new int[12][2][];
+        System.out.println(array1.length);
+        System.out.println(array1[0].length);
         boolean[][] array2 = new boolean[1][2];
         char[][] array31 = new char[1][2];
         short[][] array3 = new short[1][2];

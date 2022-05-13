@@ -230,6 +230,10 @@ public class NativeObfuscator {
                             }
                         }
 
+                        if (!staticClassProvider.isEmpty()) {
+                            cachedStrings.getPointer(staticClassProvider.getCurrentClassName().replace('/', '.'));
+                        }
+
                         classNode.version = 52;
                         ClassWriter classWriter = new SafeClassWriter(metadataReader,
                                 Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);

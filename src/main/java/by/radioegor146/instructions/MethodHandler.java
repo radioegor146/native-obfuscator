@@ -142,7 +142,7 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
                     Util.createMap("index", argOffsets.get(i))));
         }
 
-        props.put("objectstackindex", String.valueOf(stackOffset));
+        props.put("objectstackindex", String.valueOf(stackOffset - objectOffset));
         props.put("returnstackindex", String.valueOf(stackOffset - objectOffset));
 
         if (isStatic || node.getOpcode() == Opcodes.INVOKESPECIAL) {
@@ -177,23 +177,6 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
                         trimmedTryCatchBlock));
 
         props.put("args", argsBuilder.toString());
-    }
-
-    public static void processMethodHandleInvoke(ClassNode classNode, String newMethodDesc, MethodInsnNode invoke) {
-        String newMethodName = String.format("methodhandle$%s$%s", invoke.name, String.valueOf(invoke.desc.hashCode()).replace("-", ""));
-        MethodNode invokeWrapper = new MethodNode(Opcodes.ASM7,
-                Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_STATIC,
-                newMethodName, newMethodDesc, null, new String[0]);
-
-        int localVarsPosition = 0;
-        for (Type arg : Type.getArgumentTypes(newMethodDesc)) {
-            invokeWrapper.instructions.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
-            localVarsPosition += arg.getSize();
-        }
-
-        invokeWrapper.instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, invoke.owner, invoke.name, invoke.desc, false));
-        invokeWrapper.instructions.add(new InsnNode(Type.getReturnType(newMethodDesc).getOpcode(Opcodes.IRETURN)));
-        classNode.methods.add(invokeWrapper);
     }
 
     @Override
