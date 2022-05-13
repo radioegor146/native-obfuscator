@@ -211,7 +211,7 @@ public class MethodProcessor {
         if (method.maxStack > 0) {
             output.append("    jvalue ");
             for (int i = 0; i < method.maxStack; i++) {
-                output.append(String.format("cstack%s", i));
+                output.append(String.format("cstack%s = {}", i));
                 if (i != method.maxStack - 1) {
                     output.append(", ");
                 }
@@ -222,7 +222,7 @@ public class MethodProcessor {
         if (method.maxLocals > 0) {
             output.append("    jvalue ");
             for (int i = 0; i < method.maxLocals; i++) {
-                output.append(String.format("clocal%s", i));
+                output.append(String.format("clocal%s = {}", i));
                 if (i != method.maxLocals - 1) {
                     output.append(", ");
                 }
