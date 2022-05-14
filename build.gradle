@@ -16,12 +16,17 @@ if (!hasProperty('ide.eclipse')) {
     sourceSets.test.resources.srcDirs += file('test_data')
 }
 
+group = "by.radioegor146.nativeobfuscator"
+archivesBaseName = "nativeobfuscator"
+
 repositories {
     mavenLocal()
     mavenCentral()
 }
 
 dependencies {
+    compile project(':annotations')
+
     compile 'org.ow2.asm:asm:7.1'
     compile 'org.ow2.asm:asm-tree:7.1'
     compile 'org.ow2.asm:asm-commons:7.1'
@@ -65,7 +70,7 @@ test {
         System.out.print("Running test \"" + descriptor.getName() + "\" -> ");
         System.out.flush();
     }
-    
+
     afterTest { descriptor, result ->
         if (System.getenv("CI")) {
             if (result.getResultType() == TestResult.ResultType.SUCCESS)
@@ -105,3 +110,24 @@ if (hasProperty('ide.eclipse'))
         from 'test_data'
     }
 
+allprojects {
+    repositories {
+        maven {
+            url 'https://jitpack.io'
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'maven-publish'
+
+    publishing {
+        publications {
+            maven(MavenPublication) {
+                groupId project.group
+                artifactId project.name
+                version project.version
+            }
+        }
+    }
+}

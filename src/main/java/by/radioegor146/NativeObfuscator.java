@@ -1,7 +1,6 @@
 package by.radioegor146;
 
 import by.radioegor146.bytecode.Preprocessor;
-import by.radioegor146.instructions.MethodHandler;
 import by.radioegor146.source.CMakeFilesBuilder;
 import by.radioegor146.source.ClassSourceBuilder;
 import by.radioegor146.source.MainSourceBuilder;
@@ -11,19 +10,23 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.MethodNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.gravit.launchserver.asm.ClassMetadataReader;
 import ru.gravit.launchserver.asm.SafeClassWriter;
 
 import java.io.*;
-import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
@@ -45,8 +48,6 @@ public class NativeObfuscator {
     private final NodeCache<CachedMethodInfo> cachedMethods;
     private final NodeCache<CachedFieldInfo> cachedFields;
 
-    public List<String> blackList = Collections.emptyList();
-    public List<String> whiteList = null;
     private StringBuilder nativeMethods;
 
     public static class InvokeDynamicInfo {
@@ -96,11 +97,11 @@ public class NativeObfuscator {
     }
 
     public void process(Path inputJarPath, Path outputDir, List<Path> inputLibs,
-                        List<String> blackList, List<String> whiteList, String plainLibName, Platform platform) throws IOException {
+                        List<String> blackList, List<String> whiteList, String plainLibName,
+                        Platform platform, boolean useAnnotations) throws IOException {
         List<Path> libs = new ArrayList<>(inputLibs);
         libs.add(inputJarPath);
-        this.blackList = blackList;
-        this.whiteList = whiteList;
+        ClassMethodFilter classMethodFilter = new ClassMethodFilter(blackList, whiteList, useAnnotations);
         ClassMetadataReader metadataReader = new ClassMetadataReader(libs.stream().map(x -> {
             try {
                 return new JarFile(x.toFile());
@@ -132,8 +133,7 @@ public class NativeObfuscator {
 
         File jarFile = inputJarPath.toAbsolutePath().toFile();
         try (JarFile jar = new JarFile(jarFile);
-             ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())));
-             ZipOutputStream outDebug = new ZipOutputStream(Files.newOutputStream(outputDir.resolve("debug-" + jarFile.getName())))) {
+             ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())))) {
 
             logger.info("Processing {}...", jarFile);
 
@@ -147,7 +147,7 @@ public class NativeObfuscator {
             staticClassProvider = new InterfaceStaticClassProvider(nativeDir);
 
             jar.stream().forEach(entry -> {
-                if(entry.getName().equals(JarFile.MANIFEST_NAME)) return;
+                if (entry.getName().equals(JarFile.MANIFEST_NAME)) return;
 
                 try {
                     if (!entry.getName().endsWith(".class")) {
@@ -173,21 +173,28 @@ public class NativeObfuscator {
                     classReader.accept(rawClassNode, 0);
 
                     if (rawClassNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) ||
-                            blackList.contains(rawClassNode.name) || (whiteList != null && !whiteList.contains(rawClassNode.name))) {
+                            !classMethodFilter.shouldProcess(rawClassNode)) {
                         logger.info("Skipping {}", rawClassNode.name);
+                        if (useAnnotations) {
+                            ClassMethodFilter.cleanAnnotations(rawClassNode);
+                            ClassWriter clearedClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7);
+                            rawClassNode.accept(clearedClassWriter);
+                            Util.writeEntry(out, entry.getName(), clearedClassWriter.toByteArray());
+                            return;
+                        }
                         Util.writeEntry(out, entry.getName(), src);
-                        Util.writeEntry(outDebug, entry.getName(), src);
                         return;
                     }
 
                     logger.info("Preprocessing {}", rawClassNode.name);
 
-                    rawClassNode.methods.stream().filter(MethodProcessor::shouldProcess)
+                    rawClassNode.methods.stream()
+                            .filter(MethodProcessor::shouldProcess)
+                            .filter(methodNode -> classMethodFilter.shouldProcess(rawClassNode, methodNode))
                             .forEach(methodNode -> Preprocessor.preprocess(rawClassNode, methodNode, platform));
 
                     ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     rawClassNode.accept(preprocessorClassWriter);
-                    Util.writeEntry(outDebug, entry.getName(), preprocessorClassWriter.toByteArray());
                     classReader = new ClassReader(preprocessorClassWriter.toByteArray());
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);
@@ -211,11 +218,8 @@ public class NativeObfuscator {
 
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
-                            if (blackList.contains(String.format("%s#%s!%s", classNode.name, method.name, method.signature))) {
-                                continue;
-                            }
-                            if (whiteList != null && !whiteList.contains(String.format("%s#%s!%s",
-                                    classNode.name, method.name, method.signature))) {
+
+                            if (!classMethodFilter.shouldProcess(classNode, method)) {
                                 continue;
                             }
 
@@ -232,6 +236,10 @@ public class NativeObfuscator {
 
                         if (!staticClassProvider.isEmpty()) {
                             cachedStrings.getPointer(staticClassProvider.getCurrentClassName().replace('/', '.'));
+                        }
+
+                        if (useAnnotations) {
+                            ClassMethodFilter.cleanAnnotations(classNode);
                         }
 
                         classNode.version = 52;
@@ -275,14 +283,12 @@ public class NativeObfuscator {
                 ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                 bootstrapClass.accept(classWriter);
                 byte[] rawData = classWriter.toByteArray();
-                Util.writeEntry(outDebug, bootstrapClass.name + ".class", rawData);
                 List<Byte> data = new ArrayList<>(rawData.length);
                 for (byte b : rawData) {
                     data.add(b);
                 }
 
-                try (BufferedWriter hppWriter = Files.newBufferedWriter(cppOutput.resolve(bootstrapClassFileName + ".hpp")))
-                {
+                try (BufferedWriter hppWriter = Files.newBufferedWriter(cppOutput.resolve(bootstrapClassFileName + ".hpp"))) {
                     hppWriter.append("#include \"../native_jvm.hpp\"\n\n");
                     hppWriter.append("#ifndef ").append(bootstrapClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
                     hppWriter.append("#define ").append(bootstrapClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
@@ -352,8 +358,6 @@ public class NativeObfuscator {
             if (mf != null) {
                 out.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
                 mf.write(out);
-                outDebug.putNextEntry(new ZipEntry(JarFile.MANIFEST_NAME));
-                mf.write(outDebug);
             }
             out.closeEntry();
             metadataReader.close();
@@ -367,7 +371,7 @@ public class NativeObfuscator {
         Files.write(cppDir.resolve("CMakeLists.txt"), cMakeBuilder.build().getBytes(StandardCharsets.UTF_8));
     }
 
-	public Snippets getSnippets() {
+    public Snippets getSnippets() {
         return snippets;
     }
 

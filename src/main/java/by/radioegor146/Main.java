@@ -43,6 +43,9 @@ public class Main {
                 description = "Target platform: hotspot - standard standalone HotSpot JRE, std_java - java standard (as for Android)")
         private Platform platform;
 
+        @CommandLine.Option(names = {"-a", "--annotations"}, description = "Use annotations to ignore/include native obfuscation")
+        private boolean useAnnotations;
+
         @Override
         public Integer call() throws Exception {
             List<Path> libs = new ArrayList<>();
@@ -63,7 +66,7 @@ public class Main {
             }
 
             new NativeObfuscator().process(jarFile.toPath(), Paths.get(outputDirectory),
-                    libs, blackList, whiteList, libraryName, platform);
+                    libs, blackList, whiteList, libraryName, platform, useAnnotations);
 
             return 0;
         }

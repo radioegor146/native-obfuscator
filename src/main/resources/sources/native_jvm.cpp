@@ -1,5 +1,4 @@
 #include "native_jvm.hpp"
-#include <limits>
 #include <algorithm>
 
 namespace native_jvm::utils {

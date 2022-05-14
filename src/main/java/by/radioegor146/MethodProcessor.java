@@ -110,13 +110,6 @@ public class MethodProcessor {
         MethodNode method = context.method;
         StringBuilder output = context.output;
 
-        if (!shouldProcess(method) ||
-                context.obfuscator.blackList.contains(nameFromNode(method, context.clazz)) ||
-                (context.obfuscator.whiteList != null && !context.obfuscator.whiteList
-                        .contains(nameFromNode(method, context.clazz)))) {
-            return;
-        }
-
         SpecialMethodProcessor specialMethodProcessor = getSpecialMethodProcessor(method.name);
 
         output.append("// ").append(Util.escapeCommentString(method.name)).append(Util.escapeCommentString(method.desc)).append("\n");

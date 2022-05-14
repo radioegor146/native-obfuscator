@@ -125,17 +125,6 @@ public class ClassSourceBuilder implements AutoCloseable {
         hppWriter.append("}\n\n#endif");
     }
 
-    @SuppressWarnings("unused")
-	private String getGetterForType(String desc) {
-        if (desc.startsWith("[")) {
-            return "env->FindClass(" + stringPool.get(desc) + ")";
-        }
-        if (desc.endsWith(";")) {
-            desc = desc.substring(1, desc.length() - 1);
-        }
-        return "utils::find_class_wo_static(env, classloader, " + stringPool.get(desc.replace('/', '.')) + ")";
-    }
-
     public String getFilename() {
         return filename;
     }

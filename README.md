@@ -77,6 +77,12 @@ Two options are available:
     - hotspot: will use HotSpot JVM internals and should work with most obfuscators (even with stack trace checking as well)
     - std_java: will use only minor JVM internals that are available on Android as well. Use only this option if you want to run your library on Android
 
+`-a` - enable annotation processing
+
+You can add `@Native` annotation to include classes/methods to the native obfuscation process, and add `@NotNative` annotation to ignore methods in classes marked as `@Native`
+
+Whitelist/Blacklist has higher priority than annotations
+
 `-w <whiteList>` - path to .txt file for whitelist of methods and classes if required
 
 `-b <blackList>` - path to .txt file for blacklist of methods and classes if required

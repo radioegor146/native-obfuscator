@@ -1,1 +1,3 @@
 rootProject.name = 'native-obfuscator'
+
+include 'annotations'
