@@ -1,5 +1,5 @@
 allprojects {
-    groupId: "by.radioegor146.nativeobfuscator"
+    groupId = "by.radioegor146.nativeobfuscator"
 }
 
 subprojects {
