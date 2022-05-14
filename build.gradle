@@ -17,7 +17,7 @@ if (!hasProperty('ide.eclipse')) {
 }
 
 group = "by.radioegor146.nativeobfuscator"
-archivesBaseName = "nativeobfuscator"
+archivesBaseName = "native-obfuscator"
 
 repositories {
     mavenLocal()
