@@ -1,6 +1,4 @@
-allprojects {
-    groupId = "by.radioegor146.nativeobfuscator"
-}
+apply plugin: 'maven-publish'
 
 subprojects {
     apply plugin: 'maven-publish'
