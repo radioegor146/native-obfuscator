@@ -1,0 +1,108 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '5.2.0'
+    id 'java'
+    id 'eclipse'
+    id 'idea'
+}
+
+sourceCompatibility = targetCompatibility = '1.8'
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+
+if (!hasProperty('mainClass')) {
+    ext.mainClass = 'by.radioegor146.Main'
+}
+
+if (!hasProperty('ide.eclipse')) {
+    sourceSets.test.resources.srcDirs += file('test_data')
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    compile project(':annotations')
+
+    compile 'org.ow2.asm:asm:7.1'
+    compile 'org.ow2.asm:asm-tree:7.1'
+    compile 'org.ow2.asm:asm-commons:7.1'
+
+    compile 'info.picocli:picocli:4.6.3'
+
+    compile 'org.slf4j:slf4j-api:1.7.25'
+    compile 'org.apache.logging.log4j:log4j-core:2.8.2'
+    compile 'org.apache.logging.log4j:log4j-slf4j-impl:2.8.2'
+    compile 'org.apache.logging.log4j:log4j-api:2.8.2'
+
+    testCompile 'org.junit.jupiter:junit-jupiter-api:5.4.2'
+    testRuntime 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
+}
+
+shadowJar {
+    classifier null
+}
+
+assemble.dependsOn(shadowJar)
+
+jar {
+    manifest.attributes("Main-Class": getProperty('mainClass'))
+}
+
+HashMap<String, StringBuilder> testOutputs = new HashMap<>();
+
+test {
+    useJUnitPlatform()
+
+    maxParallelForks = Math.max(Runtime.runtime.availableProcessors(), 32)
+
+    testLogging {
+        events = []
+    }
+
+    beforeTest { descriptor ->
+        if (System.getenv("CI"))
+            System.out.print("\u001b[1;33m");
+        testOutputs.put(descriptor.getName(), new StringBuilder());
+        System.out.print("Running test \"" + descriptor.getName() + "\" -> ");
+        System.out.flush();
+    }
+
+    afterTest { descriptor, result ->
+        if (System.getenv("CI")) {
+            if (result.getResultType() == TestResult.ResultType.SUCCESS)
+                System.out.print("\u001b[1;32m");
+            if (result.getResultType() == TestResult.ResultType.FAILURE)
+                System.out.print("\u001b[1;31m");
+            if (result.getResultType() == TestResult.ResultType.SKIPPED)
+                System.out.print("\u001b[1;34m");
+        }
+        System.out.print(result.getResultType().toString());
+        if (System.getenv("CI"))
+            System.out.print("\u001b[1;33m");
+        System.out.println(" in " + ((result.getEndTime()) - (result.getStartTime())) + "ms");
+        if (result.getResultType() == TestResult.ResultType.FAILURE) {
+            if (System.getenv("CI")) {
+                // System.out.println("travis_fold:start:fail_log");
+                System.out.print("\u001b[1;31m");
+            }
+            System.out.println("Test fail log");
+            System.out.print(testOutputs.get(descriptor.getName()).toString());
+            testOutputs.remove(descriptor.getName());
+            if (System.getenv("CI")) {
+                // System.out.println("travis_fold:end:fail_log");
+            }
+        }
+    }
+
+    onOutput { descriptor, event ->
+        if (!testOutputs.containsKey(descriptor.getName()))
+            testOutputs.put(descriptor.getName(), new StringBuilder());
+        testOutputs.get(descriptor.getName()).append("[").append(event.getDestination().toString().toUpperCase()).append("] ").append(event.getMessage());
+    }
+}
+
+if (hasProperty('ide.eclipse'))
+    processTestResources {
+        from 'test_data'
+    }
