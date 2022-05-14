@@ -6,7 +6,7 @@ subprojects {
     publishing {
         publications {
             maven(MavenPublication) {
-                groupId project.group
+                groupId project.group + ".nativeobfuscator"
                 artifactId project.name
                 version project.version
             }
