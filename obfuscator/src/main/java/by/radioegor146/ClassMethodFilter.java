@@ -51,14 +51,17 @@ public class ClassMethodFilter {
         if (!useAnnotations) {
             return true;
         }
+        boolean classIsMarked = classNode.invisibleAnnotations != null &&
+                classNode.invisibleAnnotations.stream().anyMatch(annotationNode ->
+                        annotationNode.desc.equals(NATIVE_ANNOTATION_DESC));
         if (methodNode.invisibleAnnotations != null && 
             methodNode.invisibleAnnotations.stream().anyMatch(annotationNode ->
                 annotationNode.desc.equals(NATIVE_ANNOTATION_DESC))) {
             return true;
         }
-        return methodNode.invisibleAnnotations == null || methodNode.invisibleAnnotations
+        return classIsMarked && (methodNode.invisibleAnnotations == null || methodNode.invisibleAnnotations
                 .stream().noneMatch(annotationNode -> annotationNode.desc.equals(
-                        NOT_NATIVE_ANNOTATION_DESC));
+                        NOT_NATIVE_ANNOTATION_DESC)));
     }
 
     public static void cleanAnnotations(ClassNode classNode) {
