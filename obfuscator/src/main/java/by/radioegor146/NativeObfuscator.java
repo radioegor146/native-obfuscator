@@ -219,6 +219,10 @@ public class NativeObfuscator {
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
 
+                            if (!MethodProcessor.shouldProcess(method)) {
+                                continue;
+                            }
+
                             if (!classMethodFilter.shouldProcess(classNode, method)) {
                                 continue;
                             }
