@@ -33,7 +33,8 @@ public class ClassMethodFilter {
         if (!useAnnotations) {
             return true;
         }
-        if (classNode.invisibleAnnotations.stream().anyMatch(annotationNode ->
+        if (classNode.invisibleAnnotations != null && 
+            classNode.invisibleAnnotations.stream().anyMatch(annotationNode ->
                 annotationNode.desc.equals(NATIVE_ANNOTATION_DESC))) {
             return true;
         }
@@ -50,18 +51,23 @@ public class ClassMethodFilter {
         if (!useAnnotations) {
             return true;
         }
-        if (methodNode.invisibleAnnotations.stream().anyMatch(annotationNode ->
+        if (methodNode.invisibleAnnotations != null && 
+            methodNode.invisibleAnnotations.stream().anyMatch(annotationNode ->
                 annotationNode.desc.equals(NATIVE_ANNOTATION_DESC))) {
             return true;
         }
-        return methodNode.invisibleAnnotations
+        return methodNode.invisibleAnnotations == null || methodNode.invisibleAnnotations
                 .stream().noneMatch(annotationNode -> annotationNode.desc.equals(
                         NOT_NATIVE_ANNOTATION_DESC));
     }
 
     public static void cleanAnnotations(ClassNode classNode) {
-        classNode.invisibleAnnotations.removeIf(annotationNode -> annotationNode.desc.equals(NATIVE_ANNOTATION_DESC));
-        classNode.methods.forEach(methodNode -> methodNode.invisibleAnnotations.removeIf(annotationNode ->
-                annotationNode.desc.equals(NATIVE_ANNOTATION_DESC) || annotationNode.desc.equals(NOT_NATIVE_ANNOTATION_DESC)));
+        if (classNode.invisibleAnnotations != null) {
+            classNode.invisibleAnnotations.removeIf(annotationNode -> annotationNode.desc.equals(NATIVE_ANNOTATION_DESC));
+        }
+        classNode.methods.stream()
+                .filter(methodNode -> methodNode.invisibleAnnotations != null)
+                .forEach(methodNode -> methodNode.invisibleAnnotations.removeIf(annotationNode ->
+                    annotationNode.desc.equals(NATIVE_ANNOTATION_DESC) || annotationNode.desc.equals(NOT_NATIVE_ANNOTATION_DESC)));
     }
 }
