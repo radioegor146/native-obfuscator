@@ -79,6 +79,12 @@ Two options are available:
 
 `-a` - enable annotation processing
 
+To use annotations for black/whitelisting methods/classes as `native` you can add following library to your project:
+
+`com.github.radioegor146.native-obfuscator:annotations:master-SNAPSHOT`
+
+Also, you need to add [JitPack](https://jitpack.io) to your repositories.
+
 You can add `@Native` annotation to include classes/methods to the native obfuscation process, and add `@NotNative` annotation to ignore methods in classes marked as `@Native`
 
 Whitelist/Blacklist has higher priority than annotations
