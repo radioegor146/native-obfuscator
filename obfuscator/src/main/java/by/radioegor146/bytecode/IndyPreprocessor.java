@@ -265,9 +265,9 @@ public class IndyPreprocessor implements IPreprocessor {
                 }
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Object"));
                 bootstrapInstructions.add(new InsnNode(Opcodes.SWAP));
-                bootstrapInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodHandleNatives",
-                        "linkCallSite", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;" +
-                        "Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;"));
+                bootstrapInstructions.add(PreprocessorUtils.LINK_CALL_SITE_METHOD.get());
+                /* bootstrapInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodHandleNatives",
+                        "linkCallSite", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;")); */
                 bootstrapInstructions.add(new InsnNode(Opcodes.POP));
                 bootstrapInstructions.add(new InsnNode(Opcodes.ICONST_0));
                 bootstrapInstructions.add(new InsnNode(Opcodes.AALOAD)); // 1

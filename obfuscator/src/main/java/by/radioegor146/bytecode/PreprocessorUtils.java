@@ -30,6 +30,10 @@ public class PreprocessorUtils {
                 return new MethodInsnNode(Opcodes.INVOKESTATIC, "native/magic/1/invoke/obfuscator" + MAGIC_CONST, "a",
                         Type.getMethodDescriptor(Type.getReturnType(desc), argumentTypes.toArray(new Type[0])));
             };
+    public static final Supplier<AbstractInsnNode> LINK_CALL_SITE_METHOD = () -> new MethodInsnNode(Opcodes.INVOKESTATIC,
+            "native/magic/1/linkcallsite/obfuscator" + MAGIC_CONST, "a", "(Ljava/lang/Object;Ljava/lang/Object;" +
+            "Ljava/lang/Object;Ljava/lang/Object;" +
+            "Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;");
 
     private static boolean areMethodNodesEqual(MethodInsnNode methodInsnNode, MethodInsnNode realMethodInsnNode) {
         if (methodInsnNode.getType() != realMethodInsnNode.getType()) {
@@ -72,6 +76,10 @@ public class PreprocessorUtils {
         MethodInsnNode methodInsnNode = (MethodInsnNode) abstractInsnNode;
         MethodInsnNode realMethodInsnNode = (MethodInsnNode) INVOKE_REVERSE.apply("()V");
         return methodInsnNode.owner.equals(realMethodInsnNode.owner);
+    }
+
+    public static boolean isLinkCallSiteMethod(AbstractInsnNode abstractInsnNode) {
+        return compareSuppliers(abstractInsnNode, LINK_CALL_SITE_METHOD);
     }
 
     private PreprocessorUtils() {

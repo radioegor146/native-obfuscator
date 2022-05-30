@@ -2,13 +2,17 @@ name: Main pipeline
 on: [push]
 jobs:
   build:
+    strategy:
+      matrix:
+        java: [1.8, 9.0.x, 10, 11.0.x, 12, 13, 14, 15, 16, 17, 18]
     runs-on: ubuntu-latest
+    name: Test full test suite on JDK ${{ matrix.java }}
     steps:
     - uses: actions/checkout@v1
-    - name: Set up JDK 1.8
-      uses: actions/setup-java@v1
+    - name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v3
       with:
-        java-version: 1.8
+        java-version: ${{ matrix.java }}
     - name: Install G++7
       run: sudo apt install g++-7
     - name: Change to G++7

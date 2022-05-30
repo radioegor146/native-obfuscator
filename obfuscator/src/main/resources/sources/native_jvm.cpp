@@ -18,6 +18,9 @@ namespace native_jvm::utils {
     jmethodID init_cause_method;
     jclass methodhandles_lookup_class;
     jmethodID lookup_init_method;
+    jclass methodhandle_natives_class;
+    jmethodID link_call_site_method;
+    bool is_jvm11_link_call_site;
 
     void init_utils(JNIEnv *env) {
         jclass clazz = env->FindClass("[Z");
@@ -98,6 +101,34 @@ namespace native_jvm::utils {
         lookup_init_method = env->GetMethodID(methodhandles_lookup_class, "<init>", "(Ljava/lang/Class;)V");
         if (env->ExceptionCheck())
             return;
+
+        jclass _methodhandle_natives_class = env->FindClass("java/lang/invoke/MethodHandleNatives");
+        if (env->ExceptionCheck())
+            return;
+        methodhandle_natives_class = (jclass) env->NewGlobalRef(_methodhandle_natives_class);
+        env->DeleteLocalRef(_methodhandle_natives_class);
+
+        link_call_site_method = env->GetStaticMethodID(methodhandle_natives_class, "linkCallSite",
+            "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;");
+        is_jvm11_link_call_site = false;
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            link_call_site_method = env->GetStaticMethodID(methodhandle_natives_class, "linkCallSite",
+                "(Ljava/lang/Object;ILjava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;");
+            is_jvm11_link_call_site = true;
+            if (env->ExceptionCheck())
+                return;
+        }
+    }
+
+    jobject link_call_site(JNIEnv *env, jobject caller_obj, jobject bootstrap_method_obj,
+        jobject name_obj, jobject type_obj, jobject static_arguments, jobject appendix_result) {
+        if (is_jvm11_link_call_site) {
+            return env->CallStaticObjectMethod(methodhandle_natives_class, link_call_site_method, caller_obj, 0,
+                bootstrap_method_obj, name_obj, type_obj, static_arguments, appendix_result);
+        }
+        return env->CallStaticObjectMethod(methodhandle_natives_class, link_call_site_method, caller_obj,
+            bootstrap_method_obj, name_obj, type_obj, static_arguments, appendix_result);
     }
 
     template <>
