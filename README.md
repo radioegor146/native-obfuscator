@@ -44,18 +44,23 @@ Also, this tool does not particulary obfuscates your code, it just transpiles it
 
 ### General usage:
 ```
-Usage: native-obfuscator [-hV] [-b=<blackListFile>] [-l=<librariesDirectory>]
-                         [--plain-lib-name=<libraryName>] [-w=<whiteListFile>]
-                         <jarFile> <outputDirectory>
+Usage: native-obfuscator [-ahV] [-b=<blackListFile>] [-l=<librariesDirectory>]
+                         [-p=<platform>] [--plain-lib-name=<libraryName>]
+                         [-w=<whiteListFile>] <jarFile> <outputDirectory>
 Transpiles .jar file into .cpp files and generates output .jar file
       <jarFile>           Jar file to transpile
       <outputDirectory>   Output directory
+  -a, --annotations       Use annotations to ignore/include native obfuscation
   -b, --black-list=<blackListFile>
                           File with list of blacklist classes/methods for
                             transpilation
   -h, --help              Show this help message and exit.
   -l, --libraries=<librariesDirectory>
                           Directory for dependent libraries
+  -p, --platform=<platform>
+                          Target platform: hotspot - standard standalone
+                            HotSpot JRE, std_java - java standard (as for
+                            Android)
       --plain-lib-name=<libraryName>
                           Plain library name for LoaderPlain
   -V, --version           Print version information and exit.

@@ -146,6 +146,8 @@ public class NativeObfuscator {
 
             staticClassProvider = new InterfaceStaticClassProvider(nativeDir);
 
+            Integer[] classIndexReference = new Integer[]{0};
+
             jar.stream().forEach(entry -> {
                 if (entry.getName().equals(JarFile.MANIFEST_NAME)) return;
 
@@ -213,7 +215,8 @@ public class NativeObfuscator {
                     cachedMethods.clear();
                     cachedFields.clear();
 
-                    try (ClassSourceBuilder cppBuilder = new ClassSourceBuilder(cppOutput, classNode.name, stringPool)) {
+                    try (ClassSourceBuilder cppBuilder =
+                                 new ClassSourceBuilder(cppOutput, classNode.name, classIndexReference[0]++, stringPool)) {
                         StringBuilder instructions = new StringBuilder();
 
                         for (int i = 0; i < classNode.methods.size(); i++) {

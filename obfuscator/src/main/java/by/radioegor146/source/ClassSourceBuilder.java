@@ -23,10 +23,10 @@ public class ClassSourceBuilder implements AutoCloseable {
 
     private final StringPool stringPool;
 
-    public ClassSourceBuilder(Path cppOutputDir, String className, StringPool stringPool) throws IOException {
+    public ClassSourceBuilder(Path cppOutputDir, String className, int classIndex, StringPool stringPool) throws IOException {
         this.className = className;
         this.stringPool = stringPool;
-        filename = Util.escapeCppNameString(className.replace('/', '_'));
+        filename = String.format("%s_%d", Util.escapeCppNameString(className.replace('/', '_')), classIndex);
 
         cppFile = cppOutputDir.resolve(filename.concat(".cpp"));
         hppFile = cppOutputDir.resolve(filename.concat(".hpp"));
