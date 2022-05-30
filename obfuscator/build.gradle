@@ -1,5 +1,7 @@
+import java.util.concurrent.ConcurrentHashMap
+
 plugins {
-    id 'com.github.johnrengelman.shadow' version '5.2.0'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
     id 'java'
     id 'eclipse'
     id 'idea'
@@ -22,21 +24,21 @@ repositories {
 }
 
 dependencies {
-    compile project(':annotations')
+    implementation project(':annotations')
 
-    compile 'org.ow2.asm:asm:7.1'
-    compile 'org.ow2.asm:asm-tree:7.1'
-    compile 'org.ow2.asm:asm-commons:7.1'
+    implementation 'org.ow2.asm:asm:7.1'
+    implementation 'org.ow2.asm:asm-tree:7.1'
+    implementation 'org.ow2.asm:asm-commons:7.1'
 
-    compile 'info.picocli:picocli:4.6.3'
+    implementation 'info.picocli:picocli:4.6.3'
 
-    compile 'org.slf4j:slf4j-api:1.7.25'
-    compile 'org.apache.logging.log4j:log4j-core:2.8.2'
-    compile 'org.apache.logging.log4j:log4j-slf4j-impl:2.8.2'
-    compile 'org.apache.logging.log4j:log4j-api:2.8.2'
+    implementation 'org.slf4j:slf4j-api:1.7.25'
+    implementation 'org.apache.logging.log4j:log4j-core:2.8.2'
+    implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.8.2'
+    implementation 'org.apache.logging.log4j:log4j-api:2.8.2'
 
-    testCompile 'org.junit.jupiter:junit-jupiter-api:5.4.2'
-    testRuntime 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.4.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.4.2'
 }
 
 shadowJar {
@@ -49,7 +51,7 @@ jar {
     manifest.attributes("Main-Class": getProperty('mainClass'))
 }
 
-HashMap<String, StringBuilder> testOutputs = new HashMap<>();
+ConcurrentHashMap<String, StringBuilder> testOutputs = new ConcurrentHashMap<>();
 
 test {
     useJUnitPlatform()
@@ -98,7 +100,8 @@ test {
     onOutput { descriptor, event ->
         if (!testOutputs.containsKey(descriptor.getName()))
             testOutputs.put(descriptor.getName(), new StringBuilder());
-        testOutputs.get(descriptor.getName()).append("[").append(event.getDestination().toString().toUpperCase()).append("] ").append(event.getMessage());
+        testOutputs.get(descriptor.getName()).append("[")
+                .append(event.getDestination().toString().toUpperCase()).append("] ").append(event.getMessage());
     }
 }
 

@@ -101,7 +101,7 @@ public class ClassicTest implements Executable {
 
             System.out.println("Ideal...");
 
-            ProcessResult idealRunResult = ProcessHelper.run(temp, 30_000,
+            ProcessResult idealRunResult = ProcessHelper.run(temp, 60_000,
                     Arrays.asList("java", "-Dseed=1337", "-jar", idealJar.toString()));
             System.out.println(String.format("Took %dms", idealRunResult.execTime));
             idealRunResult.check("Ideal run");
@@ -124,11 +124,11 @@ public class ClassicTest implements Executable {
                     if (System.getProperty("sun.arch.data.model").equals("32")) {
                         arch = "x86";
                     }
-                    ProcessHelper.run(tempCpp, 60_000,
+                    ProcessHelper.run(tempCpp, 120_000,
                             Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
                             .check("CMake prepare");
                 } else {
-                    ProcessHelper.run(tempCpp, 60_000,
+                    ProcessHelper.run(tempCpp, 120_000,
                             Arrays.asList("cmake", "."))
                             .check("CMake prepare");
                 }
@@ -169,11 +169,11 @@ public class ClassicTest implements Executable {
 
                 System.out.println("OK");
             }
+            clean();
         } catch (IOException | RuntimeException e) {
             e.printStackTrace(System.err);
             throw e;
         } finally {
-            clean();
         }
     }
 

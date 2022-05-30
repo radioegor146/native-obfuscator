@@ -19,7 +19,6 @@ import java.util.stream.Stream;
 public class TestsGenerator {
 
     @TestFactory
-    @Execution(ExecutionMode.CONCURRENT)
     public Stream<DynamicTest> generateTests() throws URISyntaxException, IOException {
         URL tests = TestsGenerator.class.getClassLoader().getResource("tests");
         Objects.requireNonNull(tests, "No tests dir in resources");
