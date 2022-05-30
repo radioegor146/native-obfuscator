@@ -64,7 +64,7 @@ test {
         if (System.getenv("CI"))
             System.out.print("\u001b[1;33m");
         testOutputs.put(descriptor.getName(), new StringBuilder());
-        System.out.print("Running test \"" + descriptor.getName() + "\" -> ");
+        System.out.print("Running test \"" + descriptor.getDisplayName() + "\" -> ");
         System.out.flush();
     }
 

@@ -50,15 +50,10 @@ public class ClassicTest implements Executable {
 
             Path tempSource = temp.resolve("source");
             Path tempClasses = temp.resolve("classes");
-            Path tempOutput = temp.resolve("output");
-            Path tempCpp = tempOutput.resolve("cpp");
             Files.createDirectories(tempSource);
             Files.createDirectories(tempClasses);
-            Files.createDirectories(tempOutput);
-            Files.createDirectories(tempCpp);
 
             Path idealJar = temp.resolve("test.jar");
-            Path resultJar = tempOutput.resolve("test.jar");
 
             List<Path> javaFiles = new ArrayList<>();
             List<Path> resourceFiles = new ArrayList<>();
@@ -111,66 +106,74 @@ public class ClassicTest implements Executable {
             System.out.println(String.format("Took %dms", idealRunResult.execTime));
             idealRunResult.check("Ideal run");
 
-            System.out.println("Processing...");
+            for (Platform platform : Platform.values()) {
+                System.out.println(String.format("Processing platform %s...", platform.toString()));
 
-            new NativeObfuscator().process(idealJar, tempOutput, Collections.emptyList(), Collections.emptyList(),
-                    null, "native_library", Platform.HOTSPOT, false);
+                Path tempOutput = temp.resolve(String.format("output_%s", platform));
+                Path tempCpp = tempOutput.resolve("cpp");
+                Files.createDirectories(tempOutput);
+                Files.createDirectories(tempCpp);
+                Path resultJar = tempOutput.resolve("test.jar");
 
-            System.out.println("Compiling CPP code...");
-            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-                String arch = "x64";
-                if (System.getProperty("sun.arch.data.model").equals("32")) {
-                    arch = "x86";
+                new NativeObfuscator().process(idealJar, tempOutput, Collections.emptyList(), Collections.emptyList(),
+                        null, "native_library", platform, false);
+
+                System.out.println("Compiling CPP code...");
+                if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+                    String arch = "x64";
+                    if (System.getProperty("sun.arch.data.model").equals("32")) {
+                        arch = "x86";
+                    }
+                    ProcessHelper.run(tempCpp, 60_000,
+                            Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
+                            .check("CMake prepare");
+                } else {
+                    ProcessHelper.run(tempCpp, 60_000,
+                            Arrays.asList("cmake", "."))
+                            .check("CMake prepare");
                 }
-                ProcessHelper.run(tempCpp, 60_000,
-                        Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
-                        .check("CMake prepare");
-            } else {
-                ProcessHelper.run(tempCpp, 60_000,
-                        Arrays.asList("cmake", "."))
-                        .check("CMake prepare");
-            }
 
-            ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 160_000,
-                    Arrays.asList("cmake", "--build", ".", "--config", "Release"));
-            System.out.println(String.format("Took %dms", compileRunresult.execTime));
-            compileRunresult.check("CMake build");
+                ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 160_000,
+                        Arrays.asList("cmake", "--build", ".", "--config", "Release"));
+                System.out.println(String.format("Took %dms", compileRunresult.execTime));
+                compileRunresult.check("CMake build");
 
 
-            Files.find(tempCpp.resolve("build").resolve("lib"), 1, (path, args) -> Files.isRegularFile(path))
-                    .forEach(unchecked(p -> Files.copy(p, tempOutput.resolve(p.getFileName()))));
+                Files.find(tempCpp.resolve("build").resolve("lib"), 1, (path, args) -> Files.isRegularFile(path))
+                        .forEach(unchecked(p -> Files.copy(p, tempOutput.resolve(p.getFileName()))));
 
-            System.out.println("Running test...");
+                System.out.println("Running test...");
 
-            long timeout = 200_000;
-            ProcessResult testRunResult = ProcessHelper.run(tempOutput, timeout,
-                    Arrays.asList("java",
-                            "-Djava.library.path=.",
-                            "-Dseed=1337",
-                            "-Dtest.src=" + temp.toString(),
-                            "-jar", resultJar.toString()));
-            System.out.println(String.format("Took %dms", testRunResult.execTime));
-            testRunResult.check("Test run");
+                long timeout = 200_000;
+                ProcessResult testRunResult = ProcessHelper.run(tempOutput, timeout,
+                        Arrays.asList("java",
+                                "-Djava.library.path=.",
+                                "-Dseed=1337",
+                                "-Dtest.src=" + temp.toString(),
+                                "-jar", resultJar.toString()));
+                System.out.println(String.format("Took %dms", testRunResult.execTime));
+                testRunResult.check("Test run");
 
-            if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
-                // Some tests are random based
-                Pattern testResult = Pattern.compile("^Passed = \\d+,? failed = (\\d+)$", Pattern.MULTILINE);
-                Matcher matcher = testResult.matcher(testRunResult.stdout);
-                if(matcher.find()) {
-                    if(!matcher.group(1).equals("0")) {
+                if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
+                    // Some tests are random based
+                    Pattern testResult = Pattern.compile("^Passed = \\d+,? failed = (\\d+)$", Pattern.MULTILINE);
+                    Matcher matcher = testResult.matcher(testRunResult.stdout);
+                    if(matcher.find()) {
+                        if(!matcher.group(1).equals("0")) {
+                            fail(testRunResult, idealRunResult);
+                        }
+                    } else {
                         fail(testRunResult, idealRunResult);
                     }
-                } else {
-                    fail(testRunResult, idealRunResult);
                 }
-            }
 
-            System.out.println("OK");
+                System.out.println("OK");
+            }
         } catch (IOException | RuntimeException e) {
             e.printStackTrace(System.err);
             throw e;
         } finally {
-            // clean();
+            clean();
         }
     }
 
