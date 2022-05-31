@@ -10,7 +10,7 @@ public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
 
     @Override
     public String preProcess(MethodContext context) {
-        String name = "native_special_clinit" + context.methodIndex;
+        String name = String.format("%s_special_clinit%d", context.obfuscator.getNativeDir(), context.methodIndex);
         if (!Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
             context.proxyMethod = new MethodNode(Opcodes.ASM7,
                     Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
@@ -38,7 +38,7 @@ public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
                     context.nativeMethod.name, context.nativeMethod.desc, false));
         } else {
             instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, context.clazz.name,
-                    "native_special_clinit" + context.methodIndex, context.method.desc, false));
+                    String.format("%s_special_clinit%d", context.obfuscator.getNativeDir(), context.methodIndex), context.method.desc, false));
         }
 
         instructions.add(new InsnNode(Opcodes.RETURN));
