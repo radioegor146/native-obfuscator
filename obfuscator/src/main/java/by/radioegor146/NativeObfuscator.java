@@ -174,8 +174,9 @@ public class NativeObfuscator {
                     ClassNode rawClassNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(rawClassNode, 0);
 
-                    if (rawClassNode.methods.stream().noneMatch(MethodProcessor::shouldProcess) ||
-                            !classMethodFilter.shouldProcess(rawClassNode)) {
+                    if (!classMethodFilter.shouldProcess(rawClassNode) ||
+                            rawClassNode.methods.stream().noneMatch(method -> MethodProcessor.shouldProcess(method) &&
+                                    classMethodFilter.shouldProcess(rawClassNode, method))) {
                         logger.info("Skipping {}", rawClassNode.name);
                         if (useAnnotations) {
                             ClassMethodFilter.cleanAnnotations(rawClassNode);
