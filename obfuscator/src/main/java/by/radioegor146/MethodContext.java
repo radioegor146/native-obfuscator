@@ -27,7 +27,6 @@ public class MethodContext {
     public ArrayList<Type> argTypes;
 
     public int line;
-    public int invokeSpecialId;
     public List<Integer> stack;
     public List<Integer> locals;
     public Set<TryCatchBlockNode> tryCatches;
@@ -51,7 +50,7 @@ public class MethodContext {
         this.output = new StringBuilder();
         this.nativeMethods = new StringBuilder();
 
-        this.line = this.invokeSpecialId = -1;
+        this.line = -1;
         this.stack = new ArrayList<>();
         this.locals = new ArrayList<>();
         this.tryCatches = new HashSet<>();

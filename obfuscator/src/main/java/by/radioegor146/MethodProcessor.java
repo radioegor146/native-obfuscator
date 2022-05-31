@@ -3,7 +3,6 @@ package by.radioegor146;
 import by.radioegor146.instructions.*;
 import by.radioegor146.special.ClInitSpecialMethodProcessor;
 import by.radioegor146.special.DefaultSpecialMethodProcessor;
-import by.radioegor146.special.InitSpecialMethodProcessor;
 import by.radioegor146.special.SpecialMethodProcessor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -82,7 +81,7 @@ public class MethodProcessor {
     private SpecialMethodProcessor getSpecialMethodProcessor(String name) {
         switch (name) {
             case "<init>":
-                return new InitSpecialMethodProcessor();
+                return null;
             case "<clinit>":
                 return new ClInitSpecialMethodProcessor();
             default:
@@ -111,6 +110,10 @@ public class MethodProcessor {
         StringBuilder output = context.output;
 
         SpecialMethodProcessor specialMethodProcessor = getSpecialMethodProcessor(method.name);
+
+        if (specialMethodProcessor == null) {
+            throw new RuntimeException(String.format("Could not find special method processor for %s", method.name));
+        }
 
         output.append("// ").append(Util.escapeCommentString(method.name)).append(Util.escapeCommentString(method.desc)).append("\n");
 
@@ -244,13 +247,6 @@ public class MethodProcessor {
 
         for (int instruction = 0; instruction < method.instructions.size(); ++instruction) {
             AbstractInsnNode node = method.instructions.get(instruction);
-
-            if (method.name.equals("<init>") && context.invokeSpecialId == -1) {
-                if (node.getOpcode() == Opcodes.INVOKESPECIAL) {
-                    context.invokeSpecialId = instruction;
-                }
-                continue;
-            }
             context.output.append("    // ").append(Util.escapeCommentString(handlers[node.getType()]
                     .insnToString(context, node))).append("; Stack: ").append(context.stackPointer).append("\n");
             handlers[node.getType()].accept(context, node);

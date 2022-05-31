@@ -173,7 +173,6 @@ public class ClassicTest implements Executable {
         } catch (IOException | RuntimeException e) {
             e.printStackTrace(System.err);
             throw e;
-        } finally {
         }
     }
 
