@@ -98,10 +98,10 @@ public class NativeObfuscator {
 
     public void process(Path inputJarPath, Path outputDir, List<Path> inputLibs,
                         List<String> blackList, List<String> whiteList, String plainLibName,
-                        Platform platform, boolean useAnnotations) throws IOException {
+                        Platform platform, boolean useAnnotations, boolean generateDebugJar) throws IOException {
         List<Path> libs = new ArrayList<>(inputLibs);
         libs.add(inputJarPath);
-        ClassMethodFilter classMethodFilter = new ClassMethodFilter(blackList, whiteList, useAnnotations);
+        ClassMethodFilter classMethodFilter = new ClassMethodFilter(ClassMethodList.parse(blackList), ClassMethodList.parse(whiteList), useAnnotations);
         ClassMetadataReader metadataReader = new ClassMetadataReader(libs.stream().map(x -> {
             try {
                 return new JarFile(x.toFile());
@@ -133,7 +133,9 @@ public class NativeObfuscator {
 
         File jarFile = inputJarPath.toAbsolutePath().toFile();
         try (JarFile jar = new JarFile(jarFile);
-             ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())))) {
+             ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outputDir.resolve(jarFile.getName())));
+             ZipOutputStream debug = generateDebugJar ? new ZipOutputStream(
+                     Files.newOutputStream(outputDir.resolve("debug.jar"))) : null) {
 
             logger.info("Processing {}...", jarFile);
 
@@ -154,6 +156,9 @@ public class NativeObfuscator {
                 try {
                     if (!entry.getName().endsWith(".class")) {
                         Util.writeEntry(jar, out, entry);
+                        if (debug != null) {
+                            Util.writeEntry(jar, debug, entry);
+                        }
                         return;
                     }
 
@@ -165,6 +170,9 @@ public class NativeObfuscator {
 
                     if (Util.byteArrayToInt(Arrays.copyOfRange(src, 0, 4)) != 0xCAFEBABE) {
                         Util.writeEntry(out, entry.getName(), src);
+                        if (debug != null) {
+                            Util.writeEntry(debug, entry.getName(), src);
+                        }
                         return;
                     }
 
@@ -183,9 +191,15 @@ public class NativeObfuscator {
                             ClassWriter clearedClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7);
                             rawClassNode.accept(clearedClassWriter);
                             Util.writeEntry(out, entry.getName(), clearedClassWriter.toByteArray());
+                            if (debug != null) {
+                                Util.writeEntry(debug, entry.getName(), clearedClassWriter.toByteArray());
+                            }
                             return;
                         }
                         Util.writeEntry(out, entry.getName(), src);
+                        if (debug != null) {
+                            Util.writeEntry(debug, entry.getName(), src);
+                        }
                         return;
                     }
 
@@ -198,6 +212,9 @@ public class NativeObfuscator {
 
                     ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     rawClassNode.accept(preprocessorClassWriter);
+                    if (debug != null) {
+                        Util.writeEntry(debug, entry.getName(), preprocessorClassWriter.toByteArray());
+                    }
                     classReader = new ClassReader(preprocessorClassWriter.toByteArray());
                     ClassNode classNode = new ClassNode(Opcodes.ASM7);
                     classReader.accept(classNode, 0);

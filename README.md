@@ -108,6 +108,19 @@ mypackage/myotherpackage/Class1$SubClass#doOther!(I)V
 ```
 It uses internal names of classes and method descriptors for filtering (you can read more about it by googling "java internal class names" or "java method descriptors")
 
+Also, you can use wildcard matchers like this:
+```
+mypackage/myotherpackage/*
+mypackage/myotherpackagewithnested/**
+mypackage/myotherpackage/*/Class1
+mypackage/myotherpackagewithnested/**/Class1
+mypackage/myotherpackage/Class*
+```
+`*` matches single entry (divided by `/`) in class/package name
+
+`**` matches all entries in class/package name
+
+
 `--plain-lib-name` - if you ship your .jar in separate from result native libraries, or you use it for Android, you can specify the name of native library that it will try to search while using.
 
 If you want to ship your .jar with native libraries in it, you should omit that argument, and after building native files add them in form of

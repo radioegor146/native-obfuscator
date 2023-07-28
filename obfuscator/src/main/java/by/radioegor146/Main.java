@@ -15,7 +15,7 @@ import java.util.concurrent.Callable;
 
 public class Main {
 
-    private static final String VERSION = "2.3r";
+    private static final String VERSION = "2.4r";
 
     @CommandLine.Command(name = "native-obfuscator", mixinStandardHelpOptions = true, version = "native-obfuscator " + VERSION,
             description = "Transpiles .jar file into .cpp files and generates output .jar file")
@@ -46,6 +46,9 @@ public class Main {
         @CommandLine.Option(names = {"-a", "--annotations"}, description = "Use annotations to ignore/include native obfuscation")
         private boolean useAnnotations;
 
+        @CommandLine.Option(names = {"--debug"}, description = "Enable generation of debug .jar file (non-executable)")
+        private boolean generateDebugJar;
+
         @Override
         public Integer call() throws Exception {
             List<Path> libs = new ArrayList<>();
@@ -66,7 +69,7 @@ public class Main {
             }
 
             new NativeObfuscator().process(jarFile.toPath(), Paths.get(outputDirectory),
-                    libs, blackList, whiteList, libraryName, platform, useAnnotations);
+                    libs, blackList, whiteList, libraryName, platform, useAnnotations, generateDebugJar);
 
             return 0;
         }
