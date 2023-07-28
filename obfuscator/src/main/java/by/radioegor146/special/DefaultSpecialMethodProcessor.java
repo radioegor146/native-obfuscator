@@ -27,7 +27,7 @@ public class DefaultSpecialMethodProcessor implements SpecialMethodProcessor {
                         methodNode.access = Opcodes.ACC_NATIVE | Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_BRIDGE;
                         methodNode.visibleAnnotations = new ArrayList<>();
                         methodNode.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
-                        methodNode.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/LambdaForm$Hidden;"));
+                        methodNode.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/Hidden;"));
                     });
             return methodName;
         }

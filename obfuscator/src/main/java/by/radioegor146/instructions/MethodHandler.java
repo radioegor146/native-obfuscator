@@ -90,7 +90,7 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
                     .getMethod("invokereverse", methodDesc, method -> {
                         method.visibleAnnotations = new ArrayList<>();
                         method.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
-                        method.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/LambdaForm$Hidden;"));
+                        method.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/Hidden;"));
                         int methodHandleIndex = 0;
                         for (Type argument : Type.getArgumentTypes(mhDesc)) {
                             methodHandleIndex += argument.getSize();
@@ -129,7 +129,7 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
                     .getMethod("mhinvoke", methodDesc, method -> {
                         method.visibleAnnotations = new ArrayList<>();
                         method.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
-                        method.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/LambdaForm$Hidden;"));
+                        method.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/Hidden;"));
                         method.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
                         int index = 1;
                         for (Type argument : Type.getArgumentTypes(mhDesc)) {
