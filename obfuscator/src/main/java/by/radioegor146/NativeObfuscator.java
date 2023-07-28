@@ -40,15 +40,12 @@ public class NativeObfuscator {
 
     private final Snippets snippets;
     private final StringPool stringPool;
-    private InterfaceStaticClassProvider staticClassProvider;
     private final MethodProcessor methodProcessor;
 
     private final NodeCache<String> cachedStrings;
     private final NodeCache<String> cachedClasses;
     private final NodeCache<CachedMethodInfo> cachedMethods;
     private final NodeCache<CachedFieldInfo> cachedFields;
-
-    private StringBuilder nativeMethods;
 
     public static class InvokeDynamicInfo {
         private final String methodName;
@@ -81,7 +78,7 @@ public class NativeObfuscator {
         }
     }
 
-    private BootstrapMethodsPool bootstrapMethodsPool;
+    private HiddenMethodsPool hiddenMethodsPool;
 
     private int currentClassId;
     private String nativeDir;
@@ -144,9 +141,7 @@ public class NativeObfuscator {
                     .findFirst().orElseThrow(RuntimeException::new);
             nativeDir = "native" + nativeDirId;
 
-            bootstrapMethodsPool = new BootstrapMethodsPool(nativeDir + "/bootstrap");
-
-            staticClassProvider = new InterfaceStaticClassProvider(nativeDir);
+            hiddenMethodsPool = new HiddenMethodsPool(nativeDir + "/hidden");
 
             Integer[] classIndexReference = new Integer[]{0};
 
@@ -176,7 +171,8 @@ public class NativeObfuscator {
                         return;
                     }
 
-                    nativeMethods = new StringBuilder();
+                    StringBuilder nativeMethods = new StringBuilder();
+                    List<HiddenCppMethod> hiddenMethods = new ArrayList<>();
 
                     ClassReader classReader = new ClassReader(src);
                     ClassNode rawClassNode = new ClassNode(Opcodes.ASM7);
@@ -226,8 +222,6 @@ public class NativeObfuscator {
                                 "<clinit>", "()V", null, new String[0]));
                     }
 
-                    staticClassProvider.newClass();
-
                     cachedStrings.clear();
                     cachedClasses.clear();
                     cachedMethods.clear();
@@ -254,13 +248,13 @@ public class NativeObfuscator {
 
                             nativeMethods.append(context.nativeMethods);
 
+                            if (context.proxyMethod != null) {
+                                hiddenMethods.add(new HiddenCppMethod(context.proxyMethod, context.cppNativeMethodName));
+                            }
+
                             if ((classNode.access & Opcodes.ACC_INTERFACE) > 0) {
                                 method.access &= ~Opcodes.ACC_NATIVE;
                             }
-                        }
-
-                        if (!staticClassProvider.isEmpty()) {
-                            cachedStrings.getPointer(staticClassProvider.getCurrentClassName().replace('/', '.'));
                         }
 
                         if (useAnnotations) {
@@ -275,7 +269,7 @@ public class NativeObfuscator {
 
                         cppBuilder.addHeader(cachedStrings.size(), cachedClasses.size(), cachedMethods.size(), cachedFields.size());
                         cppBuilder.addInstructions(instructions.toString());
-                        cppBuilder.registerMethods(cachedStrings, cachedClasses, nativeMethods.toString(), staticClassProvider);
+                        cppBuilder.registerMethods(cachedStrings, cachedClasses, nativeMethods.toString(), hiddenMethods);
 
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getHppFilename());
                         cMakeBuilder.addClassFile("output/" + cppBuilder.getCppFilename());
@@ -290,43 +284,41 @@ public class NativeObfuscator {
                 }
             });
 
-            for (ClassNode ifaceStaticClass : staticClassProvider.getReadyClasses()) {
-                ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-                ifaceStaticClass.accept(classWriter);
-                Util.writeEntry(out, ifaceStaticClass.name + ".class", classWriter.toByteArray());
-            }
+            for (ClassNode hiddenClass : hiddenMethodsPool.getClasses()) {
+                String hiddenClassFileName = "data_" + Util.escapeCppNameString(hiddenClass.name.replace('/', '_'));
 
-            for (ClassNode bootstrapClass : bootstrapMethodsPool.getClasses()) {
-                String bootstrapClassFileName = "data_" + Util.escapeCppNameString(bootstrapClass.name.replace('/', '_'));
+                cMakeBuilder.addClassFile("output/" + hiddenClassFileName + ".hpp");
+                cMakeBuilder.addClassFile("output/" + hiddenClassFileName + ".cpp");
 
-                cMakeBuilder.addClassFile("output/" + bootstrapClassFileName + ".hpp");
-                cMakeBuilder.addClassFile("output/" + bootstrapClassFileName + ".cpp");
-
-                mainSourceBuilder.addHeader(bootstrapClassFileName + ".hpp");
-                mainSourceBuilder.registerDefine(stringPool.get(bootstrapClass.name), bootstrapClassFileName);
+                mainSourceBuilder.addHeader(hiddenClassFileName + ".hpp");
+                mainSourceBuilder.registerDefine(stringPool.get(hiddenClass.name), hiddenClassFileName);
 
                 ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-                bootstrapClass.accept(classWriter);
+                hiddenClass.accept(classWriter);
                 byte[] rawData = classWriter.toByteArray();
                 List<Byte> data = new ArrayList<>(rawData.length);
                 for (byte b : rawData) {
                     data.add(b);
                 }
 
-                try (BufferedWriter hppWriter = Files.newBufferedWriter(cppOutput.resolve(bootstrapClassFileName + ".hpp"))) {
+                if (debug != null) {
+                    Util.writeEntry(debug, hiddenClass.name + ".class", rawData);
+                }
+
+                try (BufferedWriter hppWriter = Files.newBufferedWriter(cppOutput.resolve(hiddenClassFileName + ".hpp"))) {
                     hppWriter.append("#include \"../native_jvm.hpp\"\n\n");
-                    hppWriter.append("#ifndef ").append(bootstrapClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
-                    hppWriter.append("#define ").append(bootstrapClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
-                    hppWriter.append("namespace native_jvm::data::__ngen_").append(bootstrapClassFileName).append(" {\n");
+                    hppWriter.append("#ifndef ").append(hiddenClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
+                    hppWriter.append("#define ").append(hiddenClassFileName.toUpperCase()).append("_HPP_GUARD\n\n");
+                    hppWriter.append("namespace native_jvm::data::__ngen_").append(hiddenClassFileName).append(" {\n");
                     hppWriter.append("    const jbyte* get_class_data();\n");
                     hppWriter.append("    const jsize get_class_data_length();\n");
                     hppWriter.append("}\n\n");
                     hppWriter.append("#endif\n");
                 }
 
-                try (BufferedWriter cppWriter = Files.newBufferedWriter(cppOutput.resolve(bootstrapClassFileName + ".cpp"))) {
-                    cppWriter.append("#include \"").append(bootstrapClassFileName).append(".hpp\"\n\n");
-                    cppWriter.append("namespace native_jvm::data::__ngen_").append(bootstrapClassFileName).append(" {\n");
+                try (BufferedWriter cppWriter = Files.newBufferedWriter(cppOutput.resolve(hiddenClassFileName + ".cpp"))) {
+                    cppWriter.append("#include \"").append(hiddenClassFileName).append(".hpp\"\n\n");
+                    cppWriter.append("namespace native_jvm::data::__ngen_").append(hiddenClassFileName).append(" {\n");
                     cppWriter.append("    static const jbyte class_data[").append(String.valueOf(data.size())).append("] = { ");
                     cppWriter.append(data.stream().map(String::valueOf).collect(Collectors.joining(", ")));
                     cppWriter.append("};\n");
@@ -404,10 +396,6 @@ public class NativeObfuscator {
         return stringPool;
     }
 
-    public InterfaceStaticClassProvider getStaticClassProvider() {
-        return staticClassProvider;
-    }
-
     public NodeCache<String> getCachedStrings() {
         return cachedStrings;
     }
@@ -428,7 +416,7 @@ public class NativeObfuscator {
         return nativeDir;
     }
 
-    public BootstrapMethodsPool getBootstrapMethodsPool() {
-        return bootstrapMethodsPool;
+    public HiddenMethodsPool getHiddenMethodsPool() {
+        return hiddenMethodsPool;
     }
 }

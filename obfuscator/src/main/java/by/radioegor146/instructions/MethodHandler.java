@@ -86,10 +86,11 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
                     Util.reverse(Util.reverse(Arrays.stream(Type.getArgumentTypes(node.desc)))
                             .skip(1)).toArray(Type[]::new)).getDescriptor());
 
-            BootstrapMethodsPool.BootstrapMethod bootstrapMethod = context.obfuscator.getBootstrapMethodsPool()
+            HiddenMethodsPool.HiddenMethod hiddenMethod = context.obfuscator.getHiddenMethodsPool()
                     .getMethod("invokereverse", methodDesc, method -> {
                         method.visibleAnnotations = new ArrayList<>();
                         method.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
+                        method.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/LambdaForm$Hidden;"));
                         int methodHandleIndex = 0;
                         for (Type argument : Type.getArgumentTypes(mhDesc)) {
                             methodHandleIndex += argument.getSize();
@@ -106,9 +107,9 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
                     });
 
             node = (MethodInsnNode) node.clone(null);
-            node.name = bootstrapMethod.getMethodNode().name;
-            node.owner = bootstrapMethod.getClassNode().name;
-            node.desc = bootstrapMethod.getMethodNode().desc;
+            node.name = hiddenMethod.getMethodNode().name;
+            node.owner = hiddenMethod.getClassNode().name;
+            node.desc = hiddenMethod.getMethodNode().desc;
             node.setOpcode(Opcodes.INVOKESTATIC);
         }
         if (node.owner.equals("java/lang/invoke/MethodHandle") &&
@@ -124,10 +125,11 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
             methodDesc = Type.getMethodDescriptor(Type.getReturnType(methodDesc), methodArguments);
             String mhDesc = simplifyDesc(node.desc);
 
-            BootstrapMethodsPool.BootstrapMethod bootstrapMethod = context.obfuscator.getBootstrapMethodsPool()
+            HiddenMethodsPool.HiddenMethod hiddenMethod = context.obfuscator.getHiddenMethodsPool()
                     .getMethod("mhinvoke", methodDesc, method -> {
                         method.visibleAnnotations = new ArrayList<>();
                         method.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
+                        method.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/LambdaForm$Hidden;"));
                         method.instructions.add(new VarInsnNode(Opcodes.ALOAD, 0));
                         int index = 1;
                         for (Type argument : Type.getArgumentTypes(mhDesc)) {
@@ -140,9 +142,9 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
                     });
 
             node = (MethodInsnNode) node.clone(null);
-            node.name = bootstrapMethod.getMethodNode().name;
-            node.owner = bootstrapMethod.getClassNode().name;
-            node.desc = bootstrapMethod.getMethodNode().desc;
+            node.name = hiddenMethod.getMethodNode().name;
+            node.owner = hiddenMethod.getClassNode().name;
+            node.desc = hiddenMethod.getMethodNode().desc;
             node.setOpcode(Opcodes.INVOKESTATIC);
         }
 

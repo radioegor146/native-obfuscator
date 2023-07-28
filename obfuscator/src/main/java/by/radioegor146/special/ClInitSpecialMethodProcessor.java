@@ -1,22 +1,27 @@
 package by.radioegor146.special;
 
 import by.radioegor146.MethodContext;
-import by.radioegor146.Util;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
 
     @Override
     public String preProcess(MethodContext context) {
-        String name = String.format("%s_special_clinit%d", context.obfuscator.getNativeDir(), context.methodIndex);
-        if (!Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
-            context.proxyMethod = new MethodNode(Opcodes.ASM7,
-                    Opcodes.ACC_NATIVE | Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                    name, context.method.desc, context.method.signature, new String[0]);
-            context.clazz.methods.add(context.proxyMethod);
-        }
+        String name = String.format("special_clinit_%d_%d", context.classIndex, context.methodIndex);
+
+        context.proxyMethod = context.obfuscator.getHiddenMethodsPool().getMethod(name, "(Ljava/lang/Class;)V", methodNode -> {
+            methodNode.signature = context.method.signature;
+            methodNode.access = Opcodes.ACC_NATIVE | Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_BRIDGE;
+            methodNode.visibleAnnotations = new ArrayList<>();
+            methodNode.visibleAnnotations.add(new AnnotationNode("Ljava/lang/invoke/LambdaForm$Hidden;"));
+            methodNode.visibleAnnotations.add(new AnnotationNode("Ljdk/internal/vm/annotation/LambdaForm$Hidden;"));
+        });
         return name;
     }
 
@@ -28,19 +33,11 @@ public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
         instructions.add(new LdcInsnNode(Type.getObjectType(context.clazz.name)));
         instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, context.obfuscator.getNativeDir() + "/Loader",
                 "registerNativesForClass", "(ILjava/lang/Class;)V", false));
-
-        if (Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
-            if (context.nativeMethod == null) {
-                throw new RuntimeException("Native method not created?!");
-            }
-            instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
-                    context.obfuscator.getStaticClassProvider().getCurrentClassName(),
-                    context.nativeMethod.name, context.nativeMethod.desc, false));
-        } else {
-            instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, context.clazz.name,
-                    String.format("%s_special_clinit%d", context.obfuscator.getNativeDir(), context.methodIndex), context.method.desc, false));
-        }
-
+        instructions.add(new LdcInsnNode(Type.getObjectType(context.clazz.name)));
+        instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                context.proxyMethod.getClassNode().name,
+                context.proxyMethod.getMethodNode().name,
+                context.proxyMethod.getMethodNode().desc, false));
         instructions.add(new InsnNode(Opcodes.RETURN));
     }
 }

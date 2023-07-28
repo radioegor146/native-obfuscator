@@ -1,15 +1,19 @@
 package by.radioegor146.source;
 
-import by.radioegor146.InterfaceStaticClassProvider;
-import by.radioegor146.MethodProcessor;
+import by.radioegor146.HiddenCppMethod;
+import by.radioegor146.HiddenMethodsPool;
 import by.radioegor146.NodeCache;
 import by.radioegor146.Util;
+import org.objectweb.asm.tree.ClassNode;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ClassSourceBuilder implements AutoCloseable {
@@ -78,9 +82,7 @@ public class ClassSourceBuilder implements AutoCloseable {
         cppWriter.append("\n");
     }
 
-    public void registerMethods(NodeCache<String> strings, NodeCache<String> classes, String nativeMethods,
-                                InterfaceStaticClassProvider staticClassProvider) throws IOException {
-
+    public void registerMethods(NodeCache<String> strings, NodeCache<String> classes, String nativeMethods, List<HiddenCppMethod> hiddenMethods) throws IOException {
         cppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass clazz) {\n");
         cppWriter.append("        string_pool = string_pool::get_pool();\n\n");
 
@@ -105,21 +107,35 @@ public class ClassSourceBuilder implements AutoCloseable {
             cppWriter.append("\n");
         }
 
-        if (!staticClassProvider.isEmpty()) {
-            cppWriter.append("        jobject classloader = utils::get_classloader_from_class(env, clazz);\n");
-            cppWriter.append("        JNINativeMethod __ngen_static_iface_methods[] = {\n");
-            cppWriter.append(staticClassProvider.getMethods());
-            cppWriter.append("        };\n\n");
-            cppWriter.append("        jclass iface_methods_clazz = utils::find_class_wo_static(env, classloader, ")
-                    .append(strings.getPointer(staticClassProvider.getCurrentClassName().replace('/', '.'))).append(");\n");
-            cppWriter.append("        if (iface_methods_clazz) env->RegisterNatives(iface_methods_clazz, __ngen_static_iface_methods, sizeof(__ngen_static_iface_methods) / sizeof(__ngen_static_iface_methods[0]));\n");
-            cppWriter.append("        if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
-                    .append(stringPool.get(className.replace('/', '.')))
-                    .append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
+        if (!hiddenMethods.isEmpty()) {
+            HashMap<ClassNode, List<HiddenCppMethod>> sortedHiddenMethods = new HashMap<>();
+            for (HiddenCppMethod method : hiddenMethods) {
+                sortedHiddenMethods.computeIfAbsent(method.getHiddenMethod().getClassNode(), unused -> new ArrayList<>()).add(method);
+            }
+
+            for (ClassNode hiddenClazz : sortedHiddenMethods.keySet()) {
+                cppWriter.append("        {\n");
+                cppWriter.append("            jclass hidden_class = env->FindClass(").append(stringPool.get(hiddenClazz.name)).append(");\n");
+                cppWriter.append("            JNINativeMethod __ngen_hidden_methods[] = {\n");
+                for (HiddenCppMethod method : sortedHiddenMethods.get(hiddenClazz)) {
+                    cppWriter.append(String.format("                { %s, %s, (void *)&%s },\n",
+                            stringPool.get(method.getHiddenMethod().getMethodNode().name),
+                            stringPool.get(method.getHiddenMethod().getMethodNode().desc),
+                            method.getCppName()));
+                }
+                cppWriter.append("            };\n");
+                cppWriter.append("            if (hidden_class) env->RegisterNatives(hidden_class, __ngen_hidden_methods, sizeof(__ngen_hidden_methods) / sizeof(__ngen_hidden_methods[0]));\n");
+                cppWriter.append("            if (env->ExceptionCheck()) { fprintf(stderr, \"Exception occured while registering native_jvm for %s\\n\", ")
+                        .append(stringPool.get(hiddenClazz.name.replace('/', '.')))
+                        .append("); fflush(stderr); env->ExceptionDescribe(); env->ExceptionClear(); }\n");
+                cppWriter.append("            env->DeleteLocalRef(hidden_class);\n");
+                cppWriter.append("        }\n");
+
+            }
         }
+
         cppWriter.append("    }\n");
         cppWriter.append("}");
-
 
         hppWriter.append("    void __ngen_register_methods(JNIEnv *env, jclass clazz);\n");
         hppWriter.append("}\n\n#endif");

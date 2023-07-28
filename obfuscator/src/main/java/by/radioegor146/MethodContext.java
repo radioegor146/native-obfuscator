@@ -3,13 +3,10 @@ package by.radioegor146;
 import by.radioegor146.source.StringPool;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 
 import java.util.*;
-
-import org.objectweb.asm.tree.MethodInsnNode;
 
 public class MethodContext {
 
@@ -32,12 +29,14 @@ public class MethodContext {
     public Set<TryCatchBlockNode> tryCatches;
     public Map<CatchesBlock, String> catches;
 
-    public MethodNode proxyMethod;
+    public HiddenMethodsPool.HiddenMethod proxyMethod;
     public MethodNode nativeMethod;
 
     public int stackPointer;
 
     private final LabelPool labelPool = new LabelPool();
+
+    public String cppNativeMethodName;
 
     public MethodContext(NativeObfuscator obfuscator, MethodNode method, int methodIndex, ClassNode clazz,
                          int classIndex) {

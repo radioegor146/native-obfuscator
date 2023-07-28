@@ -2,8 +2,6 @@ package by.radioegor146;
 
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -13,10 +11,32 @@ import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Stream;
 
 public class TestsGenerator {
+
+    private final static List<String> ALLOWED_TESTS = null;
+    /* private final static List<String> ALLOWED_TESTS = Arrays.asList(
+            "InterfaceDefaultStacktrace"
+    ); */
+
+    private static boolean testAllowed(Path testPath) {
+        //noinspection ConstantValue
+        if (ALLOWED_TESTS == null) {
+            return true;
+        }
+
+        String testPathString = testPath.toString();
+
+        for (String item : ALLOWED_TESTS) {
+            if (testPathString.contains(item)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     @TestFactory
     public Stream<DynamicTest> generateTests() throws URISyntaxException, IOException {
@@ -27,6 +47,7 @@ public class TestsGenerator {
         return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS)
                 .filter(Files::isDirectory)
                 .filter(TestsGenerator::hasJavaFiles)
+                .filter(TestsGenerator::testAllowed)
                 .map(p -> DynamicTest.dynamicTest(testDir.relativize(p).toString(), new ClassicTest(p, testDir.relativize(p).toString())));
     }
 

@@ -6,28 +6,27 @@ import org.objectweb.asm.tree.MethodNode;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.function.Consumer;
 
-public class BootstrapMethodsPool {
+public class HiddenMethodsPool {
 
     private final String baseName;
 
-    public BootstrapMethodsPool(String baseName) {
+    public HiddenMethodsPool(String baseName) {
         this.baseName = baseName;
     }
 
     private final HashMap<String, Integer> namePool = new HashMap<>();
-    private final HashMap<String, HashMap<String, BootstrapMethod>> methods = new HashMap<>();
+    private final HashMap<String, HashMap<String, HiddenMethod>> methods = new HashMap<>();
     private final List<ClassNode> classes = new ArrayList<>();
 
-    public static class BootstrapMethod {
+    public static class HiddenMethod {
 
         private final ClassNode classNode;
         private final MethodNode methodNode;
 
-        private BootstrapMethod(ClassNode classNode, MethodNode methodNode) {
+        private HiddenMethod(ClassNode classNode, MethodNode methodNode) {
             this.classNode = classNode;
             this.methodNode = methodNode;
         }
@@ -41,8 +40,8 @@ public class BootstrapMethodsPool {
         }
     }
 
-    public BootstrapMethod getMethod(String name, String desc, Consumer<MethodNode> creator) {
-        BootstrapMethod existingMethod = methods.computeIfAbsent(name, unused -> new HashMap<>()).get(desc);
+    public HiddenMethod getMethod(String name, String desc, Consumer<MethodNode> creator) {
+        HiddenMethod existingMethod = methods.computeIfAbsent(name, unused -> new HashMap<>()).get(desc);
         if (existingMethod != null) {
             return existingMethod;
         }
@@ -54,14 +53,15 @@ public class BootstrapMethodsPool {
         ClassNode classNode = classes.size() == 0 ? null : classes.get(0).methods.size() > 10000 ? null : classes.get(0);
         if (classNode == null) {
             classNode = new ClassNode(Opcodes.ASM7);
+            classNode.access = Opcodes.ACC_PUBLIC;
             classNode.version = 52;
-            classNode.name = baseName + "/Bootstrap" + classes.size();
+            classNode.name = baseName + "/Hidden" + classes.size();
             classes.add(classNode);
         }
         classNode.methods.add(newMethod);
-        BootstrapMethod bootstrapMethod = new BootstrapMethod(classNode, newMethod);
-        methods.computeIfAbsent(name, unused -> new HashMap<>()).put(desc, bootstrapMethod);
-        return bootstrapMethod;
+        HiddenMethod hiddenMethod = new HiddenMethod(classNode, newMethod);
+        methods.computeIfAbsent(name, unused -> new HashMap<>()).put(desc, hiddenMethod);
+        return hiddenMethod;
     }
 
     public List<ClassNode> getClasses() {

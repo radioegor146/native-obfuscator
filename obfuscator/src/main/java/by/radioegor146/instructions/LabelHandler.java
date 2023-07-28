@@ -12,9 +12,6 @@ public class LabelHandler extends GenericInstructionHandler<LabelNode> {
                 .forEachOrdered(context.tryCatches::add);
         context.method.tryCatchBlocks.stream().filter(x -> x.end.equals(node))
                 .forEachOrdered(context.tryCatches::remove);
-
-
-
     	try {
     		super.accept(context, node);
     	} catch (UnsupportedOperationException ex) {

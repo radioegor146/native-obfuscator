@@ -120,6 +120,7 @@ public class MethodProcessor {
         String methodName = specialMethodProcessor.preProcess(context);
         methodName = "__ngen_" + methodName.replace('/', '_');
         methodName = Util.escapeCppNameString(methodName);
+        context.cppNativeMethodName = methodName;
 
         boolean isStatic = Util.getFlag(method.access, Opcodes.ACC_STATIC);
         context.ret = Type.getReturnType(method.desc);
@@ -130,28 +131,19 @@ public class MethodProcessor {
             context.argTypes.add(0, Type.getType(Object.class));
         }
 
-        if (Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
-            String targetDesc = String.format("(%s)%s",
-                    context.argTypes.stream().map(Type::getDescriptor).collect(Collectors.joining()),
-                    context.ret.getDescriptor());
-
-            String outerJavaMethodName = String.format("iface_static_%d_%d", context.classIndex, context.methodIndex);
-            context.nativeMethod = new MethodNode(Opcodes.ASM7,
-                    Opcodes.ACC_NATIVE | Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                    outerJavaMethodName, targetDesc, null, new String[0]);
-
-            String methodSource = String.format("            { (char *)%s, (char *)%s, (void *)&%s },\n",
-                    obfuscator.getStringPool().get(outerJavaMethodName),
-                    obfuscator.getStringPool().get(targetDesc), methodName);
-
-            obfuscator.getStaticClassProvider().addMethod(context.nativeMethod, methodSource);
+        if (context.proxyMethod != null) {
+            context.nativeMethod = context.proxyMethod.getMethodNode();
+            context.nativeMethod.access |= Opcodes.ACC_NATIVE;
         } else {
-            context.nativeMethods.append(String.format("            { (char *)%s, (char *)%s, (void *)&%s },\n",
-                    obfuscator.getStringPool().get(context.proxyMethod.name),
+            context.nativeMethods.append(String.format("            { %s, %s, (void *)&%s },\n",
+                    obfuscator.getStringPool().get(context.method.name),
                     obfuscator.getStringPool().get(method.desc), methodName));
         }
 
         output.append(String.format("%s JNICALL %s(JNIEnv *env, ", CPP_TYPES[context.ret.getSort()], methodName));
+        if (context.proxyMethod != null) {
+            output.append("jobject ignored_hidden, ");
+        }
         output.append(isStatic ? "jclass clazz" : "jobject obj");
 
         ArrayList<String> argNames = new ArrayList<>();
@@ -164,6 +156,10 @@ public class MethodProcessor {
 
         output.append(") {").append("\n");
 
+        if (context.proxyMethod != null) {
+            output.append("    env->DeleteLocalRef(ignored_hidden);\n");
+        }
+
         if (!isStatic) {
             output.append("    jclass clazz = utils::get_class_from_object(env, obj);\n");
             output.append("    if (env->ExceptionCheck()) { ").append(String.format("return (%s) 0;",
@@ -175,6 +171,14 @@ public class MethodProcessor {
         output.append("    if (classloader == nullptr) { env->FatalError(").append(context.getStringPool()
                 .get("classloader == null")).append(String.format("); return (%s) 0; }\n", CPP_TYPES[context.ret.getSort()]));
         output.append("\n");
+        if (!isStatic) {
+            output.append("    env->DeleteLocalRef(clazz);\n");
+            output.append("    clazz = utils::find_class_wo_static(env, classloader, ")
+                    .append(context.getCachedStrings().getPointer(context.clazz.name.replace('/', '.')))
+                    .append(");\n");
+            output.append("    if (env->ExceptionCheck()) { ").append(String.format("return (%s) 0;",
+                    CPP_TYPES[context.ret.getSort()])).append(" }\n");
+        }
         output.append("    jobject lookup = nullptr;\n");
 
         if (method.tryCatchBlocks != null) {
