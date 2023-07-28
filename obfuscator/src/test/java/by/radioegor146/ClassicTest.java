@@ -36,7 +36,8 @@ public class ClassicTest implements Executable {
                         } catch (IOException ignored) {
                         }
                     });
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     @SuppressWarnings("RedundantStringFormatCall")
@@ -96,7 +97,7 @@ public class ClassicTest implements Executable {
                     "-C", tempClasses + File.separator, "."));
             resourceFiles.stream().map(Path::toString).forEach(jarParameters::add);
             ProcessHelper.run(temp, 10_000,
-                    jarParameters)
+                            jarParameters)
                     .check("Jar command");
 
             System.out.println("Ideal...");
@@ -125,11 +126,11 @@ public class ClassicTest implements Executable {
                         arch = "x86";
                     }
                     ProcessHelper.run(tempCpp, 120_000,
-                            Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
+                                    Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
                             .check("CMake prepare");
                 } else {
                     ProcessHelper.run(tempCpp, 120_000,
-                            Arrays.asList("cmake", "."))
+                                    Arrays.asList("cmake", "."))
                             .check("CMake prepare");
                 }
 
@@ -158,8 +159,8 @@ public class ClassicTest implements Executable {
                     // Some tests are random based
                     Pattern testResult = Pattern.compile("^Passed = \\d+,? failed = (\\d+)$", Pattern.MULTILINE);
                     Matcher matcher = testResult.matcher(testRunResult.stdout);
-                    if(matcher.find()) {
-                        if(!matcher.group(1).equals("0")) {
+                    if (matcher.find()) {
+                        if (!matcher.group(1).equals("0")) {
                             fail(testRunResult, idealRunResult);
                         }
                     } else {

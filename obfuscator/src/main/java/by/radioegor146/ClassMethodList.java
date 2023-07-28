@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class ClassMethodList {
-    private static final String STAR_CHARACTER = String.format("\\u%04x", '*' & 0xFFFF);
+    private static final String STAR_CHARACTER = quote("*");
 
     private final HashSet<String> staticEntries = new HashSet<>();
     private final List<Pattern> patterns = new ArrayList<>();
