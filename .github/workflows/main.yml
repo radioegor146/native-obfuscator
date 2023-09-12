@@ -14,12 +14,10 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: ${{ matrix.java }}
-    - name: Install G++7
-      run: sudo apt install g++-7
-    - name: Change to G++7
-      run: sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
+    - name: Install G++
+      run: sudo apt install g++
     - name: Build with Gradle
       run: ./gradlew build
       env:
-        CC: gcc-7
-        CXX: g++-7
+        CC: gcc
+        CXX: g++
