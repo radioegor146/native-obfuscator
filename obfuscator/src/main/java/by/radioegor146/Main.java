@@ -15,7 +15,7 @@ import java.util.concurrent.Callable;
 
 public class Main {
 
-    private static final String VERSION = "3.5.1r";
+    private static final String VERSION = "3.5.2r";
 
     @CommandLine.Command(name = "native-obfuscator", mixinStandardHelpOptions = true, version = "native-obfuscator " + VERSION,
             description = "Transpiles .jar file into .cpp files and generates output .jar file")
