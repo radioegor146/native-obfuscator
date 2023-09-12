@@ -1,6 +1,6 @@
 package by.radioegor146;
 
-import by.radioegor146.bytecode.Preprocessor;
+import by.radioegor146.bytecode.PreprocessorRunner;
 import by.radioegor146.source.CMakeFilesBuilder;
 import by.radioegor146.source.ClassSourceBuilder;
 import by.radioegor146.source.MainSourceBuilder;
@@ -204,7 +204,7 @@ public class NativeObfuscator {
                     rawClassNode.methods.stream()
                             .filter(MethodProcessor::shouldProcess)
                             .filter(methodNode -> classMethodFilter.shouldProcess(rawClassNode, methodNode))
-                            .forEach(methodNode -> Preprocessor.preprocess(rawClassNode, methodNode, platform));
+                            .forEach(methodNode -> PreprocessorRunner.preprocess(rawClassNode, methodNode, platform));
 
                     ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     rawClassNode.accept(preprocessorClassWriter);

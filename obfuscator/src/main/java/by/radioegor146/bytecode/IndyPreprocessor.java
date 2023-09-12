@@ -11,122 +11,9 @@ import org.objectweb.asm.tree.*;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-public class IndyPreprocessor implements IPreprocessor {
+public class IndyPreprocessor implements Preprocessor {
 
-    private static AbstractInsnNode getTypeLoadInsnNode(Type type) {
-        switch (type.getSort()) {
-            case Type.ARRAY:
-            case Type.OBJECT:
-                return new LdcInsnNode(type);
-            case Type.BOOLEAN:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Boolean", "TYPE", "Ljava/lang/Class;");
-            case Type.BYTE:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Byte", "TYPE", "Ljava/lang/Class;");
-            case Type.CHAR:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Character", "TYPE", "Ljava/lang/Class;");
-            case Type.DOUBLE:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Double", "TYPE", "Ljava/lang/Class;");
-            case Type.FLOAT:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Float", "TYPE", "Ljava/lang/Class;");
-            case Type.INT:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Integer", "TYPE", "Ljava/lang/Class;");
-            case Type.LONG:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Long", "TYPE", "Ljava/lang/Class;");
-            case Type.SHORT:
-                return new FieldInsnNode(Opcodes.GETSTATIC, "java/lang/Short", "TYPE", "Ljava/lang/Class;");
-            default:
-                throw new RuntimeException(String.format("Unsupported TypeLoad type: %s", type));
-        }
-    }
-
-    private InsnList generateMethodTypeLdcInsn(Type type) {
-        if (type.getSort() != Type.METHOD) {
-            throw new RuntimeException(String.format("Not a MT: %s", type));
-        }
-        InsnList insntructions = new InsnList();
-        insntructions.add(new LdcInsnNode(type.getDescriptor())); // 5
-        insntructions.add(PreprocessorUtils.CLASSLOADER_LOCAL.get()); // 6
-        insntructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodType",
-                "fromMethodDescriptorString", "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/invoke/MethodType;")); // 5
-        return insntructions;
-    }
-
-    private InsnList generateMethodHandleLdcInsn(Handle handle) {
-        InsnList instructions = new InsnList();
-        instructions.add(PreprocessorUtils.LOOKUP_LOCAL.get()); // 5
-        instructions.add(new LdcInsnNode(Type.getObjectType(handle.getOwner()))); // 6
-        switch (handle.getTag()) {
-            case Opcodes.H_GETFIELD:
-            case Opcodes.H_GETSTATIC:
-            case Opcodes.H_PUTFIELD:
-            case Opcodes.H_PUTSTATIC:
-                instructions.add(new LdcInsnNode(handle.getName())); // 7
-                instructions.add(getTypeLoadInsnNode(Type.getType(handle.getDesc()))); // 8
-                String methodName = "";
-                switch (handle.getTag()) {
-                    case Opcodes.H_GETFIELD:
-                        methodName = "findGetter";
-                        break;
-                    case Opcodes.H_GETSTATIC:
-                        methodName = "findStaticGetter";
-                        break;
-                    case Opcodes.H_PUTFIELD:
-                        methodName = "findSetter";
-                        break;
-                    case Opcodes.H_PUTSTATIC:
-                        methodName = "findStaticSetter";
-                        break;
-                }
-                instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL,
-                        "java/lang/invoke/MethodHandles$Lookup", methodName,
-                        "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;")); // 5
-                break;
-            case Opcodes.H_INVOKEVIRTUAL:
-            case Opcodes.H_INVOKEINTERFACE:
-                instructions.add(new LdcInsnNode(handle.getName())); // 7
-                instructions.add(new LdcInsnNode(handle.getDesc())); // 8
-                instructions.add(PreprocessorUtils.CLASSLOADER_LOCAL.get()); // 9
-                instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodType",
-                        "fromMethodDescriptorString", "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/invoke/MethodType;")); // 8
-                instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, // 5
-                        "java/lang/invoke/MethodHandles$Lookup", "findVirtual",
-                        "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"));
-                break;
-            case Opcodes.H_INVOKESTATIC:
-                instructions.add(new LdcInsnNode(handle.getName())); // 7
-                instructions.add(new LdcInsnNode(handle.getDesc())); // 8
-                instructions.add(PreprocessorUtils.CLASSLOADER_LOCAL.get()); // 9
-                instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodType",
-                        "fromMethodDescriptorString", "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/invoke/MethodType;")); // 8
-                instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, // 5
-                        "java/lang/invoke/MethodHandles$Lookup", "findStatic",
-                        "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"));
-                break;
-            case Opcodes.H_INVOKESPECIAL:
-                instructions.add(new LdcInsnNode(handle.getName())); // 7
-                instructions.add(new LdcInsnNode(handle.getDesc())); // 8
-                instructions.add(PreprocessorUtils.CLASSLOADER_LOCAL.get()); // 9
-                instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodType",
-                        "fromMethodDescriptorString", "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/invoke/MethodType;")); // 8
-                instructions.add(PreprocessorUtils.CLASS_LOCAL.get()); // 9
-                instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, // 5
-                        "java/lang/invoke/MethodHandles$Lookup", "findSpecial",
-                        "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;"));
-                break;
-            case Opcodes.H_NEWINVOKESPECIAL:
-                instructions.add(new LdcInsnNode(handle.getDesc())); // 7
-                instructions.add(PreprocessorUtils.CLASSLOADER_LOCAL.get()); // 8
-                instructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodType",
-                        "fromMethodDescriptorString", "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/invoke/MethodType;")); // 7
-                instructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, // 5
-                        "java/lang/invoke/MethodHandles$Lookup", "findConstructor",
-                        "(Ljava/lang/Class;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"));
-                break;
-        }
-        return instructions;
-    }
-
-    private void processIndy(ClassNode classNode, MethodNode methodNode,
+    private static void processIndy(ClassNode classNode, MethodNode methodNode,
                              InvokeDynamicInsnNode invokeDynamicInsnNode, Platform platform) {
         LabelNode bootstrapStart = new LabelNode(new Label());
         LabelNode bootstrapEnd = new LabelNode(new Label());
@@ -184,14 +71,14 @@ public class IndyPreprocessor implements IPreprocessor {
 
                 bootstrapInstructions.add(PreprocessorUtils.LOOKUP_LOCAL.get()); // 2
                 bootstrapInstructions.add(new LdcInsnNode(invokeDynamicInsnNode.name)); // 3
-                bootstrapInstructions.add(generateMethodTypeLdcInsn(Type.getMethodType(invokeDynamicInsnNode.desc)));
+                bootstrapInstructions.add(MethodHandleUtils.generateMethodTypeLdcInsn(Type.getMethodType(invokeDynamicInsnNode.desc)));
 
                 for (Object bsmArgument : invokeDynamicInsnNode.bsmArgs) {
                     if (bsmArgument instanceof String) {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 5
                     } else if (bsmArgument instanceof Type) {
                         if (((Type) bsmArgument).getSort() == Type.METHOD) {
-                            bootstrapInstructions.add(generateMethodTypeLdcInsn((Type) bsmArgument));
+                            bootstrapInstructions.add(MethodHandleUtils.generateMethodTypeLdcInsn((Type) bsmArgument));
                         } else {
                             bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 5
                         }
@@ -204,7 +91,7 @@ public class IndyPreprocessor implements IPreprocessor {
                     } else if (bsmArgument instanceof Double) {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 6
                     } else if (bsmArgument instanceof Handle) {
-                        bootstrapInstructions.add(generateMethodHandleLdcInsn((Handle) bsmArgument));
+                        bootstrapInstructions.add(MethodHandleUtils.generateMethodHandleLdcInsn((Handle) bsmArgument));
                     } else {
                         throw new RuntimeException("Wrong argument type: " + bsmArgument.getClass());
                     }
@@ -223,11 +110,11 @@ public class IndyPreprocessor implements IPreprocessor {
                 bootstrapInstructions.add(new InsnNode(Opcodes.DUP));
                 bootstrapInstructions.add(new LdcInsnNode(Type.getObjectType(classNode.name)));
                 bootstrapInstructions.add(new InsnNode(Opcodes.SWAP));
-                bootstrapInstructions.add(generateMethodHandleLdcInsn(invokeDynamicInsnNode.bsm));
+                bootstrapInstructions.add(MethodHandleUtils.generateMethodHandleLdcInsn(invokeDynamicInsnNode.bsm));
                 bootstrapInstructions.add(new InsnNode(Opcodes.SWAP));
                 bootstrapInstructions.add(new LdcInsnNode(invokeDynamicInsnNode.name));
                 bootstrapInstructions.add(new InsnNode(Opcodes.SWAP));
-                bootstrapInstructions.add(generateMethodTypeLdcInsn(Type.getMethodType(invokeDynamicInsnNode.desc)));
+                bootstrapInstructions.add(MethodHandleUtils.generateMethodTypeLdcInsn(Type.getMethodType(invokeDynamicInsnNode.desc)));
                 bootstrapInstructions.add(new InsnNode(Opcodes.SWAP));
                 bootstrapInstructions.add(new LdcInsnNode(invokeDynamicInsnNode.bsmArgs.length));
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
@@ -239,7 +126,7 @@ public class IndyPreprocessor implements IPreprocessor {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 5
                     } else if (bsmArgument instanceof Type) {
                         if (((Type) bsmArgument).getSort() == Type.METHOD) {
-                            bootstrapInstructions.add(generateMethodTypeLdcInsn((Type) bsmArgument));
+                            bootstrapInstructions.add(MethodHandleUtils.generateMethodTypeLdcInsn((Type) bsmArgument));
                         } else {
                             bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 5
                         }
@@ -256,7 +143,7 @@ public class IndyPreprocessor implements IPreprocessor {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 6
                         bootstrapInstructions.add(getBoxingInsnNode(Type.DOUBLE_TYPE));
                     } else if (bsmArgument instanceof Handle) {
-                        bootstrapInstructions.add(generateMethodHandleLdcInsn((Handle) bsmArgument));
+                        bootstrapInstructions.add(MethodHandleUtils.generateMethodHandleLdcInsn((Handle) bsmArgument));
                     } else {
                         throw new RuntimeException("Wrong argument type: " + bsmArgument.getClass());
                     }
@@ -266,8 +153,6 @@ public class IndyPreprocessor implements IPreprocessor {
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Object"));
                 bootstrapInstructions.add(new InsnNode(Opcodes.SWAP));
                 bootstrapInstructions.add(PreprocessorUtils.LINK_CALL_SITE_METHOD.get());
-                /* bootstrapInstructions.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/invoke/MethodHandleNatives",
-                        "linkCallSite", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/invoke/MemberName;")); */
                 bootstrapInstructions.add(new InsnNode(Opcodes.POP));
                 bootstrapInstructions.add(new InsnNode(Opcodes.ICONST_0));
                 bootstrapInstructions.add(new InsnNode(Opcodes.AALOAD)); // 1
@@ -339,7 +224,7 @@ public class IndyPreprocessor implements IPreprocessor {
         methodNode.tryCatchBlocks.add(0, new TryCatchBlockNode(bootstrapStart, bootstrapEnd, bsmeStart, "java/lang/Throwable"));
     }
 
-    private AbstractInsnNode getBoxingInsnNode(Type argument) {
+    private static AbstractInsnNode getBoxingInsnNode(Type argument) {
         switch (argument.getSort()) {
             case Type.BOOLEAN:
                 return new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;");
@@ -362,7 +247,7 @@ public class IndyPreprocessor implements IPreprocessor {
         }
     }
 
-    private InsnList getUnboxingTypeInsn(Type argument) {
+    private static InsnList getUnboxingTypeInsn(Type argument) {
         InsnList result = new InsnList();
         switch (argument.getSort()) {
             case Type.BOOLEAN:
