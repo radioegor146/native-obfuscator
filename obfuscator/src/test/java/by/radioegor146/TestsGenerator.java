@@ -16,10 +16,10 @@ import java.util.stream.Stream;
 
 public class TestsGenerator {
 
-    private final static List<String> ALLOWED_TESTS = null;
-    /* private final static List<String> ALLOWED_TESTS = Arrays.asList(
-            "InterfaceDefaultStacktrace"
-    ); */
+    private final static List<String> ALLOWED_TESTS = null; /*
+    private final static List<String> ALLOWED_TESTS = Arrays.asList(
+            "StringTokenizer"
+    ); // */
 
     private static boolean testAllowed(Path testPath) {
         //noinspection ConstantValue
@@ -44,11 +44,7 @@ public class TestsGenerator {
         Objects.requireNonNull(tests, "No tests dir in resources");
 
         Path testDir = Paths.get(tests.toURI());
-        return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS)
-                .filter(Files::isDirectory)
-                .filter(TestsGenerator::hasJavaFiles)
-                .filter(TestsGenerator::testAllowed)
-                .map(p -> DynamicTest.dynamicTest(testDir.relativize(p).toString(), new ClassicTest(p, testDir.relativize(p).toString())));
+        return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS).filter(Files::isDirectory).filter(TestsGenerator::hasJavaFiles).filter(TestsGenerator::testAllowed).map(p -> DynamicTest.dynamicTest(testDir.relativize(p).toString(), new ClassicTest(p, testDir.relativize(p).toString())));
     }
 
     private static boolean hasJavaFiles(Path path) {

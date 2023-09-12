@@ -2,7 +2,6 @@ package by.radioegor146.instructions;
 
 import by.radioegor146.MethodContext;
 import by.radioegor146.Util;
-import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.InsnNode;
 

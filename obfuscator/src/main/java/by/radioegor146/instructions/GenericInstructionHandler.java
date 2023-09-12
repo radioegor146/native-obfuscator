@@ -7,8 +7,6 @@ import by.radioegor146.Util;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.TryCatchBlockNode;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.util.*;
 import java.util.stream.Collectors;
 

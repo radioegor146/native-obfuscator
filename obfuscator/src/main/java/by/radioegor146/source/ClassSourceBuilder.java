@@ -1,7 +1,6 @@
 package by.radioegor146.source;
 
 import by.radioegor146.HiddenCppMethod;
-import by.radioegor146.HiddenMethodsPool;
 import by.radioegor146.NodeCache;
 import by.radioegor146.Util;
 import org.objectweb.asm.tree.ClassNode;

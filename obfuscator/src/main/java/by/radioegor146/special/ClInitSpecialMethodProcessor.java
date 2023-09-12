@@ -6,8 +6,6 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class ClInitSpecialMethodProcessor implements SpecialMethodProcessor {
 

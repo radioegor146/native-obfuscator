@@ -1,7 +1,6 @@
 package by.radioegor146.instructions;
 
 import by.radioegor146.MethodContext;
-import by.radioegor146.Util;
 import org.objectweb.asm.tree.LabelNode;
 
 public class LabelHandler extends GenericInstructionHandler<LabelNode> {
