@@ -30,10 +30,10 @@ public class Main {
         @CommandLine.Option(names = {"-l", "--libraries"}, description = "Directory for dependent libraries")
         private File librariesDirectory;
 
-        @CommandLine.Option(names = {"-b", "--black-list"}, description = "File with list of blacklist classes/methods for transpilation")
+        @CommandLine.Option(names = {"-b", "--black-list"}, description = "File with a list of blacklist classes/methods for transpilation")
         private File blackListFile;
 
-        @CommandLine.Option(names = {"-w", "--white-list"}, description = "File with list of whitelist classes/methods for transpilation")
+        @CommandLine.Option(names = {"-w", "--white-list"}, description = "File with a list of whitelist classes/methods for transpilation")
         private File whiteListFile;
 
         @CommandLine.Option(names = {"--plain-lib-name"}, description = "Plain library name for LoaderPlain")

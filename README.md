@@ -65,7 +65,7 @@ Transpiles .jar file into .cpp files and generates output .jar file
                           Plain library name for LoaderPlain
   -V, --version           Print version information and exit
   -w, --white-list=<whiteListFile>
-                          File with list of whitelist classes/methods for
+                          File with a list of whitelist classes/methods for
                             transpilation
 ```
 
