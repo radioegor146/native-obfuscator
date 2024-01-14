@@ -150,3 +150,7 @@ to the directory of the .jar file that this tool will print in `stdout` (by defa
 ---
 
 In case of any problems, feel free to open an issue or contact me at [re146.dev](https://re146.dev)
+
+### Stargazers over time
+
+[![Stargazers over time](https://starchart.cc/radioegor146/native-obfuscator.svg?variant=adaptive)](https://starchart.cc/radioegor146/native-obfuscator)
