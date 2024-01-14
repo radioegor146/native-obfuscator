@@ -50,7 +50,7 @@ public class HiddenMethodsPool {
         MethodNode newMethod = new MethodNode(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_BRIDGE |
                 Opcodes.ACC_SYNTHETIC, newName, desc, null, new String[0]);
         creator.accept(newMethod);
-        ClassNode classNode = classes.size() == 0 ? null : classes.get(0).methods.size() > 10000 ? null : classes.get(0);
+        ClassNode classNode = classes.isEmpty() ? null : classes.get(classes.size() - 1).methods.size() > 10000 ? null : classes.get(classes.size() - 1);
         if (classNode == null) {
             classNode = new ClassNode(Opcodes.ASM7);
             classNode.access = Opcodes.ACC_PUBLIC;
