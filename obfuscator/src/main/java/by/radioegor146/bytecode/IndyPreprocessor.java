@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 public class IndyPreprocessor implements Preprocessor {
 
     private static void processIndy(ClassNode classNode, MethodNode methodNode,
-                             InvokeDynamicInsnNode invokeDynamicInsnNode, Platform platform) {
+                                    InvokeDynamicInsnNode invokeDynamicInsnNode, Platform platform) {
         LabelNode bootstrapStart = new LabelNode(new Label());
         LabelNode bootstrapEnd = new LabelNode(new Label());
         LabelNode bsmeStart = new LabelNode(new Label());
@@ -42,6 +42,34 @@ public class IndyPreprocessor implements Preprocessor {
 
 
                 Type[] arguments = Type.getArgumentTypes(invokeDynamicInsnNode.desc);
+
+                // compatibility with java 9+
+                // "aaa" + 1 + "bbb"
+                // -->
+                // iconst_1
+                //
+                // bsmArgs:
+                // "aaa\u0001bbb"
+                //
+                // invokedynamic StringConcatFactory.makeConcatWithConstants(Lookup, String, MethodType, String, Object...)CallSite
+
+                int targetArgLength = bsmArguments.length - 3;
+                int originArgLength = invokeDynamicInsnNode.bsmArgs.length;
+                if (originArgLength != targetArgLength) {
+                    Object[] newArgs = new Object[targetArgLength];
+                    System.arraycopy(invokeDynamicInsnNode.bsmArgs, 0, newArgs, 0, originArgLength);
+
+                    for (int index = originArgLength; index < targetArgLength; index++) {
+                        if (bsmArguments[index + 3].getSort() == Type.ARRAY) {
+                            newArgs[index] = new Object[0];
+                        } else {
+                            throw new RuntimeException("Wrong argument type: " + bsmArguments[index + 3].getClass());
+                        }
+                    }
+
+                    invokeDynamicInsnNode.bsmArgs = newArgs;
+                }
+
                 bootstrapInstructions.add(new LdcInsnNode(arguments.length)); // 1
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object")); // 1
                 {
@@ -92,6 +120,44 @@ public class IndyPreprocessor implements Preprocessor {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 6
                     } else if (bsmArgument instanceof Handle) {
                         bootstrapInstructions.add(MethodHandleUtils.generateMethodHandleLdcInsn((Handle) bsmArgument));
+                    } else if (bsmArgument instanceof Object[]) {
+                        Object[] objects = (Object[]) bsmArgument;
+                        bootstrapInstructions.add(new LdcInsnNode(objects.length));
+                        bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object"));
+
+                        int index = 0;
+                        for (Object object : objects) {
+                            bootstrapInstructions.add(new InsnNode(Opcodes.DUP));
+                            bootstrapInstructions.add(new LdcInsnNode(index));
+                            if (object instanceof String) {
+                                bootstrapInstructions.add(new LdcInsnNode(object));
+                            } else if (object instanceof Type) {
+                                if (((Type) object).getSort() == Type.METHOD) {
+                                    bootstrapInstructions.add(MethodHandleUtils.generateMethodTypeLdcInsn((Type) object));
+                                } else {
+                                    bootstrapInstructions.add(new LdcInsnNode(object));
+                                }
+                            } else if (object instanceof Integer) {
+                                bootstrapInstructions.add(new LdcInsnNode(object));
+                                bootstrapInstructions.add(getBoxingInsnNode(Type.INT_TYPE));
+                            } else if (object instanceof Long) {
+                                bootstrapInstructions.add(new LdcInsnNode(object));
+                                bootstrapInstructions.add(getBoxingInsnNode(Type.LONG_TYPE));
+                            } else if (object instanceof Float) {
+                                bootstrapInstructions.add(new LdcInsnNode(object));
+                                bootstrapInstructions.add(getBoxingInsnNode(Type.FLOAT_TYPE));
+                            } else if (object instanceof Double) {
+                                bootstrapInstructions.add(new LdcInsnNode(object));
+                                bootstrapInstructions.add(getBoxingInsnNode(Type.DOUBLE_TYPE));
+                            } else if (object instanceof Handle) {
+                                bootstrapInstructions.add(MethodHandleUtils.generateMethodHandleLdcInsn((Handle) object));
+                            } else {
+                                throw new RuntimeException("Wrong argument type: " + object.getClass());
+                            }
+                            bootstrapInstructions.add(new InsnNode(Opcodes.AASTORE));
+                            index++;
+                        }
+
                     } else {
                         throw new RuntimeException("Wrong argument type: " + bsmArgument.getClass());
                     }
@@ -223,6 +289,7 @@ public class IndyPreprocessor implements Preprocessor {
         methodNode.instructions.remove(invokeDynamicInsnNode);
         methodNode.tryCatchBlocks.add(0, new TryCatchBlockNode(bootstrapStart, bootstrapEnd, bsmeStart, "java/lang/Throwable"));
     }
+
 
     private static AbstractInsnNode getBoxingInsnNode(Type argument) {
         switch (argument.getSort()) {
