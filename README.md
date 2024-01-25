@@ -44,9 +44,11 @@ Also, this tool does not particularly obfuscate your code; it just transpiles it
 
 ### General usage:
 ```
-Usage: native-obfuscator [-ahV] [-b=<blackListFile>] [-l=<librariesDirectory>]
-                         [-p=<platform>] [--plain-lib-name=<libraryName>]
-                         [-w=<whiteListFile>] <jarFile> <outputDirectory>
+Usage: native-obfuscator [-ahV] [--debug] [-b=<blackListFile>]
+                         [--custom-lib-dir=<customLibraryDirectory>]
+                         [-l=<librariesDirectory>] [-p=<platform>]
+                         [--plain-lib-name=<libraryName>] [-w=<whiteListFile>]
+                         <jarFile> <outputDirectory>
 Transpiles .jar file into .cpp files and generates output .jar file
       <jarFile>           Jar file to transpile
       <outputDirectory>   Output directory
@@ -54,7 +56,10 @@ Transpiles .jar file into .cpp files and generates output .jar file
   -b, --black-list=<blackListFile>
                           File with a list of blacklist classes/methods for
                             transpilation
-  -h, --help              Show this help message and exit
+      --custom-lib-dir=<customLibraryDirectory>
+                          Custom library directory for LoaderUnpack
+      --debug             Enable generation of debug .jar file (non-executable)
+  -h, --help              Show this help message and exit.
   -l, --libraries=<librariesDirectory>
                           Directory for dependent libraries
   -p, --platform=<platform>
@@ -63,7 +68,7 @@ Transpiles .jar file into .cpp files and generates output .jar file
                             Android)
       --plain-lib-name=<libraryName>
                           Plain library name for LoaderPlain
-  -V, --version           Print version information and exit
+  -V, --version           Print version information and exit.
   -w, --white-list=<whiteListFile>
                           File with a list of whitelist classes/methods for
                             transpilation
@@ -121,7 +126,9 @@ mypackage/myotherpackage/Class*
 `**` matches all entries in class/package name
 
 
-`--plain-lib-name` - if you ship your .jar separately from the result native libraries or you use it for Android, you can specify the name of the native library that it will try to search while using.
+`--plain-lib-name` - if you ship your .jar separately from the result native libraries, or you use it for Android, you can specify the name of the native library that it will try to search while using.
+
+`--custom-lib-dir` - if you want to set custom directory for storing libraries inside the jar
 
 If you want to ship your .jar with native libraries in it, you should omit that argument, and after building native files, add them in the form of
 ```
@@ -132,7 +139,7 @@ x64-macos.dylib
 arm64-linux.so
 arm64-windows.dll
 ```
-to the directory of the .jar file that this tool will print in `stdout` (by default `native0/`)
+to the directory of the .jar file that this tool will print in `stdout` (by default `native0/` or custom if `--custom-lib-dir` is present)
 
 #### Basic usage:
 1. Transpile your code using `java -jar native-obfuscator.jar <input jar> <output directory>`
