@@ -95,7 +95,12 @@ public class NativeObfuscator {
 
     public void process(Path inputJarPath, Path outputDir, List<Path> inputLibs,
                         List<String> blackList, List<String> whiteList, String plainLibName,
+                        String customLibraryDirectory,
                         Platform platform, boolean useAnnotations, boolean generateDebugJar) throws IOException {
+        if (Files.exists(outputDir) && Files.isSameFile(inputJarPath.toRealPath().getParent(), outputDir.toRealPath())) {
+            throw new RuntimeException("Input jar can't be in the same directory as output directory");
+        }
+
         List<Path> libs = new ArrayList<>(inputLibs);
         libs.add(inputJarPath);
         ClassMethodFilter classMethodFilter = new ClassMethodFilter(ClassMethodList.parse(blackList), ClassMethodList.parse(whiteList), useAnnotations);
@@ -136,10 +141,20 @@ public class NativeObfuscator {
 
             logger.info("Processing {}...", jarFile);
 
-            int nativeDirId = IntStream.iterate(0, i -> i + 1)
-                    .filter(i -> jar.stream().noneMatch(x -> x.getName().startsWith("native" + i)))
-                    .findFirst().orElseThrow(RuntimeException::new);
-            nativeDir = "native" + nativeDirId;
+            if (customLibraryDirectory != null) {
+                nativeDir = customLibraryDirectory;
+
+                if (jar.stream().anyMatch(x -> x.getName().equals(nativeDir) ||
+                        x.getName().startsWith(nativeDir + "/"))) {
+                    logger.warn("Directory '{}' already exists in input jar file", nativeDir);
+                }
+            } else {
+                int nativeDirId = IntStream.iterate(0, i -> i + 1)
+                        .filter(i -> jar.stream().noneMatch(x -> x.getName().equals("native" + i) ||
+                                x.getName().startsWith("native" + i + "/")))
+                        .findFirst().orElseThrow(RuntimeException::new);
+                nativeDir = "native" + nativeDirId;
+            }
 
             hiddenMethodsPool = new HiddenMethodsPool(nativeDir + "/hidden");
 

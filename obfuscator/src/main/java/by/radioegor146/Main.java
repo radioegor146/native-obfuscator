@@ -15,7 +15,7 @@ import java.util.concurrent.Callable;
 
 public class Main {
 
-    private static final String VERSION = "3.5.2b";
+    private static final String VERSION = "3.5.2r";
 
     @CommandLine.Command(name = "native-obfuscator", mixinStandardHelpOptions = true, version = "native-obfuscator " + VERSION,
             description = "Transpiles .jar file into .cpp files and generates output .jar file")
@@ -38,6 +38,9 @@ public class Main {
 
         @CommandLine.Option(names = {"--plain-lib-name"}, description = "Plain library name for LoaderPlain")
         private String libraryName;
+
+        @CommandLine.Option(names = {"--custom-lib-dir"}, description = "Custom library directory for LoaderUnpack")
+        private String customLibraryDirectory;
 
         @CommandLine.Option(names = {"-p", "--platform"}, defaultValue = "hotspot",
                 description = "Target platform: hotspot - standard standalone HotSpot JRE, std_java - java standard (as for Android)")
@@ -69,7 +72,7 @@ public class Main {
             }
 
             new NativeObfuscator().process(jarFile.toPath(), Paths.get(outputDirectory),
-                    libs, blackList, whiteList, libraryName, platform, useAnnotations, generateDebugJar);
+                    libs, blackList, whiteList, libraryName, customLibraryDirectory, platform, useAnnotations, generateDebugJar);
 
             return 0;
         }
