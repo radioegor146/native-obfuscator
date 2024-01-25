@@ -22,9 +22,43 @@ public class IndyPreprocessor implements Preprocessor {
 
         InsnList bootstrapInstructions = new InsnList();
         bootstrapInstructions.add(bootstrapStart); // 0
+
+
         switch (platform) {
             case STD_JAVA: {
                 Type[] bsmArguments = Type.getArgumentTypes(invokeDynamicInsnNode.bsm.getDesc());
+                int targetArgLength = bsmArguments.length - 3;
+                int originArgLength = invokeDynamicInsnNode.bsmArgs.length;
+
+                // process variable arguments for bsm like StringConcatFactory.makeConcatWithConstants(Lookup, String, MethodType, String, Object...)
+                // jvm will process variable argument automatically when using linkCallSite
+                // but if we want to use invokeWithArguments, we need to process variable argument manually
+                if (originArgLength < targetArgLength) {
+                    Object[] newArgs = new Object[targetArgLength];
+                    System.arraycopy(invokeDynamicInsnNode.bsmArgs, 0, newArgs, 0, originArgLength);
+
+                    if (targetArgLength - originArgLength != 1)
+                        throw new RuntimeException("Impossible BootstrapMethod Arguments Length");
+
+                    if (bsmArguments[originArgLength + 3].getSort() == Type.ARRAY) {
+                        newArgs[originArgLength] = new Object[0];
+                    } else {
+                        throw new RuntimeException("Last Argument of BootstrapMethod is NOT a Variable Argument");
+                    }
+
+                    invokeDynamicInsnNode.bsmArgs = newArgs;
+                } else if (originArgLength > targetArgLength || (bsmArguments[bsmArguments.length - 1].getSort() == Type.ARRAY && Type.getType(invokeDynamicInsnNode.bsmArgs[invokeDynamicInsnNode.bsmArgs.length - 1].getClass()).getSort() != Type.ARRAY)) {
+                    Object[] newArgs = new Object[targetArgLength];
+                    System.arraycopy(invokeDynamicInsnNode.bsmArgs, 0, newArgs, 0, targetArgLength - 1);
+
+                    Object[] varArgs = new Object[originArgLength - targetArgLength + 1];
+                    System.arraycopy(invokeDynamicInsnNode.bsmArgs, targetArgLength - 1, varArgs, 0, originArgLength - targetArgLength + 1);
+
+                    newArgs[targetArgLength - 1] = varArgs;
+                    invokeDynamicInsnNode.bsmArgs = newArgs;
+                }
+
+
                 if (bsmArguments.length < 3 || !bsmArguments[0].getDescriptor().equals("Ljava/lang/invoke/MethodHandles$Lookup;") ||
                         !bsmArguments[1].getDescriptor().equals("Ljava/lang/String;") ||
                         !bsmArguments[2].getDescriptor().equals("Ljava/lang/invoke/MethodType;")) {
@@ -43,32 +77,6 @@ public class IndyPreprocessor implements Preprocessor {
 
                 Type[] arguments = Type.getArgumentTypes(invokeDynamicInsnNode.desc);
 
-                // compatibility with java 9+
-                // "aaa" + 1 + "bbb"
-                // -->
-                // iconst_1
-                //
-                // bsmArgs:
-                // "aaa\u0001bbb"
-                //
-                // invokedynamic StringConcatFactory.makeConcatWithConstants(Lookup, String, MethodType, String, Object...)CallSite
-
-                int targetArgLength = bsmArguments.length - 3;
-                int originArgLength = invokeDynamicInsnNode.bsmArgs.length;
-                if (originArgLength != targetArgLength) {
-                    Object[] newArgs = new Object[targetArgLength];
-                    System.arraycopy(invokeDynamicInsnNode.bsmArgs, 0, newArgs, 0, originArgLength);
-
-                    for (int index = originArgLength; index < targetArgLength; index++) {
-                        if (bsmArguments[index + 3].getSort() == Type.ARRAY) {
-                            newArgs[index] = new Object[0];
-                        } else {
-                            throw new RuntimeException("Wrong argument type: " + bsmArguments[index + 3].getClass());
-                        }
-                    }
-
-                    invokeDynamicInsnNode.bsmArgs = newArgs;
-                }
 
                 bootstrapInstructions.add(new LdcInsnNode(arguments.length)); // 1
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object")); // 1

@@ -40,7 +40,13 @@ public class DefaultSpecialMethodProcessor implements SpecialMethodProcessor {
         context.method.instructions.clear();
         if (Util.getFlag(context.clazz.access, Opcodes.ACC_INTERFACE)) {
             InsnList list = new InsnList();
+
+            if (Util.getFlag(context.method.access, Opcodes.ACC_STATIC)) {
+                list.add(new LdcInsnNode(Type.getObjectType(context.clazz.name)));
+            }
+
             int localVarsPosition = 0;
+
             for (Type arg : context.argTypes) {
                 list.add(new VarInsnNode(arg.getOpcode(Opcodes.ILOAD), localVarsPosition));
                 localVarsPosition += arg.getSize();
