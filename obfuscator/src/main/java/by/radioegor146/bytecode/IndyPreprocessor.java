@@ -37,13 +37,14 @@ public class IndyPreprocessor implements Preprocessor {
                     Object[] newArgs = new Object[targetArgLength];
                     System.arraycopy(invokeDynamicInsnNode.bsmArgs, 0, newArgs, 0, originArgLength);
 
-                    if (targetArgLength - originArgLength != 1)
-                        throw new RuntimeException("Impossible BootstrapMethod Arguments Length");
+                    if (targetArgLength - originArgLength != 1) {
+                        throw new RuntimeException("Impossible BSM arguments length");
+                    }
 
                     if (bsmArguments[originArgLength + 3].getSort() == Type.ARRAY) {
                         newArgs[originArgLength] = new Object[0];
                     } else {
-                        throw new RuntimeException("Last Argument of BootstrapMethod is NOT a Variable Argument");
+                        throw new RuntimeException("Last argument of BSM is not a vararg array");
                     }
 
                     invokeDynamicInsnNode.bsmArgs = newArgs;
@@ -74,9 +75,7 @@ public class IndyPreprocessor implements Preprocessor {
                     return;
                 }
 
-
                 Type[] arguments = Type.getArgumentTypes(invokeDynamicInsnNode.desc);
-
 
                 bootstrapInstructions.add(new LdcInsnNode(arguments.length)); // 1
                 bootstrapInstructions.add(new TypeInsnNode(Opcodes.ANEWARRAY, "java/lang/Object")); // 1
