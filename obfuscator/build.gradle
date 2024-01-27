@@ -11,7 +11,7 @@ sourceCompatibility = targetCompatibility = '1.8'
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
 if (!hasProperty('mainClass')) {
-    ext.mainClass = 'by.radioegor146.Main'
+    ext.mainClass = 'cn.langya.MainUI'
 }
 
 if (!hasProperty('ide.eclipse')) {
