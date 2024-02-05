@@ -16,7 +16,7 @@ jobs:
             cxx: clang++
           - os: windows-latest
             compiler_install_command: choco install cmake
-            prebuild_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+            prebuild_script: '"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"'
             cc: cl
             cxx: cl
     runs-on: ${{ matrix.os.os }}
