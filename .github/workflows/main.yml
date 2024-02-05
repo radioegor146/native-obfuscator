@@ -28,7 +28,7 @@ jobs:
       with:
         java-version: ${{ matrix.java }}
     - name: Install C++ dependencies
-      run: ${{ matrix.os.compiler_install_command
+      run: ${{ matrix.os.compiler_install_command }}
     - name: Build with Gradle
       run: |
         ${{ matrix.os.prebuild_script }}
