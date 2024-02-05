@@ -150,6 +150,7 @@ public class ClassicTest implements Executable {
                         Arrays.asList("java",
                                 "-Djava.library.path=.",
                                 "-Dseed=1337",
+                                "-Dplatform=" + platform.name(),
                                 "-Dtest.src=" + temp.toString(),
                                 "-jar", resultJar.toString()));
                 System.out.println(String.format("Took %dms", testRunResult.execTime));
