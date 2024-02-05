@@ -2,7 +2,6 @@ name: Main pipeline
 on: [push]
 jobs:
   build:
-    continue-on-error: true
     strategy:
       matrix:
         java: [1.8, 9.0.x, 10, 11.0.x, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
