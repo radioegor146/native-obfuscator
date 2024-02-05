@@ -1,6 +1,7 @@
 package by.radioegor146;
 
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -56,6 +57,7 @@ public class HiddenMethodsPool {
             classNode.access = Opcodes.ACC_PUBLIC;
             classNode.version = 52;
             classNode.name = baseName + "/Hidden" + classes.size();
+            classNode.superName = Type.getInternalName(Object.class);
             classes.add(classNode);
         }
         classNode.methods.add(newMethod);
