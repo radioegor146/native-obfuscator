@@ -4,19 +4,35 @@ jobs:
   build:
     strategy:
       matrix:
-        java: [1.8, 9.0.x, 10, 11.0.x, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
-    runs-on: ubuntu-latest
-    name: Test full test suite on JDK ${{ matrix.java }}
+        java: [1.8, 11.0.x, 17, 21]
+        os:
+          - os: ubuntu-latest
+            compiler_install_command: sudo apt install g++ cmake
+            cc: gcc
+            cxx: g++
+          - os: macos-latest
+            compiler_install_command: brew install cmake
+            cc: clang
+            cxx: clang++
+          - os: windows-latest
+            compiler_install_command: choco install cmake
+            prebuild_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
+            cc: cl
+            cxx: cl
+    runs-on: ${{ matrix.os.os }}
+    name: Run full test suite on JDK ${{ matrix.java }} on ${{ matrix.os.os }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v4
       with:
         java-version: ${{ matrix.java }}
-    - name: Install G++
-      run: sudo apt install g++
+    - name: Install C++ dependencies
+      run: ${{ matrix.os.compiler_install_command
     - name: Build with Gradle
-      run: ./gradlew build
+      run: |
+        ${{ matrix.os.prebuild_script }}
+        ./gradlew build
       env:
-        CC: gcc
-        CXX: g++
+        CC: ${{ matrix.os.cc }}
+        CXX: ${{ matrix.os.cxx }}
