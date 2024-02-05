@@ -25,6 +25,7 @@ public class IndyPreprocessor implements Preprocessor {
 
 
         switch (platform) {
+            case ANDROID:
             case STD_JAVA: {
                 Type[] bsmArguments = Type.getArgumentTypes(invokeDynamicInsnNode.bsm.getDesc());
                 int targetArgLength = bsmArguments.length - 3;
@@ -256,6 +257,7 @@ public class IndyPreprocessor implements Preprocessor {
                 }
                 break;
             }
+            case ANDROID:
             case STD_JAVA: {
                 invokeInstructions.add(new InsnNode(Opcodes.SWAP)); // 2
                 invokeInstructions.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/invoke/MethodHandle",

@@ -1,7 +1,7 @@
 # native-obfuscator
 Java .class to .cpp converter for use with JNI
 
-Currently fully supports only Java 8. Java 9+ support is entirely experimental
+Currently fully supports only Java 8. Java 9+ and Android support is entirely experimental
 
 Warning: blacklist/whitelist usage is recommended because this tool slows down code significantly (like do not obfuscate full Minecraft .jar)
 
@@ -64,8 +64,8 @@ Transpiles .jar file into .cpp files and generates output .jar file
                           Directory for dependent libraries
   -p, --platform=<platform>
                           Target platform: hotspot - standard standalone
-                            HotSpot JRE, std_java - java standard (as for
-                            Android)
+                            HotSpot JRE, std_java - java standard, android -
+                            for Android builds (w/o DefineClass)
       --plain-lib-name=<libraryName>
                           Plain library name for LoaderPlain
   -V, --version           Print version information and exit.
@@ -83,9 +83,10 @@ Transpiles .jar file into .cpp files and generates output .jar file
 
 `-p <platform>` - JVM platform to run library on
 
-Two options are available:
-    - hotspot: will use HotSpot JVM internals and should work with most obfuscators (even with stack trace checking as well)
-    - std_java: will use only minor JVM internals that are also available on Android. Use only this option if you want to run your library on Android
+Three options are available:
+ - `hotspot`: will use HotSpot JVM internals and should work with most obfuscators (even with stack trace checking as well)
+ - `std_java`: will use only minor JVM internals that must be available on all JVMs
+ - `android`: use this method when building library for Android. Will use no JVM internals, as well as no DefineClass for hidden methods (obfuscators that rely on stack for string/name obfuscator will not work due to the fact that some methods will not be hidden)
 
 `-a` - enable annotation processing
 

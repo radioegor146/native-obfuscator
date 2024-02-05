@@ -43,7 +43,7 @@ public class Main {
         private String customLibraryDirectory;
 
         @CommandLine.Option(names = {"-p", "--platform"}, defaultValue = "hotspot",
-                description = "Target platform: hotspot - standard standalone HotSpot JRE, std_java - java standard (as for Android)")
+                description = "Target platform: hotspot - standard standalone HotSpot JRE, std_java - java standard, android - for Android builds (w/o DefineClass)")
         private Platform platform;
 
         @CommandLine.Option(names = {"-a", "--annotations"}, description = "Use annotations to ignore/include native obfuscation")

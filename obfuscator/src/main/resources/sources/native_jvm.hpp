@@ -70,8 +70,10 @@ namespace native_jvm::utils {
         return result_array;
     }
 
+#ifdef USE_HOTSPOT
     jobject link_call_site(JNIEnv *env, jobject caller_obj, jobject bootstrap_method_obj,
             jobject name_obj, jobject type_obj, jobject static_arguments, jobject appendix_result);
+#endif
 
     jclass find_class_wo_static(JNIEnv *env, jobject classloader, jstring class_name);
 

@@ -28,4 +28,6 @@ include_directories(${JNI_INCLUDE_DIRS})
 
 set(CLASS_FILES $classfiles)
 set(MAIN_FILES $mainfiles)
+add_definitions($definitions)
+
 add_library($projectname SHARED ${CLASS_FILES} ${MAIN_FILES})

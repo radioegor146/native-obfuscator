@@ -18,9 +18,11 @@ namespace native_jvm::utils {
     jmethodID init_cause_method;
     jclass methodhandles_lookup_class;
     jmethodID lookup_init_method;
+#ifdef USE_HOTSPOT
     jclass methodhandle_natives_class;
     jmethodID link_call_site_method;
     bool is_jvm11_link_call_site;
+#endif
 
     void init_utils(JNIEnv *env) {
         jclass clazz = env->FindClass("[Z");
@@ -102,6 +104,7 @@ namespace native_jvm::utils {
         if (env->ExceptionCheck())
             return;
 
+#ifdef USE_HOTSPOT
         jclass _methodhandle_natives_class = env->FindClass("java/lang/invoke/MethodHandleNatives");
         if (env->ExceptionCheck())
             return;
@@ -119,8 +122,10 @@ namespace native_jvm::utils {
             if (env->ExceptionCheck())
                 return;
         }
+#endif
     }
 
+#ifdef USE_HOTSPOT
     jobject link_call_site(JNIEnv *env, jobject caller_obj, jobject bootstrap_method_obj,
         jobject name_obj, jobject type_obj, jobject static_arguments, jobject appendix_result) {
         if (is_jvm11_link_call_site) {
@@ -130,6 +135,7 @@ namespace native_jvm::utils {
         return env->CallStaticObjectMethod(methodhandle_natives_class, link_call_site_method, caller_obj,
             bootstrap_method_obj, name_obj, type_obj, static_arguments, appendix_result);
     }
+#endif
 
     template <>
     jarray create_array_value<1>(JNIEnv *env, jint size) {
