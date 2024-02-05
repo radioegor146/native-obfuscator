@@ -7,7 +7,7 @@ public class Test {
             if ("ANDROID".equals(platform) && stack[i].getClassName().equals("native0.hidden.Hidden0")) {
                 continue;
             }
-            System.out.printf("%s.%s\n", i, stack[i].getClassName(), stack[i].getMethodName());
+            System.out.printf("%s.%s\n", stack[i].getClassName(), stack[i].getMethodName());
         }
     }
 
