@@ -8,14 +8,17 @@ jobs:
         os:
           - os: ubuntu-latest
             compiler_install_command: sudo apt install g++ cmake
+            krakatau_install_command: sudo cp ./target/release/krak2 /usr/local/bin/
             cc: gcc
             cxx: g++
           - os: macos-latest
             compiler_install_command: brew install cmake
+            krakatau_install_command: cp ./target/release/krak2 /usr/local/bin/
             cc: clang
             cxx: clang++
           - os: windows-latest
             compiler_install_command: choco install cmake
+            krakatau_install_command: copy ./target/release/krak2.exe C:/Windows
             prebuild_script: '"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"'
             cc: cl
             cxx: cl
@@ -28,6 +31,15 @@ jobs:
       with:
         java-version: ${{ matrix.java }}
         distribution: temurin
+    - name: Install Rust toolchain for Krakatau
+      uses: dtolnay/rust-toolchain@stable
+    - name: Build Krakatau
+      run: |
+        git clone https://github.com/Storyyeller/Krakatau.git
+        cd Krakatau
+        cargo build --release
+    - name: Install Krakatau
+      run: ${{ matrix.os.krakatau_install_command }}
     - name: Install C++ dependencies
       run: ${{ matrix.os.compiler_install_command }}
     - name: Build with Gradle

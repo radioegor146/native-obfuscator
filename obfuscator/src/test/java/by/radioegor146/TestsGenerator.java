@@ -43,11 +43,27 @@ public class TestsGenerator {
         URL tests = TestsGenerator.class.getClassLoader().getResource("tests");
         Objects.requireNonNull(tests, "No tests dir in resources");
 
+        boolean useKrakatau;
+
+        try {
+            Process process = new ProcessBuilder().command("krak2", "-V").start();
+            process.waitFor();
+            if (process.exitValue() != 0) {
+                throw new RuntimeException("krak2 -V failed");
+            }
+            useKrakatau = true;
+        } catch (Exception e) {
+            System.err.println("No Krakatau2 found (krak2), so tests with it will fail");
+            useKrakatau = false;
+        }
+
+        boolean finalUseKrakatau = useKrakatau;
+
         Path testDir = Paths.get(tests.toURI());
         return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS).filter(Files::isDirectory)
                 .filter(TestsGenerator::hasJavaFiles).filter(TestsGenerator::testAllowed)
                 .map(p -> DynamicTest.dynamicTest(testDir.relativize(p).toString(),
-                        new ClassicTest(p, testDir.relativize(p).toString())));
+                        new ClassicTest(p, testDir.relativize(p).toString(), finalUseKrakatau)));
     }
 
     private static boolean hasJavaFiles(Path path) {

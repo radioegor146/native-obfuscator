@@ -11,8 +11,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class ClassicTest implements Executable {
@@ -20,10 +18,12 @@ public class ClassicTest implements Executable {
     private final Path testData;
     private Path temp;
     private final String testName;
+    private final boolean useKrakatau;
 
-    ClassicTest(Path path, String testName) {
+    ClassicTest(Path path, String testName, boolean useKrakatau) {
         testData = path;
         this.testName = testName;
+        this.useKrakatau = useKrakatau;
     }
 
     private void clean() {
@@ -50,18 +50,24 @@ public class ClassicTest implements Executable {
             temp = Files.createTempDirectory(String.format("native-obfuscator-test-%s-", testData.toFile().getName()));
 
             Path tempSource = temp.resolve("source");
+            Path tempKrakatauSource = temp.resolve("source-krakatau");
             Path tempClasses = temp.resolve("classes");
             Files.createDirectories(tempSource);
+            Files.createDirectories(tempKrakatauSource);
             Files.createDirectories(tempClasses);
 
             Path idealJar = temp.resolve("test.jar");
 
             List<Path> javaFiles = new ArrayList<>();
+            List<Path> krakatauFiles = new ArrayList<>();
             List<Path> resourceFiles = new ArrayList<>();
             Files.find(testData, 10, (path, attr) -> true)
                     .filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".java"))
                     .forEach(javaFiles::add);
-            Files.find(testData, 10, (path, attr) -> attr.isDirectory() || !path.toString().endsWith(".java"))
+            Files.find(testData, 10, (path, attr) -> true)
+                    .filter(p -> Files.isRegularFile(p) && p.toString().endsWith(".j"))
+                    .forEach(krakatauFiles::add);
+            Files.find(testData, 10, (path, attr) -> attr.isDirectory() || (!path.toString().endsWith(".java") && !path.toString().endsWith(".j")))
                     .filter(Files::isRegularFile)
                     .forEach(resourceFiles::add);
 
@@ -74,11 +80,12 @@ public class ClassicTest implements Executable {
 
             if (!mainClassOptional.isPresent()) {
                 System.out.println("Can't find main class");
-                return;
+                throw new RuntimeException("Main class not found");
             }
 
-            javaFiles.forEach(unchecked(p -> Files.copy(p, tempSource.resolve(p.getFileName()))));
-            resourceFiles.forEach(unchecked(p -> {
+            javaFiles.forEach(uncheckedConsumer(p -> Files.copy(p, tempSource.resolve(p.getFileName()))));
+            krakatauFiles.forEach(uncheckedConsumer(p -> Files.copy(p, tempKrakatauSource.resolve(p.getFileName()))));
+            resourceFiles.forEach(uncheckedConsumer(p -> {
                 Path target = temp.resolve(testData.relativize(p));
                 Files.createDirectories(target.getParent());
                 Files.copy(p, target);
@@ -91,6 +98,17 @@ public class ClassicTest implements Executable {
 
             ProcessHelper.run(temp, 10_000, javacParameters)
                     .check("Compilation");
+
+            if (useKrakatau) {
+                System.out.println("Compiling Krakatau...");
+                krakatauFiles.stream().forEach(uncheckedConsumer(path -> {
+                    List<String> krakatauParameters = new ArrayList<>(Arrays.asList("krak2", "asm", "--out",
+                            tempClasses.resolve(testData.relativize(path)).toString().replaceAll("\\.j$", ".class"),
+                            path.toString()));
+                    ProcessHelper.run(temp, 1_000, krakatauParameters)
+                            .check("Krakatau compilation");
+                }));
+            }
 
             List<String> jarParameters = new ArrayList<>(Arrays.asList(
                     "jar", "cvfe", idealJar.toString(), mainClassOptional.get(),
@@ -141,7 +159,7 @@ public class ClassicTest implements Executable {
 
 
                 Files.find(tempCpp.resolve("build").resolve("lib"), 1, (path, args) -> Files.isRegularFile(path))
-                        .forEach(unchecked(p -> Files.copy(p, tempOutput.resolve(p.getFileName()))));
+                        .forEach(uncheckedConsumer(p -> Files.copy(p, tempOutput.resolve(p.getFileName()))));
 
                 System.out.println("Running test...");
 
@@ -157,21 +175,13 @@ public class ClassicTest implements Executable {
                 testRunResult.check("Test run");
 
                 if (!testRunResult.stdout.equals(idealRunResult.stdout)) {
-                    // Some tests are random based
-                    Pattern testResult = Pattern.compile("^Passed = \\d+,? failed = (\\d+)$", Pattern.MULTILINE);
-                    Matcher matcher = testResult.matcher(testRunResult.stdout);
-                    if (matcher.find()) {
-                        if (!matcher.group(1).equals("0")) {
-                            fail(testRunResult, idealRunResult);
-                        }
-                    } else {
-                        fail(testRunResult, idealRunResult);
-                    }
+                    fail(testRunResult, idealRunResult);
                 }
 
                 System.out.println("OK");
             }
-            // clean();
+
+            clean();
         } catch (IOException | RuntimeException e) {
             e.printStackTrace(System.err);
             throw e;
@@ -186,17 +196,17 @@ public class ClassicTest implements Executable {
         throw new RuntimeException("Ideal != Test");
     }
 
-    private <T> Predicate<T> uncheckedPredicate(UncheckedPredicate<T> consumer) {
+    private <T> Predicate<T> uncheckedPredicate(UncheckedPredicate<T> predicate) {
         return value -> {
             try {
-                return consumer.test(value);
+                return predicate.test(value);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         };
     }
 
-    private <T> Consumer<T> unchecked(UncheckedConsumer<T> consumer) {
+    private <T> Consumer<T> uncheckedConsumer(UncheckedConsumer<T> consumer) {
         return value -> {
             try {
                 consumer.accept(value);
