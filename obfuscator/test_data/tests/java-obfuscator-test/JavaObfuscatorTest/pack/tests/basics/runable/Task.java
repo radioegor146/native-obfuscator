@@ -31,7 +31,7 @@ public class Task {
             // 1->4(+3,e2)->14(+10,catch)->16(+2,e1)->30(+14,ix)
             System.out.println("PASS");
         } else {
-            System.out.println("FAIL");
+            System.out.println("FAIL: " + Exec.i);
         }
     }
 }
