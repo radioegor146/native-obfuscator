@@ -33,13 +33,14 @@ jobs:
         distribution: temurin
     - name: Install Rust toolchain for Krakatau
       uses: dtolnay/rust-toolchain@stable
-    - name: Build Krakatau
+    - name: Setup cache for Rust toolchain
+      uses: Swatinem/rust-cache@v2
+    - name: Install Krakatau
       run: |
         git clone https://github.com/Storyyeller/Krakatau.git
         cd Krakatau
         cargo build --release
-    - name: Install Krakatau
-      run: ${{ matrix.os.krakatau_install_command }}
+        ${{ matrix.os.krakatau_install_command }}
     - name: Install C++ dependencies
       run: ${{ matrix.os.compiler_install_command }}
     - name: Build with Gradle
