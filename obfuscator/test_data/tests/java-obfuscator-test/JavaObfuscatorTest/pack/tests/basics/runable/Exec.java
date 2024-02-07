@@ -10,7 +10,7 @@ public class Exec {
 
     void doAdd() {
         try {
-            Thread.sleep(200L);
+            Thread.sleep(2000L);
         } catch (Exception ignored) {
 
         }

@@ -10,7 +10,7 @@ public class Task {
         try {
             Pool.tpe.submit(e2::doAdd);
             try {
-                Thread.sleep(50L);
+                Thread.sleep(500L);
             } catch (InterruptedException e) {
             }
             Pool.tpe.submit(() -> {
@@ -19,14 +19,14 @@ public class Task {
                 Exec.i += ix;
             });
             try {
-                Thread.sleep(50L);
+                Thread.sleep(500L);
             } catch (InterruptedException e) {
             }
             Pool.tpe.submit(e3::doAdd);
         } catch (RejectedExecutionException e) {
             Exec.i += 10;
         }
-        Thread.sleep(300L);
+        Thread.sleep(3000L);
         if (Exec.i == 30) {
             // 1->4(+3,e2)->14(+10,catch)->16(+2,e1)->30(+14,ix)
             System.out.println("PASS");
