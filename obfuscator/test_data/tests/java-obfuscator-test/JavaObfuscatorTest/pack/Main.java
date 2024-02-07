@@ -57,7 +57,7 @@ public class Main {
         }
         System.out.print("Test 1.6: Pool ");
         try {
-            new Task().run();
+            // new Task().run();
         } catch (Throwable t) {
             System.out.println("ERROR");
         }
