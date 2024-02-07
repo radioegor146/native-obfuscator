@@ -157,6 +157,15 @@ to the directory of the .jar file that this tool will print in `stdout` (by defa
 
 ---
 
+### Tests
+You need to have [Krakatau](https://github.com/Storyyeller/Krakatau) installed to your PATH, because test suite is using `krak2` for some tests
+
+1. Run `gradlew build` to assemble and run full test suite
+
+This tool uses tests from [huzpsb/JavaObfuscatorTest](https://github.com/huzpsb/JavaObfuscatorTest)
+
+---
+
 In case of any problems, feel free to open an issue or contact me at [re146.dev](https://re146.dev)
 
 ### Stargazers over time

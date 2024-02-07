@@ -74,7 +74,7 @@ public class ClassicTest implements Executable {
             Optional<String> mainClassOptional = javaFiles.stream()
                     .filter(uncheckedPredicate(p -> Files.lines(p).collect(Collectors.joining("\n"))
                             .matches("(?s).*public(\\s+static)?\\s+void\\s+main.*")))
-                    .map(p -> p.getFileName().toString())
+                    .map(p -> testData.relativize(p).toString().replace('\\', '/'))
                     .map(f -> f.substring(0, f.lastIndexOf('.')))
                     .findAny();
 
@@ -83,10 +83,13 @@ public class ClassicTest implements Executable {
                 throw new RuntimeException("Main class not found");
             }
 
-            javaFiles.forEach(uncheckedConsumer(p -> Files.copy(p, tempSource.resolve(p.getFileName()))));
-            krakatauFiles.forEach(uncheckedConsumer(p -> Files.copy(p, tempKrakatauSource.resolve(p.getFileName()))));
-            resourceFiles.forEach(uncheckedConsumer(p -> {
-                Path target = temp.resolve(testData.relativize(p));
+            javaFiles.forEach(uncheckedConsumer(p -> {
+                Path target = tempSource.resolve(testData.relativize(p));
+                Files.createDirectories(target.getParent());
+                Files.copy(p, target);
+            }));
+            krakatauFiles.forEach(uncheckedConsumer(p -> {
+                Path target = tempKrakatauSource.resolve(testData.relativize(p));
                 Files.createDirectories(target.getParent());
                 Files.copy(p, target);
             }));
@@ -110,10 +113,16 @@ public class ClassicTest implements Executable {
                 }));
             }
 
+            System.out.println("Copying resources");
+            resourceFiles.forEach(uncheckedConsumer(p -> {
+                Path target = tempClasses.resolve(testData.relativize(p));
+                Files.createDirectories(target.getParent());
+                Files.copy(p, target);
+            }));
+
             List<String> jarParameters = new ArrayList<>(Arrays.asList(
                     "jar", "cvfe", idealJar.toString(), mainClassOptional.get(),
                     "-C", tempClasses + File.separator, "."));
-            resourceFiles.stream().map(Path::toString).forEach(jarParameters::add);
             ProcessHelper.run(temp, 10_000,
                             jarParameters)
                     .check("Jar command");

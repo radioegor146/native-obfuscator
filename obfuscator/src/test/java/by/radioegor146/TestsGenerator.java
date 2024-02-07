@@ -12,13 +12,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class TestsGenerator {
 
-    private final static List<String> ALLOWED_TESTS = null; /*
+    // private final static List<String> ALLOWED_TESTS = null; /*
     private final static List<String> ALLOWED_TESTS = Arrays.asList(
-            "StringTokenizer"
+            "JavaObfuscatorTest"
     ); // */
 
     private static boolean testAllowed(Path testPath) {
@@ -38,8 +39,21 @@ public class TestsGenerator {
         return false;
     }
 
+    public List<DynamicTest> generateTests(Path testDir, boolean useKrakatau) throws IOException {
+        List<DynamicTest> result = new ArrayList<>();
+        for (Path path : Files.list(testDir).filter(Files::isDirectory).collect(Collectors.toList())) {
+            if (hasJavaFiles(path) && testAllowed(path)) {
+                result.add(DynamicTest.dynamicTest(testDir.relativize(path).toString(),
+                        new ClassicTest(path, testDir.relativize(path).toString(), useKrakatau)));
+                continue;
+            }
+            result.addAll(generateTests(path, useKrakatau));
+        }
+        return result;
+    }
+
     @TestFactory
-    public Stream<DynamicTest> generateTests() throws URISyntaxException, IOException {
+    public Collection<DynamicTest> generateTests() throws URISyntaxException, IOException {
         URL tests = TestsGenerator.class.getClassLoader().getResource("tests");
         Objects.requireNonNull(tests, "No tests dir in resources");
 
@@ -57,13 +71,9 @@ public class TestsGenerator {
             useKrakatau = false;
         }
 
-        boolean finalUseKrakatau = useKrakatau;
-
         Path testDir = Paths.get(tests.toURI());
-        return Files.walk(testDir, FileVisitOption.FOLLOW_LINKS).filter(Files::isDirectory)
-                .filter(TestsGenerator::hasJavaFiles).filter(TestsGenerator::testAllowed)
-                .map(p -> DynamicTest.dynamicTest(testDir.relativize(p).toString(),
-                        new ClassicTest(p, testDir.relativize(p).toString(), finalUseKrakatau)));
+
+        return generateTests(testDir, useKrakatau);
     }
 
     private static boolean hasJavaFiles(Path path) {
