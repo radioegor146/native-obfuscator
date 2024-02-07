@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 public class TestsGenerator {
 
-    // private final static List<String> ALLOWED_TESTS = null; /*
+    private final static List<String> ALLOWED_TESTS = null; /*
     private final static List<String> ALLOWED_TESTS = Arrays.asList(
             "JavaObfuscatorTest"
     ); // */
