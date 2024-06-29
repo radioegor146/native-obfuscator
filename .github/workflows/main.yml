@@ -5,7 +5,7 @@ jobs:
     strategy:
       matrix:
         java: [8, 11, 17, 21]
-        os:
+        platform:
           - os: ubuntu-latest
             compiler_install_command: sudo apt install g++ cmake
             krakatau_install_command: sudo cp ./target/release/krak2 /usr/local/bin/
@@ -22,8 +22,20 @@ jobs:
             prebuild_script: '"C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat"'
             cc: cl
             cxx: cl
-    runs-on: ${{ matrix.os.os }}
-    name: Run full test suite on JDK ${{ matrix.java }} on ${{ matrix.os.os }}
+        exclude: 
+          - java: 8
+            platform:
+              - os: macos-latest
+        include:
+          - java: 8
+          - platform:
+              os: macos-13
+              compiler_install_command: brew install cmake
+              krakatau_install_command: cp ./target/release/krak2 /usr/local/bin/
+              cc: clang
+              cxx: clang++
+    runs-on: ${{ matrix.platform.os }}
+    name: Run full test suite on JDK ${{ matrix.java }} on ${{ matrix.platform.os }}
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK ${{ matrix.java }}
@@ -40,13 +52,13 @@ jobs:
         git clone https://github.com/Storyyeller/Krakatau.git
         cd Krakatau
         cargo build --release
-        ${{ matrix.os.krakatau_install_command }}
+        ${{ matrix.platform.krakatau_install_command }}
     - name: Install C++ dependencies
-      run: ${{ matrix.os.compiler_install_command }}
+      run: ${{ matrix.platform.compiler_install_command }}
     - name: Build with Gradle
       run: |
-        ${{ matrix.os.prebuild_script }}
+        ${{ matrix.platform.prebuild_script }}
         ./gradlew build
       env:
-        CC: ${{ matrix.os.cc }}
-        CXX: ${{ matrix.os.cxx }}
+        CC: ${{ matrix.platform.cc }}
+        CXX: ${{ matrix.platform.cxx }}
