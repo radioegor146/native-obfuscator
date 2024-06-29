@@ -1,4 +1,9 @@
 #include "jni.h"
+
+// Fix https://developercommunity.visualstudio.com/t/Access-violation-in-_Thrd_yield-after-up/10664660#T-N10668856
+// Thanks, microsoft!
+#define _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
+
 #include <cmath>
 #include <cstring>
 #include <string>
