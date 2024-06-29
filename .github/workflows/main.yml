@@ -26,9 +26,13 @@ jobs:
           - java: 8
             platform:
               - os: macos-latest
+                compiler_install_command: brew install cmake
+                krakatau_install_command: cp ./target/release/krak2 /usr/local/bin/
+                cc: clang
+                cxx: clang++
         include:
           - java: 8
-          - platform:
+            platform:
               os: macos-13
               compiler_install_command: brew install cmake
               krakatau_install_command: cp ./target/release/krak2 /usr/local/bin/
