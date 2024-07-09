@@ -19,7 +19,7 @@ public class TestsGenerator {
 
     private final static List<String> ALLOWED_TESTS = null; /*
     private final static List<String> ALLOWED_TESTS = Arrays.asList(
-            "JavaObfuscatorTest"
+            "EmptyTest1"
     ); // */
 
     private static boolean testAllowed(Path testPath) {

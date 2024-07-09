@@ -144,7 +144,7 @@ public class ClassicTest implements Executable {
                 Path resultJar = tempOutput.resolve("test.jar");
 
                 new NativeObfuscator().process(idealJar, tempOutput, Collections.emptyList(), Collections.emptyList(),
-                        null, "native_library", null, platform, false, true);
+                        null, "native_library", null, platform, true, true);
 
                 System.out.println("Compiling CPP code...");
                 if (System.getProperty("os.name").toLowerCase().contains("windows")) {

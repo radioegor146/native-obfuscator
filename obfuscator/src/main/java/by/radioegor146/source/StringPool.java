@@ -87,7 +87,7 @@ public class StringPool {
 
         String template = Util.readResource("sources/string_pool.cpp");
         return Util.dynamicFormat(template, Util.createMap(
-                "size", bytes.size() + "LL",
+                "size", Math.max(1, bytes.size()) + "LL",
                 "value", result
         ));
     }

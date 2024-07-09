@@ -4,5 +4,8 @@ plugins {
     id 'idea'
 }
 
-sourceCompatibility = targetCompatibility = '1.8'
+java {
+    sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
+}
+
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
