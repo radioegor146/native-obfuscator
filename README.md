@@ -1,7 +1,7 @@
 # native-obfuscator
 Java .class to .cpp converter for use with JNI
 
-Currently fully supports only Java 8. Java 9+ and Android support is entirely experimental
+Currently, fully supports only Java 8. Java 9+ and Android support is entirely experimental
 
 Warning: blacklist/whitelist usage is recommended because this tool slows down code significantly (like do not obfuscate full Minecraft .jar)
 
