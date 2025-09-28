@@ -120,12 +120,16 @@ public class IndyPreprocessor implements Preprocessor {
                         }
                     } else if (bsmArgument instanceof Integer) {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 5
+                        bootstrapInstructions.add(getBoxingInsnNode(Type.INT_TYPE));
                     } else if (bsmArgument instanceof Long) {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 6
+                        bootstrapInstructions.add(getBoxingInsnNode(Type.LONG_TYPE));
                     } else if (bsmArgument instanceof Float) {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 5
+                        bootstrapInstructions.add(getBoxingInsnNode(Type.FLOAT_TYPE));
                     } else if (bsmArgument instanceof Double) {
                         bootstrapInstructions.add(new LdcInsnNode(bsmArgument)); // 6
+                        bootstrapInstructions.add(getBoxingInsnNode(Type.DOUBLE_TYPE));
                     } else if (bsmArgument instanceof Handle) {
                         bootstrapInstructions.add(MethodHandleUtils.generateMethodHandleLdcInsn((Handle) bsmArgument));
                     } else if (bsmArgument instanceof Object[]) {
