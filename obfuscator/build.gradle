@@ -29,9 +29,9 @@ repositories {
 dependencies {
     implementation project(':annotations')
 
-    implementation 'org.ow2.asm:asm:9.6'
-    implementation 'org.ow2.asm:asm-tree:9.6'
-    implementation 'org.ow2.asm:asm-commons:9.6'
+    implementation 'org.ow2.asm:asm:9.8'
+    implementation 'org.ow2.asm:asm-tree:9.8'
+    implementation 'org.ow2.asm:asm-commons:9.8'
 
     implementation 'info.picocli:picocli:4.6.3'
 
