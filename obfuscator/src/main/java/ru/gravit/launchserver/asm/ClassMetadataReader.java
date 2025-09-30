@@ -18,7 +18,7 @@ public class ClassMetadataReader {
         String superClassName;
 
         public CheckSuperClassVisitor() {
-            super(Opcodes.ASM7);
+            super(Opcodes.ASM9);
         }
 
         @Override

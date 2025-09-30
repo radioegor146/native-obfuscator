@@ -149,13 +149,13 @@ public class NativeObfuscator {
                 nativeDir = customLibraryDirectory;
 
                 if (jar.stream().anyMatch(x -> x.getName().equals(nativeDir) ||
-                        x.getName().startsWith(nativeDir + "/"))) {
+                                               x.getName().startsWith(nativeDir + "/"))) {
                     logger.warn("Directory '{}' already exists in input jar file", nativeDir);
                 }
             } else {
                 int nativeDirId = IntStream.iterate(0, i -> i + 1)
                         .filter(i -> jar.stream().noneMatch(x -> x.getName().equals("native" + i) ||
-                                x.getName().startsWith("native" + i + "/")))
+                                                                 x.getName().startsWith("native" + i + "/")))
                         .findFirst().orElseThrow(RuntimeException::new);
                 nativeDir = "native" + nativeDirId;
             }
@@ -194,16 +194,16 @@ public class NativeObfuscator {
                     List<HiddenCppMethod> hiddenMethods = new ArrayList<>();
 
                     ClassReader classReader = new ClassReader(src);
-                    ClassNode rawClassNode = new ClassNode(Opcodes.ASM7);
+                    ClassNode rawClassNode = new ClassNode(Opcodes.ASM9);
                     classReader.accept(rawClassNode, 0);
 
                     if (!classMethodFilter.shouldProcess(rawClassNode) ||
-                            rawClassNode.methods.stream().noneMatch(method -> MethodProcessor.shouldProcess(method) &&
-                                    classMethodFilter.shouldProcess(rawClassNode, method))) {
+                        rawClassNode.methods.stream().noneMatch(method -> MethodProcessor.shouldProcess(method) &&
+                                                                          classMethodFilter.shouldProcess(rawClassNode, method))) {
                         logger.info("Skipping {}", rawClassNode.name);
                         if (useAnnotations) {
                             ClassMethodFilter.cleanAnnotations(rawClassNode);
-                            ClassWriter clearedClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7);
+                            ClassWriter clearedClassWriter = new SafeClassWriter(metadataReader, 0);
                             rawClassNode.accept(clearedClassWriter);
                             Util.writeEntry(out, entry.getName(), clearedClassWriter.toByteArray());
                             if (debug != null) {
@@ -225,19 +225,19 @@ public class NativeObfuscator {
                             .filter(methodNode -> classMethodFilter.shouldProcess(rawClassNode, methodNode))
                             .forEach(methodNode -> PreprocessorRunner.preprocess(rawClassNode, methodNode, platform));
 
-                    ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                    ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     rawClassNode.accept(preprocessorClassWriter);
                     if (debug != null) {
                         Util.writeEntry(debug, entry.getName(), preprocessorClassWriter.toByteArray());
                     }
                     classReader = new ClassReader(preprocessorClassWriter.toByteArray());
-                    ClassNode classNode = new ClassNode(Opcodes.ASM7);
+                    ClassNode classNode = new ClassNode(Opcodes.ASM9);
                     classReader.accept(classNode, 0);
 
                     logger.info("Processing {}", classNode.name);
 
                     if (classNode.methods.stream().noneMatch(x -> x.name.equals("<clinit>"))) {
-                        classNode.methods.add(new MethodNode(Opcodes.ASM7, Opcodes.ACC_STATIC,
+                        classNode.methods.add(new MethodNode(Opcodes.ASM9, Opcodes.ACC_STATIC,
                                 "<clinit>", "()V", null, new String[0]));
                     }
 
@@ -282,7 +282,7 @@ public class NativeObfuscator {
 
                         classNode.version = 52;
                         ClassWriter classWriter = new SafeClassWriter(metadataReader,
-                                Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                                ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                         classNode.accept(classWriter);
                         Util.writeEntry(out, entry.getName(), classWriter.toByteArray());
 
@@ -305,7 +305,7 @@ public class NativeObfuscator {
 
             if (platform == Platform.ANDROID) {
                 for (ClassNode hiddenClass : hiddenMethodsPool.getClasses()) {
-                    ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                    ClassWriter classWriter = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     hiddenClass.accept(classWriter);
                     Util.writeEntry(out, hiddenClass.name + ".class", classWriter.toByteArray());
                 }
@@ -319,7 +319,7 @@ public class NativeObfuscator {
                     mainSourceBuilder.addHeader(hiddenClassFileName + ".hpp");
                     mainSourceBuilder.registerDefine(stringPool.get(hiddenClass.name), hiddenClassFileName);
 
-                    ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                    ClassWriter classWriter = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
                     hiddenClass.accept(classWriter);
                     byte[] rawData = classWriter.toByteArray();
                     List<Byte> data = new ArrayList<>(rawData.length);
@@ -363,28 +363,28 @@ public class NativeObfuscator {
             if (plainLibName == null) {
                 ClassReader loaderClassReader = new ClassReader(Objects.requireNonNull(NativeObfuscator.class
                         .getResourceAsStream("compiletime/LoaderUnpack.class")));
-                loaderClass = new ClassNode(Opcodes.ASM7);
+                loaderClass = new ClassNode(Opcodes.ASM9);
                 loaderClassReader.accept(loaderClass, 0);
                 loaderClass.sourceFile = "synthetic";
                 System.out.println("/" + nativeDir + "/");
             } else {
                 ClassReader loaderClassReader = new ClassReader(Objects.requireNonNull(NativeObfuscator.class
                         .getResourceAsStream("compiletime/LoaderPlain.class")));
-                loaderClass = new ClassNode(Opcodes.ASM7);
+                loaderClass = new ClassNode(Opcodes.ASM9);
                 loaderClassReader.accept(loaderClass, 0);
                 loaderClass.sourceFile = "synthetic";
                 loaderClass.methods.forEach(method -> {
                     for (int i = 0; i < method.instructions.size(); i++) {
                         AbstractInsnNode insnNode = method.instructions.get(i);
                         if (insnNode instanceof LdcInsnNode && ((LdcInsnNode) insnNode).cst instanceof String &&
-                                ((LdcInsnNode) insnNode).cst.equals("%LIB_NAME%")) {
+                            ((LdcInsnNode) insnNode).cst.equals("%LIB_NAME%")) {
                             ((LdcInsnNode) insnNode).cst = plainLibName;
                         }
                     }
                 });
             }
 
-            ClassNode resultLoaderClass = new ClassNode(Opcodes.ASM7);
+            ClassNode resultLoaderClass = new ClassNode(Opcodes.ASM9);
             String originalLoaderClassName = loaderClass.name;
             loaderClass.accept(new ClassRemapper(resultLoaderClass, new Remapper() {
                 @Override
@@ -393,7 +393,7 @@ public class NativeObfuscator {
                 }
             }));
 
-            ClassWriter classWriter = new SafeClassWriter(metadataReader, Opcodes.ASM7 | ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            ClassWriter classWriter = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             resultLoaderClass.accept(classWriter);
             Util.writeEntry(out, loaderClassName + ".class", classWriter.toByteArray());
 

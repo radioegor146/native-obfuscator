@@ -53,7 +53,7 @@ public class HiddenMethodsPool {
         creator.accept(newMethod);
         ClassNode classNode = classes.isEmpty() ? null : classes.get(classes.size() - 1).methods.size() > 10000 ? null : classes.get(classes.size() - 1);
         if (classNode == null) {
-            classNode = new ClassNode(Opcodes.ASM7);
+            classNode = new ClassNode(Opcodes.ASM9);
             classNode.access = Opcodes.ACC_PUBLIC;
             classNode.version = 52;
             classNode.name = baseName + "/Hidden" + classes.size();
