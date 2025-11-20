@@ -39,7 +39,10 @@ Also, this tool does not particularly obfuscate your code; it just transpiles it
     - For Linux/MacOS:
         
         Google "your distro install g++"
-      
+4. Zig 0.15.x for cross compilation (optional)
+
+    Download from [official website](https://ziglang.org/download/)
+
 ---
 
 ### General usage:
@@ -147,8 +150,13 @@ to the directory of the .jar file that this tool will print in `stdout` (by defa
 2. Run `cmake .` in the result `cpp` directory
 3. Add changes to .cpp code if necessary
 4. Run `cmake --build . --config Release` in result `cpp` directory to build .so/.dll file
-5. Copy result .dll/.so from `build/libs/` to the path specified in the previous paragraph.
+5. Copy result .dll/.so from `build/libs/` to the path specified in the previous paragraph
 6. Run created .jar `java -jar <output jar>` and enjoy!
+
+#### Cross compilation using zig:
+1. Transpile your code using `java -jar native-obfuscator.jar <input jar> <output directory>`
+2. Use `zig build -Dtarget <target>` to build for a specific platform, or `zig build all` to build for all supported platforms. Example: `zig build -Dtarget=aarch64-linux`. Repeat the command to build for any other platforms you need.
+3. Run created .jar `java -jar <output jar>` and enjoy!
 
 ---
 

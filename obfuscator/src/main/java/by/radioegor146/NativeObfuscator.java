@@ -425,7 +425,7 @@ public class NativeObfuscator {
         Files.write(cppDir.resolve("native_jvm_output.cpp"), mainSourceBuilder.build(nativeDir, currentClassId)
                 .getBytes(StandardCharsets.UTF_8));
 
-        for (BuildFilesBuilder.OutputFile file : buildBuilder.build()) {
+        for (BuildFilesBuilder.OutputFile file : buildBuilder.build(nativeDir, inputJarPath.getFileName().toString())) {
             Files.write(outputDir.resolve(file.path), file.content.getBytes(StandardCharsets.UTF_8));
         }
     }

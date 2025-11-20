@@ -32,7 +32,7 @@ public class BuildFilesBuilder {
         flags.add(flag);
     }
 
-    public List<OutputFile> build() {
+    public List<OutputFile> build(String nativeDir, String jarFileName) {
         List<OutputFile> result = new ArrayList<>();
         
         String cmakeTemplate = Util.readResource("sources/CMakeLists.txt");
@@ -46,6 +46,8 @@ public class BuildFilesBuilder {
         
         String zigTemplate = Util.readResource("sources/build.zig");
         String zigContent = Util.dynamicFormat(zigTemplate, Util.createMap(
+                "nativedir", nativeDir,
+                "jarfilename", jarFileName,
                 "classfiles", classFiles.stream().map(file -> String.format("\"%s\",", file)).collect(Collectors.joining(" ")),
                 "mainfiles", mainFiles.stream().map(file -> String.format("\"%s\",", file)).collect(Collectors.joining(" ")),
                 "projectname", projectName,

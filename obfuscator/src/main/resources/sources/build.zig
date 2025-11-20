@@ -51,14 +51,63 @@ fn findJavaInclude(b: *std.Build, target: std.Target) !std.Build.LazyPath {
 }
 
 pub fn build(b: *std.Build) !void {
-    const target = b.standardTargetOptions(.{ .whitelist = platforms });
-    b.getInstallStep().dependOn(try buildFor(b, target));
-
-    const step = b.step("all", "Build for all platforms");
-    for (platforms) |query| step.dependOn(try buildFor(b, b.resolveTargetQuery(query)));
+    try buildInstall(b);
+    try buildAll(b);
 }
 
-fn buildFor(b: *std.Build, target: std.Build.ResolvedTarget) !*std.Build.Step {
+fn buildInstall(b: *std.Build) !void {
+    const target = b.standardTargetOptions(.{ .whitelist = platforms });
+    const output = getOutputName(b, target.result);
+    const lib = try buildFor(b, target);
+
+    const artifact = b.addInstallArtifact(lib, .{
+        .dest_sub_path = output,
+        .dest_dir = .{ .override = .prefix },
+    });
+
+    const files = b.addWriteFiles();
+    _ = files.addCopyFile(lib.getEmittedBin(), b.fmt("$nativedir/{s}", .{output}));
+    files.step.dependOn(&artifact.step);
+
+    const jar_cmd = b.addSystemCommand(&.{ "jar", "uf" });
+    jar_cmd.setCwd(files.getDirectory());
+
+    jar_cmd.addFileArg(b.path("$jarfilename"));
+    jar_cmd.addDirectoryArg(files.getDirectory());
+
+    jar_cmd.step.dependOn(&files.step);
+    b.getInstallStep().dependOn(&jar_cmd.step);
+}
+
+fn buildAll(b: *std.Build) !void {
+    const step = b.step("all", "Build for all platforms");
+    const files = b.addWriteFiles();
+
+    for (platforms) |query| {
+        const target = b.resolveTargetQuery(query);
+        const output = getOutputName(b, target.result);
+        const lib = try buildFor(b, target);
+
+        const artifact = b.addInstallArtifact(lib, .{
+            .dest_sub_path = output,
+            .dest_dir = .{ .override = .prefix },
+        });
+
+        _ = files.addCopyFile(lib.getEmittedBin(), b.fmt("$nativedir/{s}", .{output}));
+        files.step.dependOn(&artifact.step);
+    }
+
+    const jar_cmd = b.addSystemCommand(&.{ "jar", "uf" });
+    jar_cmd.setCwd(files.getDirectory());
+
+    jar_cmd.addFileArg(b.path("$jarfilename"));
+    jar_cmd.addDirectoryArg(files.getDirectory());
+
+    jar_cmd.step.dependOn(&files.step);
+    step.dependOn(&jar_cmd.step);
+}
+
+fn buildFor(b: *std.Build, target: std.Build.ResolvedTarget) !*std.Build.Step.Compile {
     const include: std.Build.LazyPath = try findJavaInclude(b, target.result);
 
     const mod = b.createModule(.{
@@ -67,9 +116,6 @@ fn buildFor(b: *std.Build, target: std.Build.ResolvedTarget) !*std.Build.Step {
         .link_libcpp = true,
     });
 
-    const output = getOutputName(b, target.result);
-    const header = getIncludeDir(target.result);
-
     const lib = b.addLibrary(.{
         .linkage = .dynamic,
         .name = "$projectname",
@@ -77,7 +123,7 @@ fn buildFor(b: *std.Build, target: std.Build.ResolvedTarget) !*std.Build.Step {
     });
 
     mod.addIncludePath(include);
-    mod.addIncludePath(try include.join(b.allocator, header));
+    mod.addIncludePath(try include.join(b.allocator, getIncludeDir(target.result)));
     try mod.c_macros.append(b.allocator, "$definitions");
 
     mod.addCSourceFiles(.{
@@ -92,10 +138,5 @@ fn buildFor(b: *std.Build, target: std.Build.ResolvedTarget) !*std.Build.Step {
         .flags = &.{ "-std=c++17", "-fno-sanitize=undefined" },
     });
 
-    const artifact = b.addInstallArtifact(lib, .{
-        .dest_sub_path = output,
-        .dest_dir = .{ .override = .prefix },
-    });
-
-    return &artifact.step;
+    return lib;
 }
