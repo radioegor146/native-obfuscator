@@ -1,7 +1,7 @@
 package by.radioegor146;
 
 import by.radioegor146.bytecode.PreprocessorRunner;
-import by.radioegor146.source.CMakeFilesBuilder;
+import by.radioegor146.source.BuildFilesBuilder;
 import by.radioegor146.source.ClassSourceBuilder;
 import by.radioegor146.source.MainSourceBuilder;
 import by.radioegor146.source.StringPool;
@@ -114,25 +114,38 @@ public class NativeObfuscator {
 
         Path cppDir = outputDir.resolve("cpp");
         Path cppOutput = cppDir.resolve("output");
+        Path jniDir = outputDir.resolve("jni-headers");
         Files.createDirectories(cppOutput);
 
         Util.copyResource("sources/native_jvm.cpp", cppDir);
         Util.copyResource("sources/native_jvm.hpp", cppDir);
         Util.copyResource("sources/native_jvm_output.hpp", cppDir);
         Util.copyResource("sources/string_pool.hpp", cppDir);
+        
+        Path linuxDir = jniDir.resolve("linux");
+        Files.createDirectories(linuxDir);
+        Path win32Dir = jniDir.resolve("win32");
+        Files.createDirectories(win32Dir);
+        Path darwinDir = jniDir.resolve("darwin");
+        Files.createDirectories(darwinDir);
+        
+        Util.copyResource("sources/jni-headers/jni.h", jniDir);
+        Util.copyResource("sources/jni-headers/linux/jni_md.h", linuxDir);
+        Util.copyResource("sources/jni-headers/win32/jni_md.h", win32Dir);
+        Util.copyResource("sources/jni-headers/darwin/jni_md.h", darwinDir);
 
         String projectName = "native_library";
 
-        CMakeFilesBuilder cMakeBuilder = new CMakeFilesBuilder(projectName);
-        cMakeBuilder.addMainFile("native_jvm.hpp");
-        cMakeBuilder.addMainFile("native_jvm.cpp");
-        cMakeBuilder.addMainFile("native_jvm_output.hpp");
-        cMakeBuilder.addMainFile("native_jvm_output.cpp");
-        cMakeBuilder.addMainFile("string_pool.hpp");
-        cMakeBuilder.addMainFile("string_pool.cpp");
+        BuildFilesBuilder buildBuilder = new BuildFilesBuilder(projectName);
+        buildBuilder.addMainFile("native_jvm.hpp");
+        buildBuilder.addMainFile("native_jvm.cpp");
+        buildBuilder.addMainFile("native_jvm_output.hpp");
+        buildBuilder.addMainFile("native_jvm_output.cpp");
+        buildBuilder.addMainFile("string_pool.hpp");
+        buildBuilder.addMainFile("string_pool.cpp");
 
         if (platform == Platform.HOTSPOT) {
-            cMakeBuilder.addFlag("USE_HOTSPOT");
+            buildBuilder.addFlag("USE_HOTSPOT");
         }
 
         MainSourceBuilder mainSourceBuilder = new MainSourceBuilder();
@@ -290,8 +303,8 @@ public class NativeObfuscator {
                         cppBuilder.addInstructions(instructions.toString());
                         cppBuilder.registerMethods(cachedStrings, cachedClasses, nativeMethods.toString(), hiddenMethods);
 
-                        cMakeBuilder.addClassFile("output/" + cppBuilder.getHppFilename());
-                        cMakeBuilder.addClassFile("output/" + cppBuilder.getCppFilename());
+                        buildBuilder.addClassFile("output/" + cppBuilder.getHppFilename());
+                        buildBuilder.addClassFile("output/" + cppBuilder.getCppFilename());
 
                         mainSourceBuilder.addHeader(cppBuilder.getHppFilename());
                         mainSourceBuilder.registerClassMethods(currentClassId, cppBuilder.getFilename());
@@ -313,8 +326,8 @@ public class NativeObfuscator {
                 for (ClassNode hiddenClass : hiddenMethodsPool.getClasses()) {
                     String hiddenClassFileName = "data_" + Util.escapeCppNameString(hiddenClass.name.replace('/', '_'));
 
-                    cMakeBuilder.addClassFile("output/" + hiddenClassFileName + ".hpp");
-                    cMakeBuilder.addClassFile("output/" + hiddenClassFileName + ".cpp");
+                    buildBuilder.addClassFile("output/" + hiddenClassFileName + ".hpp");
+                    buildBuilder.addClassFile("output/" + hiddenClassFileName + ".cpp");
 
                     mainSourceBuilder.addHeader(hiddenClassFileName + ".hpp");
                     mainSourceBuilder.registerDefine(stringPool.get(hiddenClass.name), hiddenClassFileName);
@@ -412,7 +425,9 @@ public class NativeObfuscator {
         Files.write(cppDir.resolve("native_jvm_output.cpp"), mainSourceBuilder.build(nativeDir, currentClassId)
                 .getBytes(StandardCharsets.UTF_8));
 
-        Files.write(cppDir.resolve("CMakeLists.txt"), cMakeBuilder.build().getBytes(StandardCharsets.UTF_8));
+        for (BuildFilesBuilder.OutputFile file : buildBuilder.build()) {
+            Files.write(outputDir.resolve(file.path), file.content.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     public Snippets getSnippets() {
