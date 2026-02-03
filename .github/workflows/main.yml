@@ -4,7 +4,7 @@ jobs:
   build:
     strategy:
       matrix:
-        java: [8, 11, 17, 21]
+        java: [8, 11, 17, 21, 25]
         platform:
           - os: ubuntu-latest
             compiler_install_command: sudo apt install g++ cmake
