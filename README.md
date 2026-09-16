@@ -96,6 +96,10 @@ To use annotations for black/whitelisting methods/classes as `native` you can ad
 
 Also, you need to add [JitPack](https://jitpack.io) to your repositories.
 
+This library is licensed under [LGPL-3.0 only](annotations/LICENSE), not GPL-3.0.
+It contains no executable code and is not required at runtime, so it can be used
+as a compile-time-only dependency.
+
 You can add `@Native` annotation to include classes/methods to the native obfuscation process and add `@NotNative` annotation to ignore methods in classes marked as `@Native`
 
 Whitelist/Blacklist has higher priority than annotations.
@@ -178,6 +182,12 @@ and all code fragments from `cppsnippets.properties` -- may be linked,
 embedded, compiled, and distributed in your own programs under terms of your
 choice, regardless of GPL-3.0 section 5(c). See the Output Exception in
 [LICENSE](LICENSE) for the full terms.
+
+**Annotations:** the `annotations` module (`@Native` / `@NotNative`, published
+as `com.github.radioegor146.native-obfuscator:annotations`) is licensed under
+[LGPL-3.0 only](annotations/LICENSE), not GPL-3.0. It contains no executable
+code, and both annotations use `RetentionPolicy.CLASS`, so they are neither
+present nor required at runtime -- it is a compile-time-only dependency.
 
 ---
 

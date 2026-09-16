@@ -689,3 +689,17 @@ remains licensed under GPL-3.0 in full, without modification.
 A modified version of the tool may carry this exception only if the
 modification does not alter the emitted runtime code, or if the modified
 runtime carries the same exception.
+
+
+Annotations subproject
+
+The `annotations` subproject -- the by.radioegor146.nativeobfuscator.Native
+and NotNative annotations -- is not licensed under GPL-3.0. It is licensed
+under LGPL-3.0 only; see annotations/LICENSE for the full text.
+
+That subproject contains no executable code, and both annotations use
+RetentionPolicy.CLASS, so they are neither present nor required at runtime.
+
+LGPL-3.0 section 2 permits conveying the covered work under GPL-3.0, so the
+annotations may be bundled inside the GPL-3.0 obfuscator jar, which is what
+happens when the distribution is built.

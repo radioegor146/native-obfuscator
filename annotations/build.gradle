@@ -9,3 +9,32 @@ java {
 }
 
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+
+// This module is LGPL-3.0-only, not GPL-3.0 like the rest of the project.
+// The text has to travel with the artifact. It must not be called
+// META-INF/LICENSE: the obfuscator fat jar already contains an Apache-2.0
+// META-INF/LICENSE coming from log4j-slf4j-impl, and shadowJar would silently
+// keep only one of the two.
+jar {
+    from('LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-annotations' }
+    }
+}
+
+publishing {
+    publications {
+        named('maven', MavenPublication) {
+            pom {
+                name = 'native-obfuscator annotations'
+                description = 'Compile-time @Native / @NotNative annotations for native-obfuscator'
+                licenses {
+                    license {
+                        name = 'GNU Lesser General Public License v3.0 only'
+                        url = 'https://www.gnu.org/licenses/lgpl-3.0.txt'
+                    }
+                }
+            }
+        }
+    }
+}
