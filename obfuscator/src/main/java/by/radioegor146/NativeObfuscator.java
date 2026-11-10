@@ -93,6 +93,13 @@ public class NativeObfuscator {
         methodProcessor = new MethodProcessor(this);
     }
 
+    private static boolean shouldProcessMethod(ClassMethodFilter classMethodFilter, ClassNode classNode, MethodNode methodNode) {
+        if (!MethodProcessor.shouldProcess(methodNode)) {
+            return false;
+        }
+        return methodNode.name.equals("<clinit>") || classMethodFilter.shouldProcess(classNode, methodNode);
+    }
+
     public void process(Path inputJarPath, Path outputDir, List<Path> inputLibs,
                         List<String> blackList, List<String> whiteList, String plainLibName,
                         String customLibraryDirectory,
@@ -221,8 +228,7 @@ public class NativeObfuscator {
                     logger.info("Preprocessing {}", rawClassNode.name);
 
                     rawClassNode.methods.stream()
-                            .filter(MethodProcessor::shouldProcess)
-                            .filter(methodNode -> classMethodFilter.shouldProcess(rawClassNode, methodNode))
+                            .filter(methodNode -> shouldProcessMethod(classMethodFilter, rawClassNode, methodNode))
                             .forEach(methodNode -> PreprocessorRunner.preprocess(rawClassNode, methodNode, platform));
 
                     ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -253,11 +259,7 @@ public class NativeObfuscator {
                         for (int i = 0; i < classNode.methods.size(); i++) {
                             MethodNode method = classNode.methods.get(i);
 
-                            if (!MethodProcessor.shouldProcess(method)) {
-                                continue;
-                            }
-
-                            if (!classMethodFilter.shouldProcess(classNode, method)) {
+                            if (!shouldProcessMethod(classMethodFilter, classNode, method)) {
                                 continue;
                             }
 
