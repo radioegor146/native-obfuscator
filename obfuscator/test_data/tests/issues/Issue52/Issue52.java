@@ -1,3 +1,6 @@
+import by.radioegor146.nativeobfuscator.Native;
+
+@Native
 public class Issue52 {
 
     public static void test1() {
@@ -30,5 +33,17 @@ public class Issue52 {
     public static void main(String[] args) {
         test1();
         test2();
+        try {
+            int[][] array = new int[0][-1];
+            System.out.println(array.length);
+        } catch (NegativeArraySizeException exception) {
+            System.out.println("negative primitive array size");
+        }
+        try {
+            Object[][][] array = new Object[1][0][-1];
+            System.out.println(array.length);
+        } catch (NegativeArraySizeException exception) {
+            System.out.println("negative object array size");
+        }
     }
 }

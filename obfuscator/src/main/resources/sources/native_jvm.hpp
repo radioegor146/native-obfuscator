@@ -16,7 +16,9 @@
 #define _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <cstdio>
 #include <unordered_set>
@@ -29,9 +31,37 @@
 
 namespace native_jvm::utils {
 
+    // JVM conversion truncates toward zero and saturates beyond the signed range.
+    template <typename Integer, typename Float>
+    Integer float_to_integer(Float value) {
+        if (std::isnan(value)) {
+            return 0;
+        }
+        constexpr Integer minimum = (std::numeric_limits<Integer>::min)();
+        constexpr Float lower_bound = static_cast<Float>(minimum);
+        if (value <= lower_bound) {
+            return minimum;
+        }
+        if (value >= -lower_bound) {
+            return (std::numeric_limits<Integer>::max)();
+        }
+        return static_cast<Integer>(value);
+    }
+
     void init_utils(JNIEnv *env);
 
     void throw_re(JNIEnv *env, const char *exception_class, const char *error, int line);
+
+    inline bool check_array_sizes(JNIEnv *env, int line, std::initializer_list<jint> sizes) {
+        for (jint size : sizes) {
+            if (size < 0) {
+                throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     jobjectArray create_multidim_array(JNIEnv *env, jobject classloader, jint count, jint required_count,
         const char *class_name, int line, std::initializer_list<jint> sizes, int dim_index = 0);
@@ -46,11 +76,11 @@ namespace native_jvm::utils {
             env->FatalError("required_count == 0");
             return nullptr;
         }
-        jint current_size = sizes.begin()[dim_index];
-        if (current_size < 0) {
-            throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
+        // The JVM checks the inner dimensions even when an outer dimension is zero.
+        if (dim_index == 0 && !check_array_sizes(env, line, sizes)) {
             return nullptr;
         }
+        jint current_size = sizes.begin()[dim_index];
         if (count == 1) {
             return create_array_value<sort>(env, current_size);
         }

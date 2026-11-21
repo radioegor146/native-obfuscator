@@ -194,22 +194,25 @@ namespace native_jvm::utils {
             env->FatalError("required_count == 0");
             return nullptr;
         }
-        jint current_size = sizes.begin()[dim_index];
-        if (current_size < 0) {
-            throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
+        if (dim_index == 0 && !check_array_sizes(env, line, sizes)) {
             return nullptr;
         }
+        jint current_size = sizes.begin()[dim_index];
         jobjectArray result_array = nullptr;
         if (count == 1) {
             std::string renamed_class_name(class_name);
             std::replace(renamed_class_name.begin(), renamed_class_name.end(), '/', '.');
             jstring renamed_class_name_string = env->NewStringUTF(renamed_class_name.c_str());
+            if (renamed_class_name_string == nullptr) {
+                return nullptr;
+            }
             jclass clazz = find_class_wo_static(env, classloader, renamed_class_name_string);
             env->DeleteLocalRef(renamed_class_name_string);
             if (env->ExceptionCheck()) {
                 return nullptr;
             }
             result_array = env->NewObjectArray(current_size, clazz, nullptr);
+            env->DeleteLocalRef(clazz);
             if (env->ExceptionCheck()) {
                 return nullptr;
             }
