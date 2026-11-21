@@ -6,7 +6,9 @@ import by.radioegor146.source.ClassSourceBuilder;
 import by.radioegor146.source.MainSourceBuilder;
 import by.radioegor146.source.StringPool;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.ClassRemapper;
@@ -29,8 +31,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
@@ -223,20 +227,26 @@ public class NativeObfuscator {
 
                     logger.info("Preprocessing {}", rawClassNode.name);
 
-                    rawClassNode.methods.stream()
-                            .filter(MethodProcessor::shouldProcess)
-                            .filter(methodNode -> classMethodFilter.shouldProcess(rawClassNode, methodNode))
-                            .forEach(methodNode -> PreprocessorRunner.preprocess(rawClassNode, methodNode, platform));
+                    boolean hasRequiredFrames = (rawClassNode.version & 0xffff) >= Opcodes.V1_7;
+                    Set<String> changedMethods = new HashSet<>();
+                    for (MethodNode method : rawClassNode.methods) {
+                        if (MethodProcessor.shouldProcess(method) && classMethodFilter.shouldProcess(rawClassNode, method)
+                                && PreprocessorRunner.preprocess(rawClassNode, method, platform)) {
+                            changedMethods.add(method.name + method.desc);
+                        }
+                    }
 
-                    ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-                    rawClassNode.accept(preprocessorClassWriter);
-                    byte[] preprocessedClass = preprocessorClassWriter.toByteArray();
+                    byte[] preprocessedClass = src;
+                    ClassNode classNode = rawClassNode;
+                    if (!hasRequiredFrames || !changedMethods.isEmpty()) {
+                        preprocessedClass = writePreprocessedClass(rawClassNode, metadataReader, hasRequiredFrames,
+                                changedMethods);
+                        classNode = new ClassNode(Opcodes.ASM9);
+                        new ClassReader(preprocessedClass).accept(classNode, 0);
+                    }
                     if (debug != null) {
                         Util.writeEntry(debug, entry.getName(), preprocessedClass);
                     }
-                    classReader = new ClassReader(preprocessedClass);
-                    ClassNode classNode = new ClassNode(Opcodes.ASM9);
-                    classReader.accept(classNode, 0);
 
                     logger.info("Processing {}", classNode.name);
 
@@ -283,8 +293,8 @@ public class NativeObfuscator {
                         if ((classNode.version & 0xffff) < Opcodes.V1_8) {
                             classNode.version = Opcodes.V1_8;
                         }
-                        ClassWriter classWriter = new SafeClassWriter(metadataReader,
-                                ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                        // The final edits replace whole method bodies or add a straight-line registration prefix.
+                        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
                         classNode.accept(classWriter);
                         Util.writeEntry(out, entry.getName(), classWriter.toByteArray());
 
@@ -415,6 +425,24 @@ public class NativeObfuscator {
                 .getBytes(StandardCharsets.UTF_8));
 
         Files.write(cppDir.resolve("CMakeLists.txt"), cMakeBuilder.build().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] writePreprocessedClass(ClassNode classNode, ClassMetadataReader metadataReader,
+                                                 boolean hasRequiredFrames, Set<String> changedMethods) {
+        ClassWriter writer = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_FRAMES);
+        if (hasRequiredFrames) {
+            classNode.accept(new ClassVisitor(Opcodes.ASM9, writer) {
+                @Override
+                public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+                                                 String[] exceptions) {
+                    writer.setFlags(changedMethods.contains(name + descriptor) ? ClassWriter.COMPUTE_FRAMES : 0);
+                    return super.visitMethod(access, name, descriptor, signature, exceptions);
+                }
+            });
+        } else {
+            classNode.accept(writer);
+        }
+        return writer.toByteArray();
     }
 
     private void addNativeRegistration(ClassNode classNode) {

@@ -372,12 +372,16 @@ public class IndyPreprocessor implements Preprocessor {
     }
 
     @Override
-    public void process(ClassNode classNode, MethodNode methodNode, Platform platform) {
-        for (int i = 0; i < methodNode.instructions.size(); i++) {
-            AbstractInsnNode insnNode = methodNode.instructions.get(i);
+    public boolean process(ClassNode classNode, MethodNode methodNode, Platform platform) {
+        boolean changed = false;
+        for (AbstractInsnNode insnNode = methodNode.instructions.getFirst(); insnNode != null; ) {
+            AbstractInsnNode next = insnNode.getNext();
             if (insnNode instanceof InvokeDynamicInsnNode) {
                 processIndy(classNode, methodNode, (InvokeDynamicInsnNode) insnNode, platform);
+                changed = true;
             }
+            insnNode = next;
         }
+        return changed;
     }
 }
