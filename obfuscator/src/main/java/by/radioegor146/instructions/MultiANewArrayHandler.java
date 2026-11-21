@@ -19,6 +19,8 @@ public class MultiANewArrayHandler extends GenericInstructionHandler<MultiANewAr
         if (elementType.getSort() != Type.OBJECT) {
             props.put("sort", String.valueOf(elementType.getSort()));
             instructionName = "MULTIANEWARRAY_VALUE";
+        } else {
+            context.needsClassLoader = true;
         }
         props.put("dims", String.format("{ %s }", IntStream.range(context.stackPointer - dimensions, context.stackPointer)
                 .mapToObj(i -> String.format("cstack%d.i", i)).collect(Collectors.joining(", "))));

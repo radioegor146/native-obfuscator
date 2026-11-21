@@ -14,7 +14,7 @@ public class VarHandler extends GenericInstructionHandler<VarInsnNode> {
 
     @Override
     public String insnToString(MethodContext context, VarInsnNode node) {
-        return String.format("%s %d", Util.getOpcodeString(node.getOpcode()), node.var);
+        return Util.getOpcodeString(node.getOpcode()) + " " + node.var;
     }
 
     @Override

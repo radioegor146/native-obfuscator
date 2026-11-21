@@ -32,17 +32,20 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
     @Override
     protected void process(MethodContext context, MethodInsnNode node) {
         if (PreprocessorUtils.isLookupLocal(node)) {
+            context.needsLookup = true;
             context.output.append("if (lookup == nullptr) { lookup = utils::get_lookup(env, clazz); ")
                     .append(trimmedTryCatchBlock).append(" } cstack").append(context.stackPointer).append(".l = lookup;");
             instructionName = null;
             return;
         }
         if (PreprocessorUtils.isClassLoaderLocal(node)) {
+            context.needsClassLoader = true;
             context.output.append("cstack").append(context.stackPointer).append(".l = classloader;");
             instructionName = null;
             return;
         }
         if (PreprocessorUtils.isClassLocal(node)) {
+            context.needsDeclaringClass = true;
             context.output.append("cstack").append(context.stackPointer).append(".l = clazz;");
             instructionName = null;
             return;
