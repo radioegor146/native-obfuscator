@@ -32,7 +32,7 @@ public class DefaultSpecialMethodProcessor implements SpecialMethodProcessor {
             return methodName;
         }
         context.method.access |= Opcodes.ACC_NATIVE;
-        return "native_" + context.method.name + context.methodIndex;
+        return "native_" + context.methodIndex + "_" + context.method.name;
     }
 
     @Override

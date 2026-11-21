@@ -29,28 +29,17 @@ public class ClassMethodFilter {
     }
 
     public boolean shouldProcess(ClassNode classNode) {
-        if (hasInList(blackList, classNode.name)) {
-            return false;
-        }
-        if (whiteList != null && !hasInList(whiteList, classNode.name)) {
-            return false;
-        }
-        if (!useAnnotations) {
-            return true;
-        }
-        if (classNode.invisibleAnnotations != null && 
-            classNode.invisibleAnnotations.stream().anyMatch(annotationNode ->
-                annotationNode.desc.equals(NATIVE_ANNOTATION_DESC))) {
-            return true;
-        }
-        return classNode.methods.stream().anyMatch(methodNode -> this.shouldProcess(classNode, methodNode));
+        return !hasInList(blackList, classNode.name)
+                && classNode.methods.stream().anyMatch(method -> MethodProcessor.shouldProcess(method)
+                && shouldProcess(classNode, method));
     }
 
     public boolean shouldProcess(ClassNode classNode, MethodNode methodNode) {
-        if (hasInList(blackList, MethodProcessor.nameFromNode(methodNode, classNode))) {
+        String methodName = MethodProcessor.nameFromNode(methodNode, classNode);
+        if (hasInList(blackList, classNode.name) || hasInList(blackList, methodName)) {
             return false;
         }
-        if (whiteList != null && !hasInList(whiteList, MethodProcessor.nameFromNode(methodNode, classNode))) {
+        if (whiteList != null && !hasInList(whiteList, classNode.name) && !hasInList(whiteList, methodName)) {
             return false;
         }
         if (!useAnnotations) {
