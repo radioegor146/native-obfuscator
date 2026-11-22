@@ -78,7 +78,7 @@ public class LdcHandler extends GenericInstructionHandler<LdcInsnNode> {
 
     @Override
     public String insnToString(MethodContext context, LdcInsnNode node) {
-        return String.format("LDC %s", node.cst);
+        return "LDC " + node.cst;
     }
 
     @Override

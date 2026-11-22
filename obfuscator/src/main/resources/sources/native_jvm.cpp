@@ -18,6 +18,10 @@ namespace native_jvm::utils {
     jmethodID string_intern_method;
     jclass class_class;
     jmethodID get_classloader_method;
+    jmethodID class_for_name_method;
+    jmethodID get_component_type_method;
+    jclass reflect_array_class;
+    jmethodID new_array_method;
     jclass object_class;
     jmethodID get_class_method;
     jclass classloader_class;
@@ -57,6 +61,24 @@ namespace native_jvm::utils {
         env->DeleteLocalRef(_class_class);
 
         get_classloader_method = env->GetMethodID(class_class, "getClassLoader", "()Ljava/lang/ClassLoader;");
+        if (env->ExceptionCheck())
+            return;
+        class_for_name_method = env->GetStaticMethodID(class_class, "forName",
+            "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;");
+        if (env->ExceptionCheck())
+            return;
+        get_component_type_method = env->GetMethodID(class_class, "getComponentType", "()Ljava/lang/Class;");
+        if (env->ExceptionCheck())
+            return;
+        jclass array_class = env->FindClass("java/lang/reflect/Array");
+        if (env->ExceptionCheck())
+            return;
+        reflect_array_class = (jclass) env->NewGlobalRef(array_class);
+        env->DeleteLocalRef(array_class);
+        if (reflect_array_class == nullptr)
+            return;
+        new_array_method = env->GetStaticMethodID(reflect_array_class, "newInstance",
+            "(Ljava/lang/Class;[I)Ljava/lang/Object;");
         if (env->ExceptionCheck())
             return;
 
@@ -148,111 +170,56 @@ namespace native_jvm::utils {
     }
 #endif
 
-    template <>
-    jarray create_array_value<1>(JNIEnv *env, jint size) {
-        return env->NewBooleanArray(size);
-    }
+    static jclass complete_class_lookup(JNIEnv *env, jclass clazz);
 
-    template <>
-    jarray create_array_value<2>(JNIEnv *env, jint size) {
-        return env->NewCharArray(size);
-    }
+    jarray create_multidim_array(JNIEnv *env, jobject classloader, const char *descriptor, int line,
+        std::initializer_list<jint> sizes) {
+        // Even a zero-length outer dimension does not suppress a negative inner dimension.
+        for (jint size : sizes) {
+            if (size < 0) {
+                throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
+                return nullptr;
+            }
+        }
 
-    template <>
-    jarray create_array_value<3>(JNIEnv *env, jint size) {
-        return env->NewByteArray(size);
-    }
-
-    template <>
-    jarray create_array_value<4>(JNIEnv *env, jint size) {
-        return env->NewShortArray(size);
-    }
-
-    template <>
-    jarray create_array_value<5>(JNIEnv *env, jint size) {
-        return env->NewIntArray(size);
-    }
-
-    template <>
-    jarray create_array_value<6>(JNIEnv *env, jint size) {
-        return env->NewFloatArray(size);
-    }
-
-    template <>
-    jarray create_array_value<7>(JNIEnv *env, jint size) {
-        return env->NewLongArray(size);
-    }
-
-    template <>
-    jarray create_array_value<8>(JNIEnv *env, jint size) {
-        return env->NewDoubleArray(size);
-    }
-
-    jobjectArray create_multidim_array(JNIEnv *env, jobject classloader, jint count, jint required_count,
-        const char *class_name, int line, std::initializer_list<jint> sizes, int dim_index) {
-        if (required_count == 0) {
-            env->FatalError("required_count == 0");
+        // Leave one more array dimension than the component type passed to Array.newInstance.
+        std::string binary_name(descriptor + sizes.size() - 1);
+        std::replace(binary_name.begin(), binary_name.end(), '/', '.');
+        jstring name = env->NewStringUTF(binary_name.c_str());
+        if (name == nullptr) {
             return nullptr;
         }
-        jint current_size = sizes.begin()[dim_index];
-        if (current_size < 0) {
-            throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
-            return nullptr;
-        }
-        jobjectArray result_array = nullptr;
-        if (count == 1) {
-            std::string renamed_class_name(class_name);
-            std::replace(renamed_class_name.begin(), renamed_class_name.end(), '/', '.');
-            jstring renamed_class_name_string = env->NewStringUTF(renamed_class_name.c_str());
-            jclass clazz = find_class_wo_static(env, classloader, renamed_class_name_string);
-            env->DeleteLocalRef(renamed_class_name_string);
-            if (env->ExceptionCheck()) {
-                return nullptr;
-            }
-            result_array = env->NewObjectArray(current_size, clazz, nullptr);
-            if (env->ExceptionCheck()) {
-                return nullptr;
-            }
-            return result_array;
-        }
-        std::string clazz_name = std::string(count - 1, '[') + "L" + std::string(class_name) + ";";
-        if (jclass clazz = env->FindClass(clazz_name.c_str())) {
-            result_array = env->NewObjectArray(current_size, clazz, nullptr);
-            if (env->ExceptionCheck()) {
-                return nullptr;
-            }
-            env->DeleteLocalRef(clazz);
-        } else {
+        jclass array_class = complete_class_lookup(env, (jclass) env->CallStaticObjectMethod(
+            class_class, class_for_name_method, name, JNI_FALSE, classloader));
+        env->DeleteLocalRef(name);
+        if (array_class == nullptr) {
             return nullptr;
         }
 
-        if (required_count == 1) {
-            return result_array;
+        jclass component = (jclass) env->CallObjectMethod(array_class, get_component_type_method);
+        bool lookup_failed = env->ExceptionCheck();
+        env->DeleteLocalRef(array_class);
+        if (lookup_failed) {
+            return nullptr;
+        }
+        jsize dimensions = static_cast<jsize>(sizes.size());
+        jintArray lengths = env->NewIntArray(dimensions);
+        if (lengths == nullptr) {
+            env->DeleteLocalRef(component);
+            return nullptr;
         }
 
-        for (jint i = 0; i < current_size; i++) {
-            jobjectArray inner_array = create_multidim_array(env, classloader, count - 1, required_count - 1,
-                class_name, line, sizes, dim_index + 1);
-            if (env->ExceptionCheck()) {
-                env->DeleteLocalRef(result_array);
-                return nullptr;
-            }
-            env->SetObjectArrayElement(result_array, i, inner_array);
-            env->DeleteLocalRef(inner_array);
-            if (env->ExceptionCheck()) {
-                env->DeleteLocalRef(result_array);
-                return nullptr;
-            }
+        env->SetIntArrayRegion(lengths, 0, dimensions, sizes.begin());
+        jarray result = nullptr;
+        if (!env->ExceptionCheck()) {
+            result = (jarray) env->CallStaticObjectMethod(reflect_array_class, new_array_method, component, lengths);
         }
-        return result_array;
+        env->DeleteLocalRef(lengths);
+        env->DeleteLocalRef(component);
+        return result;
     }
 
-    jclass find_class_wo_static(JNIEnv *env, jobject classloader, jstring class_name_string) {
-        jclass clazz = (jclass) env->CallObjectMethod(
-            classloader,
-            load_class_method,
-            class_name_string
-        );
+    static jclass complete_class_lookup(JNIEnv *env, jclass clazz) {
         if (env->ExceptionCheck()) {
             jthrowable exception = env->ExceptionOccurred();
             env->ExceptionClear();
@@ -280,11 +247,17 @@ namespace native_jvm::utils {
                 return nullptr;
             }
             env->Throw((jthrowable) new_exception);
+            env->DeleteLocalRef(new_exception);
             env->DeleteLocalRef(exception);
             env->DeleteLocalRef(details);
             return nullptr;
         }
         return clazz;
+    }
+
+    jclass find_class_wo_static(JNIEnv *env, jobject classloader, jstring class_name_string) {
+        return complete_class_lookup(env, (jclass) env->CallObjectMethod(
+            classloader, load_class_method, class_name_string));
     }
 
     void throw_re(JNIEnv *env, const char *exception_class, const char *error, int line) {
@@ -334,13 +307,6 @@ namespace native_jvm::utils {
             return nullptr;
         }
         return lookup;
-    }
-
-    void clear_refs(JNIEnv *env, std::unordered_set<jobject> &refs) {
-        for (jobject ref : refs)
-            if (env->GetObjectRefType(ref) == JNILocalRefType)
-                env->DeleteLocalRef(ref);
-        refs.clear();
     }
 
     jstring get_interned(JNIEnv *env, jstring value) {

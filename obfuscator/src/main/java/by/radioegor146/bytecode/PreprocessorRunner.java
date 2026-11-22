@@ -16,9 +16,11 @@ public class PreprocessorRunner {
         PREPROCESSORS.add(new LdcPreprocessor());
     }
 
-    public static void preprocess(ClassNode classNode, MethodNode methodNode, Platform platform) {
+    public static boolean preprocess(ClassNode classNode, MethodNode methodNode, Platform platform) {
+        boolean changed = false;
         for (Preprocessor preprocessor : PREPROCESSORS) {
-            preprocessor.process(classNode, methodNode, platform);
+            changed |= preprocessor.process(classNode, methodNode, platform);
         }
+        return changed;
     }
 }

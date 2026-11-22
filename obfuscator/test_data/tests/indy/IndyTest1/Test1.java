@@ -1,5 +1,8 @@
+import by.radioegor146.nativeobfuscator.Native;
+
 import java.util.*;
 
+@Native
 public class Test1 {
     public static void main(String[] args) {
         List<String> l = new ArrayList<>();

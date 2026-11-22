@@ -1,4 +1,13 @@
+import by.radioegor146.nativeobfuscator.Native;
+
+@Native
 public class Issue52 {
+
+    private static class Component {
+        static {
+            System.out.println("Component initialized");
+        }
+    }
 
     public static void test1() {
         int[][] array = new int[12][2];
@@ -30,5 +39,22 @@ public class Issue52 {
     public static void main(String[] args) {
         test1();
         test2();
+        Component[][][] full = new Component[2][3][4];
+        Component[][][] partial = new Component[2][3][];
+        System.out.println(full[1][2].length);
+        System.out.println(partial[1][2] == null);
+        System.out.println(full.getClass() == partial.getClass());
+        try {
+            int[][] array = new int[0][-1];
+            System.out.println(array.length);
+        } catch (NegativeArraySizeException exception) {
+            System.out.println("negative primitive array size");
+        }
+        try {
+            Object[][][] array = new Object[1][0][-1];
+            System.out.println(array.length);
+        } catch (NegativeArraySizeException exception) {
+            System.out.println("negative object array size");
+        }
     }
 }

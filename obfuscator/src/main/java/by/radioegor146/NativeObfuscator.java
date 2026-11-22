@@ -6,13 +6,19 @@ import by.radioegor146.source.ClassSourceBuilder;
 import by.radioegor146.source.MainSourceBuilder;
 import by.radioegor146.source.StringPool;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +31,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
@@ -197,17 +205,16 @@ public class NativeObfuscator {
                     ClassNode rawClassNode = new ClassNode(Opcodes.ASM9);
                     classReader.accept(rawClassNode, 0);
 
-                    if (!classMethodFilter.shouldProcess(rawClassNode) ||
-                        rawClassNode.methods.stream().noneMatch(method -> MethodProcessor.shouldProcess(method) &&
-                                                                          classMethodFilter.shouldProcess(rawClassNode, method))) {
+                    if (!classMethodFilter.shouldProcess(rawClassNode)) {
                         logger.info("Skipping {}", rawClassNode.name);
                         if (useAnnotations) {
                             ClassMethodFilter.cleanAnnotations(rawClassNode);
                             ClassWriter clearedClassWriter = new SafeClassWriter(metadataReader, 0);
                             rawClassNode.accept(clearedClassWriter);
-                            Util.writeEntry(out, entry.getName(), clearedClassWriter.toByteArray());
+                            byte[] clearedClass = clearedClassWriter.toByteArray();
+                            Util.writeEntry(out, entry.getName(), clearedClass);
                             if (debug != null) {
-                                Util.writeEntry(debug, entry.getName(), clearedClassWriter.toByteArray());
+                                Util.writeEntry(debug, entry.getName(), clearedClass);
                             }
                             return;
                         }
@@ -220,26 +227,28 @@ public class NativeObfuscator {
 
                     logger.info("Preprocessing {}", rawClassNode.name);
 
-                    rawClassNode.methods.stream()
-                            .filter(MethodProcessor::shouldProcess)
-                            .filter(methodNode -> classMethodFilter.shouldProcess(rawClassNode, methodNode))
-                            .forEach(methodNode -> PreprocessorRunner.preprocess(rawClassNode, methodNode, platform));
-
-                    ClassWriter preprocessorClassWriter = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-                    rawClassNode.accept(preprocessorClassWriter);
-                    if (debug != null) {
-                        Util.writeEntry(debug, entry.getName(), preprocessorClassWriter.toByteArray());
+                    boolean hasRequiredFrames = (rawClassNode.version & 0xffff) >= Opcodes.V1_7;
+                    Set<String> changedMethods = new HashSet<>();
+                    for (MethodNode method : rawClassNode.methods) {
+                        if (MethodProcessor.shouldProcess(method) && classMethodFilter.shouldProcess(rawClassNode, method)
+                                && PreprocessorRunner.preprocess(rawClassNode, method, platform)) {
+                            changedMethods.add(method.name + method.desc);
+                        }
                     }
-                    classReader = new ClassReader(preprocessorClassWriter.toByteArray());
-                    ClassNode classNode = new ClassNode(Opcodes.ASM9);
-                    classReader.accept(classNode, 0);
+
+                    byte[] preprocessedClass = src;
+                    ClassNode classNode = rawClassNode;
+                    if (!hasRequiredFrames || !changedMethods.isEmpty()) {
+                        preprocessedClass = writePreprocessedClass(rawClassNode, metadataReader, hasRequiredFrames,
+                                changedMethods);
+                        classNode = new ClassNode(Opcodes.ASM9);
+                        new ClassReader(preprocessedClass).accept(classNode, 0);
+                    }
+                    if (debug != null) {
+                        Util.writeEntry(debug, entry.getName(), preprocessedClass);
+                    }
 
                     logger.info("Processing {}", classNode.name);
-
-                    if (classNode.methods.stream().noneMatch(x -> x.name.equals("<clinit>"))) {
-                        classNode.methods.add(new MethodNode(Opcodes.ASM9, Opcodes.ACC_STATIC,
-                                "<clinit>", "()V", null, new String[0]));
-                    }
 
                     cachedStrings.clear();
                     cachedClasses.clear();
@@ -280,9 +289,12 @@ public class NativeObfuscator {
                             ClassMethodFilter.cleanAnnotations(classNode);
                         }
 
-                        classNode.version = 52;
-                        ClassWriter classWriter = new SafeClassWriter(metadataReader,
-                                ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+                        addNativeRegistration(classNode);
+                        if ((classNode.version & 0xffff) < Opcodes.V1_8) {
+                            classNode.version = Opcodes.V1_8;
+                        }
+                        // The final edits replace whole method bodies or add a straight-line registration prefix.
+                        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
                         classNode.accept(classWriter);
                         Util.writeEntry(out, entry.getName(), classWriter.toByteArray());
 
@@ -413,6 +425,42 @@ public class NativeObfuscator {
                 .getBytes(StandardCharsets.UTF_8));
 
         Files.write(cppDir.resolve("CMakeLists.txt"), cMakeBuilder.build().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] writePreprocessedClass(ClassNode classNode, ClassMetadataReader metadataReader,
+                                                 boolean hasRequiredFrames, Set<String> changedMethods) {
+        ClassWriter writer = new SafeClassWriter(metadataReader, ClassWriter.COMPUTE_FRAMES);
+        if (hasRequiredFrames) {
+            classNode.accept(new ClassVisitor(Opcodes.ASM9, writer) {
+                @Override
+                public MethodVisitor visitMethod(int access, String name, String descriptor, String signature,
+                                                 String[] exceptions) {
+                    writer.setFlags(changedMethods.contains(name + descriptor) ? ClassWriter.COMPUTE_FRAMES : 0);
+                    return super.visitMethod(access, name, descriptor, signature, exceptions);
+                }
+            });
+        } else {
+            classNode.accept(writer);
+        }
+        return writer.toByteArray();
+    }
+
+    private void addNativeRegistration(ClassNode classNode) {
+        MethodNode initializer = classNode.methods.stream()
+                .filter(method -> method.name.equals("<clinit>"))
+                .findFirst().orElseGet(() -> {
+                    MethodNode method = new MethodNode(Opcodes.ASM9, Opcodes.ACC_STATIC,
+                            "<clinit>", "()V", null, null);
+                    method.instructions.add(new InsnNode(Opcodes.RETURN));
+                    classNode.methods.add(method);
+                    return method;
+                });
+        InsnList registration = new InsnList();
+        registration.add(new LdcInsnNode(currentClassId));
+        registration.add(new LdcInsnNode(Type.getObjectType(classNode.name)));
+        registration.add(new MethodInsnNode(Opcodes.INVOKESTATIC, nativeDir + "/Loader",
+                "registerNativesForClass", "(ILjava/lang/Class;)V", false));
+        initializer.instructions.insert(registration);
     }
 
     public Snippets getSnippets() {

@@ -7,7 +7,8 @@ import org.objectweb.asm.tree.*;
 
 public class LdcPreprocessor implements Preprocessor {
     @Override
-    public void process(ClassNode classNode, MethodNode methodNode, Platform platform) {
+    public boolean process(ClassNode classNode, MethodNode methodNode, Platform platform) {
+        boolean changed = false;
         AbstractInsnNode insnNode = methodNode.instructions.getFirst();
         while (insnNode != null) {
             if (insnNode instanceof LdcInsnNode) {
@@ -18,6 +19,7 @@ public class LdcPreprocessor implements Preprocessor {
                             MethodHandleUtils.generateMethodHandleLdcInsn((Handle) ldcInsnNode.cst));
                     AbstractInsnNode nextInsnNode = insnNode.getNext();
                     methodNode.instructions.remove(insnNode);
+                    changed = true;
                     insnNode = nextInsnNode;
                     continue;
                 }
@@ -30,6 +32,7 @@ public class LdcPreprocessor implements Preprocessor {
                                 MethodHandleUtils.generateMethodTypeLdcInsn(type));
                         AbstractInsnNode nextInsnNode = insnNode.getNext();
                         methodNode.instructions.remove(insnNode);
+                        changed = true;
                         insnNode = nextInsnNode;
                     }
                 }
@@ -37,5 +40,6 @@ public class LdcPreprocessor implements Preprocessor {
 
             insnNode = insnNode.getNext();
         }
+        return changed;
     }
 }

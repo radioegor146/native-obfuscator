@@ -2,12 +2,14 @@ package by.radioegor146;
 
 import by.radioegor146.helpers.ProcessHelper;
 import by.radioegor146.helpers.ProcessHelper.ProcessResult;
+import by.radioegor146.nativeobfuscator.Native;
 import org.junit.jupiter.api.function.Executable;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -96,7 +98,9 @@ public class ClassicTest implements Executable {
 
             System.out.println("Compiling...");
 
-            List<String> javacParameters = new ArrayList<>(Arrays.asList("javac", "-d", tempClasses.toString()));
+            Path annotations = Paths.get(Native.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            List<String> javacParameters = new ArrayList<>(Arrays.asList(
+                    "javac", "-cp", annotations.toString(), "-d", tempClasses.toString()));
             javaFiles.stream().map(Path::toString).forEach(javacParameters::add);
 
             ProcessHelper.run(temp, 10_000, javacParameters)
@@ -147,19 +151,15 @@ public class ClassicTest implements Executable {
                         null, "native_library", null, platform, true, true);
 
                 System.out.println("Compiling CPP code...");
-                if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-                    String arch = "x64";
-                    if (System.getProperty("sun.arch.data.model").equals("32")) {
-                        arch = "x86";
-                    }
-                    ProcessHelper.run(tempCpp, 120_000,
-                                    Arrays.asList("cmake", "-DCMAKE_GENERATOR_PLATFORM=" + arch, "."))
-                            .check("CMake prepare");
-                } else {
-                    ProcessHelper.run(tempCpp, 120_000,
-                                    Arrays.asList("cmake", "."))
-                            .check("CMake prepare");
+                List<String> configure = new ArrayList<>(Arrays.asList("cmake", "-DCMAKE_BUILD_TYPE=Release"));
+                String generator = System.getenv("CMAKE_GENERATOR");
+                if (System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")
+                        && (generator == null || generator.startsWith("Visual Studio"))) {
+                    configure.add("-A");
+                    configure.add(System.getProperty("sun.arch.data.model").equals("32") ? "Win32" : "x64");
                 }
+                configure.add(".");
+                ProcessHelper.run(tempCpp, 120_000, configure).check("CMake prepare");
 
                 ProcessResult compileRunresult = ProcessHelper.run(tempCpp, 160_000,
                         Arrays.asList("cmake", "--build", ".", "--config", "Release"));

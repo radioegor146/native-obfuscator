@@ -9,6 +9,7 @@ import org.objectweb.asm.tree.FrameNode;
 import org.objectweb.asm.tree.LabelNode;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 
 public class FrameHandler implements InstructionTypeHandler<FrameNode> {
@@ -65,30 +66,20 @@ public class FrameHandler implements InstructionTypeHandler<FrameNode> {
                 break;
         }
 
-        if (context.stack.stream().anyMatch(x -> x == 0)) {
-            int currentSp = 0;
-            context.output.append("    ");
-            for (int type : context.stack) {
-                if (type == 0) {
-                    context.output.append("refs.erase(cstack").append(currentSp).append(".l); ");
-                }
-                currentSp += Math.max(1, type);
-            }
-            context.output.append("\n");
-        }
+        context.output.append("    refs.keep_live(env, {");
+        appendLiveReferences(context.output, context.stack, "cstack");
+        appendLiveReferences(context.output, context.locals, "clocal");
+        context.output.append("});\n");
+    }
 
-        if (context.locals.stream().anyMatch(x -> x == 0)) {
-            int currentLp = 0;
-            context.output.append("    ");
-            for (int type : context.locals) {
-                if (type == 0) {
-                    context.output.append("refs.erase(clocal").append(currentLp).append(".l); ");
-                }
-                currentLp += Math.max(1, type);
+    private static void appendLiveReferences(StringBuilder output, List<Integer> types, String prefix) {
+        int slot = 0;
+        for (int type : types) {
+            if (type == 0) {
+                output.append(prefix).append(slot).append(".l, ");
             }
-            context.output.append("\n");
+            slot += Math.max(1, type);
         }
-        context.output.append("    utils::clear_refs(env, refs);\n");
     }
 
     @Override

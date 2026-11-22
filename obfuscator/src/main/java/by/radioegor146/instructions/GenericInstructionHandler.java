@@ -1,64 +1,56 @@
 package by.radioegor146.instructions;
 
-import by.radioegor146.CatchesBlock;
 import by.radioegor146.MethodContext;
 import by.radioegor146.MethodProcessor;
-import by.radioegor146.Util;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.TryCatchBlockNode;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 public abstract class GenericInstructionHandler<T extends AbstractInsnNode> implements InstructionTypeHandler<T> {
 
-    protected Map<String, String> props;
+    protected final Map<String, String> props = new HashMap<>();
     protected String instructionName;
     protected String trimmedTryCatchBlock;
 
     @Override
     public void accept(MethodContext context, T node) {
-        props = new HashMap<>();
-        List<TryCatchBlockNode> tryCatchBlockNodeList = new ArrayList<>();
-        for (TryCatchBlockNode tryCatchBlock : context.method.tryCatchBlocks) {
-            if (!context.tryCatches.contains(tryCatchBlock)) {
-                continue;
-            }
-            if (tryCatchBlockNodeList.stream().noneMatch(tryCatchBlockNode ->
-                    Objects.equals(tryCatchBlockNode.type, tryCatchBlock.type))) {
-                tryCatchBlockNodeList.add(tryCatchBlock);
-            }
-        }
+        props.clear();
         instructionName = MethodProcessor.INSTRUCTIONS.getOrDefault(node.getOpcode(), "NOTFOUND");
-        props.put("line", String.valueOf(context.line));
-        StringBuilder tryCatch = new StringBuilder("\n");
-        tryCatch.append("    ");
-        if (tryCatchBlockNodeList.size() > 0) {
-            String tryCatchLabelName = context.catches.computeIfAbsent(new CatchesBlock(tryCatchBlockNodeList.stream().map(item ->
-                    new CatchesBlock.CatchBlock(item.type, item.handler)).collect(Collectors.toList())),
-                    key -> String.format("L_CATCH_%d", context.catches.size()));
-            tryCatch.append(context.getSnippets().getSnippet("TRYCATCH_START"));
-            tryCatch.append(" goto ").append(tryCatchLabelName).append("; }");
-        } else {
-            tryCatch.append(context.getSnippets().getSnippet("TRYCATCH_EMPTY", Util.createMap(
-                    "rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()]
-            )));
-        }
-        props.put("trycatchhandler", tryCatch.toString());
-        props.put("rettype", MethodProcessor.CPP_TYPES[context.ret.getSort()]);
-        trimmedTryCatchBlock = tryCatch.toString().trim().replace('\n', ' ');
-
-        for (int i = -5; i <= 5; i++) {
-            props.put("stackindex" + (i >= 0 ? i : "m" + (-i)), String.valueOf(context.stackPointer + i));
-        }
+        trimmedTryCatchBlock = context.getInlineExceptionCheck();
 
         context.output.append("    ");
         process(context, node);
 
         if (instructionName != null) {
-            context.output.append(context.obfuscator.getSnippets().getSnippet(instructionName, props));
+            context.getSnippets().append(context.output, instructionName, key -> resolveToken(context, key));
         }
-        context.output.append("\n");
+        context.output.append('\n');
+    }
+
+    private String resolveToken(MethodContext context, String key) {
+        switch (key) {
+            case "line":
+                return Integer.toString(context.line);
+            case "trycatchhandler":
+                return context.getExceptionCheck();
+            case "rettype":
+                return MethodProcessor.CPP_TYPES[context.ret.getSort()];
+            case "stackindex0":
+                return Integer.toString(context.stackPointer);
+            case "stackindex1":
+                return Integer.toString(context.stackPointer + 1);
+            case "stackindexm1":
+                return Integer.toString(context.stackPointer - 1);
+            case "stackindexm2":
+                return Integer.toString(context.stackPointer - 2);
+            case "stackindexm3":
+                return Integer.toString(context.stackPointer - 3);
+            case "stackindexm4":
+                return Integer.toString(context.stackPointer - 4);
+            default:
+                return props.get(key);
+        }
     }
 
     protected abstract void process(MethodContext context, T node);

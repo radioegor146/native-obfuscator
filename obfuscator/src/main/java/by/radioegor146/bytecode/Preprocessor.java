@@ -6,5 +6,5 @@ import org.objectweb.asm.tree.MethodNode;
 
 public interface Preprocessor {
 
-    void process(ClassNode classNode, MethodNode methodNode, Platform platform);
+    boolean process(ClassNode classNode, MethodNode methodNode, Platform platform);
 }

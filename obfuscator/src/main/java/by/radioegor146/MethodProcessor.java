@@ -102,6 +102,7 @@ public class MethodProcessor {
         if (desc.endsWith(";")) {
             desc = desc.substring(1, desc.length() - 1);
         }
+        context.needsClassLoader = true;
         return "utils::find_class_wo_static(env, classloader, " + context.getCachedStrings().getPointer(desc.replace('/', '.')) + ")";
     }
 
@@ -160,26 +161,7 @@ public class MethodProcessor {
             output.append("    env->DeleteLocalRef(ignored_hidden);\n");
         }
 
-        if (!isStatic) {
-            output.append("    jclass clazz = utils::get_class_from_object(env, obj);\n");
-            output.append("    if (env->ExceptionCheck()) { ").append(String.format("return (%s) 0;",
-                    CPP_TYPES[context.ret.getSort()])).append(" }\n");
-        }
-        output.append("    jobject classloader = utils::get_classloader_from_class(env, clazz);\n");
-        output.append("    if (env->ExceptionCheck()) { ").append(String.format("return (%s) 0;",
-                CPP_TYPES[context.ret.getSort()])).append(" }\n");
-        output.append("    if (classloader == nullptr) { env->FatalError(").append(context.getStringPool()
-                .get("classloader == null")).append(String.format("); return (%s) 0; }\n", CPP_TYPES[context.ret.getSort()]));
-        output.append("\n");
-        if (!isStatic) {
-            output.append("    env->DeleteLocalRef(clazz);\n");
-            output.append("    clazz = utils::find_class_wo_static(env, classloader, ")
-                    .append(context.getCachedStrings().getPointer(context.clazz.name.replace('/', '.')))
-                    .append(");\n");
-            output.append("    if (env->ExceptionCheck()) { ").append(String.format("return (%s) 0;",
-                    CPP_TYPES[context.ret.getSort()])).append(" }\n");
-        }
-        output.append("    jobject lookup = nullptr;\n");
+        int prologueOffset = output.length();
 
         if (method.tryCatchBlocks != null) {
             for (TryCatchBlockNode tryCatch : method.tryCatchBlocks) {
@@ -211,7 +193,7 @@ public class MethodProcessor {
         if (method.maxStack > 0) {
             output.append("    jvalue ");
             for (int i = 0; i < method.maxStack; i++) {
-                output.append(String.format("cstack%s = {}", i));
+                output.append("cstack").append(i).append(" = {}");
                 if (i != method.maxStack - 1) {
                     output.append(", ");
                 }
@@ -222,7 +204,7 @@ public class MethodProcessor {
         if (method.maxLocals > 0) {
             output.append("    jvalue ");
             for (int i = 0; i < method.maxLocals; i++) {
-                output.append(String.format("clocal%s = {}", i));
+                output.append("clocal").append(i).append(" = {}");
                 if (i != method.maxLocals - 1) {
                     output.append(", ");
                 }
@@ -230,7 +212,7 @@ public class MethodProcessor {
             output.append(";\n");
         }
 
-        output.append("    std::unordered_set<jobject> refs;\n");
+        output.append("    utils::local_refs refs;\n");
         output.append("\n");
 
         int localIndex = 0;
@@ -249,15 +231,16 @@ public class MethodProcessor {
 
         context.stackPointer = 0;
 
-        for (int instruction = 0; instruction < method.instructions.size(); ++instruction) {
-            AbstractInsnNode node = method.instructions.get(instruction);
-            context.output.append("    // ").append(Util.escapeCommentString(handlers[node.getType()]
+        for (AbstractInsnNode node : method.instructions) {
+            InstructionHandlerContainer<?> handler = handlers[node.getType()];
+            context.output.append("    // ").append(Util.escapeCommentString(handler
                     .insnToString(context, node))).append("; Stack: ").append(context.stackPointer).append("\n");
-            handlers[node.getType()].accept(context, node);
-            context.stackPointer = handlers[node.getType()].getNewStackPointer(node, context.stackPointer);
+            handler.accept(context, node);
+            context.stackPointer = handler.getNewStackPointer(node, context.stackPointer);
             context.output.append("    // New stack: ").append(context.stackPointer).append("\n");
         }
 
+        addPrologue(context, isStatic, prologueOffset);
         output.append(String.format("    return (%s) 0;\n", CPP_TYPES[context.ret.getSort()]));
 
         boolean hasAddedNewBlocks = true;
@@ -312,6 +295,46 @@ public class MethodProcessor {
         method.tryCatchBlocks.clear();
 
         specialMethodProcessor.postProcess(context);
+    }
+
+    private void addPrologue(MethodContext context, boolean isStatic, int offset) {
+        boolean resolveDeclaringClass = !isStatic && (context.needsDeclaringClass || context.needsLookup);
+        boolean needsClassLoader = context.needsClassLoader || context.needsArrayClassLoader;
+        if (!needsClassLoader && !resolveDeclaringClass && !context.needsLookup) {
+            return;
+        }
+        StringBuilder prologue = new StringBuilder();
+        String earlyReturn = "return (" + CPP_TYPES[context.ret.getSort()] + ") 0;";
+        String check = "    if (env->ExceptionCheck()) { " + earlyReturn + " }\n";
+        if (needsClassLoader || resolveDeclaringClass) {
+            boolean useDeclaringClass = !isStatic && context.needsArrayClassLoader && context.proxyMethod == null;
+            if (!isStatic) {
+                if (useDeclaringClass) {
+                    prologue.append("    jclass clazz = env->FindClass(")
+                            .append(context.getStringPool().get(context.clazz.name)).append(");\n");
+                } else {
+                    prologue.append("    jclass clazz = utils::get_class_from_object(env, obj);\n");
+                }
+                prologue.append(check);
+            }
+            prologue.append("    jobject classloader = utils::get_classloader_from_class(env, clazz);\n")
+                    .append(check)
+                    .append("    if (classloader == nullptr) { env->FatalError(")
+                    .append(context.getStringPool().get("classloader == null"))
+                    .append("); ").append(earlyReturn).append(" }\n");
+            if (!isStatic && !(useDeclaringClass && resolveDeclaringClass)) {
+                prologue.append("    env->DeleteLocalRef(clazz);\n");
+            }
+            if (resolveDeclaringClass && !useDeclaringClass) {
+                prologue.append("    clazz = utils::find_class_wo_static(env, classloader, ")
+                        .append(context.getCachedStrings().getPointer(context.clazz.name.replace('/', '.')))
+                        .append(");\n").append(check);
+            }
+        }
+        if (context.needsLookup) {
+            prologue.append("    jobject lookup = nullptr;\n");
+        }
+        context.output.insert(offset, prologue);
     }
 
     public static String nameFromNode(MethodNode m, ClassNode cn) {

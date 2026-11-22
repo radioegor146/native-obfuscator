@@ -2,25 +2,21 @@ package by.radioegor146.source;
 
 import by.radioegor146.Util;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class StringPool {
 
     private long length;
-    private final Map<String, Long> pool;
-
-    public StringPool() {
-        this.length = 0;
-        this.pool = new HashMap<>();
-    }
+    private final Map<String, Entry> pool = new LinkedHashMap<>();
 
     public String get(String value) {
-        if (!pool.containsKey(value)) {
-            pool.put(value, length);
-            length += getModifiedUtf8Bytes(value).length + 1;
-        }
-        return String.format("((char *)(string_pool + %dLL))", pool.get(value));
+        return pool.computeIfAbsent(value, key -> {
+            byte[] bytes = getModifiedUtf8Bytes(key);
+            Entry entry = new Entry("((char *)(string_pool + " + length + "LL))", bytes);
+            length += bytes.length + 1;
+            return entry;
+        }).pointer;
     }
 
     private static byte[] getModifiedUtf8Bytes(String str) {
@@ -71,24 +67,34 @@ public class StringPool {
     }
 
     public String build() {
-        List<Byte> bytes = new ArrayList<>();
-        pool.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .forEach(string -> {
-                    for (byte b : getModifiedUtf8Bytes(string)) {
-                        bytes.add(b);
-                    }
-                    bytes.add((byte) 0);
-                });
-
-        String result = String.format("{ %s }", bytes.stream().map(String::valueOf)
-                .collect(Collectors.joining(", ")));
+        StringBuilder values = new StringBuilder("{ ");
+        boolean first = true;
+        for (Entry entry : pool.values()) {
+            if (!first) {
+                values.append(", ");
+            }
+            for (byte value : entry.bytes) {
+                values.append(value).append(", ");
+            }
+            values.append('0');
+            first = false;
+        }
+        values.append(" }");
 
         String template = Util.readResource("sources/string_pool.cpp");
         return Util.dynamicFormat(template, Util.createMap(
-                "size", Math.max(1, bytes.size()) + "LL",
-                "value", result
+                "size", Math.max(1, length) + "LL",
+                "value", values
         ));
+    }
+
+    private static final class Entry {
+        private final String pointer;
+        private final byte[] bytes;
+
+        private Entry(String pointer, byte[] bytes) {
+            this.pointer = pointer;
+            this.bytes = bytes;
+        }
     }
 }
