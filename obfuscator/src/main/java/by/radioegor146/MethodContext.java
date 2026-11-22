@@ -39,6 +39,7 @@ public class MethodContext {
 
     public int stackPointer;
     public boolean needsClassLoader;
+    public boolean needsArrayClassLoader;
     public boolean needsDeclaringClass;
     public boolean needsLookup;
 

@@ -212,7 +212,7 @@ public class MethodProcessor {
             output.append(";\n");
         }
 
-        output.append("    std::unordered_set<jobject> refs;\n");
+        output.append("    utils::local_refs refs;\n");
         output.append("\n");
 
         int localIndex = 0;
@@ -299,25 +299,33 @@ public class MethodProcessor {
 
     private void addPrologue(MethodContext context, boolean isStatic, int offset) {
         boolean resolveDeclaringClass = !isStatic && (context.needsDeclaringClass || context.needsLookup);
-        if (!context.needsClassLoader && !resolveDeclaringClass && !context.needsLookup) {
+        boolean needsClassLoader = context.needsClassLoader || context.needsArrayClassLoader;
+        if (!needsClassLoader && !resolveDeclaringClass && !context.needsLookup) {
             return;
         }
         StringBuilder prologue = new StringBuilder();
         String earlyReturn = "return (" + CPP_TYPES[context.ret.getSort()] + ") 0;";
         String check = "    if (env->ExceptionCheck()) { " + earlyReturn + " }\n";
-        if (context.needsClassLoader || resolveDeclaringClass) {
+        if (needsClassLoader || resolveDeclaringClass) {
+            boolean useDeclaringClass = !isStatic && context.needsArrayClassLoader && context.proxyMethod == null;
             if (!isStatic) {
-                prologue.append("    jclass clazz = utils::get_class_from_object(env, obj);\n").append(check);
+                if (useDeclaringClass) {
+                    prologue.append("    jclass clazz = env->FindClass(")
+                            .append(context.getStringPool().get(context.clazz.name)).append(");\n");
+                } else {
+                    prologue.append("    jclass clazz = utils::get_class_from_object(env, obj);\n");
+                }
+                prologue.append(check);
             }
             prologue.append("    jobject classloader = utils::get_classloader_from_class(env, clazz);\n")
                     .append(check)
                     .append("    if (classloader == nullptr) { env->FatalError(")
                     .append(context.getStringPool().get("classloader == null"))
                     .append("); ").append(earlyReturn).append(" }\n");
-            if (!isStatic) {
+            if (!isStatic && !(useDeclaringClass && resolveDeclaringClass)) {
                 prologue.append("    env->DeleteLocalRef(clazz);\n");
             }
-            if (resolveDeclaringClass) {
+            if (resolveDeclaringClass && !useDeclaringClass) {
                 prologue.append("    clazz = utils::find_class_wo_static(env, classloader, ")
                         .append(context.getCachedStrings().getPointer(context.clazz.name.replace('/', '.')))
                         .append(");\n").append(check);

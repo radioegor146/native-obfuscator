@@ -75,6 +75,7 @@ public class MethodHandler extends GenericInstructionHandler<MethodInsnNode> {
 
             context.output.append("cstack").append(stackOffset).append(".l = utils::link_call_site(env")
                     .append(argsBuilder).append("); ");
+            context.output.append("refs.add(cstack").append(stackOffset).append(".l); ");
             context.output.append(trimmedTryCatchBlock);
             instructionName = null;
             return;

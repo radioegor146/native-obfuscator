@@ -21,7 +21,7 @@
 #include <limits>
 #include <string>
 #include <cstdio>
-#include <unordered_set>
+#include <unordered_map>
 #include <mutex>
 #include <initializer_list>
 
@@ -52,69 +52,8 @@ namespace native_jvm::utils {
 
     void throw_re(JNIEnv *env, const char *exception_class, const char *error, int line);
 
-    inline bool check_array_sizes(JNIEnv *env, int line, std::initializer_list<jint> sizes) {
-        for (jint size : sizes) {
-            if (size < 0) {
-                throw_re(env, "java/lang/NegativeArraySizeException", "MULTIANEWARRAY size < 0", line);
-                return false;
-            }
-        }
-        return true;
-    }
-
-
-    jobjectArray create_multidim_array(JNIEnv *env, jobject classloader, jint count, jint required_count,
-        const char *class_name, int line, std::initializer_list<jint> sizes, int dim_index = 0);
-
-    template <int sort>
-    jarray create_array_value(JNIEnv* env, jint size);
-
-    template <int sort>
-    jarray create_multidim_array_value(JNIEnv *env, jint count, jint required_count,
-        const char *name, int line, std::initializer_list<jint> sizes, int dim_index = 0) {
-        if (required_count == 0) {
-            env->FatalError("required_count == 0");
-            return nullptr;
-        }
-        // The JVM checks the inner dimensions even when an outer dimension is zero.
-        if (dim_index == 0 && !check_array_sizes(env, line, sizes)) {
-            return nullptr;
-        }
-        jint current_size = sizes.begin()[dim_index];
-        if (count == 1) {
-            return create_array_value<sort>(env, current_size);
-        }
-        jobjectArray result_array = nullptr;
-        if (jclass clazz = env->FindClass((std::string(count - 1, '[') + std::string(name)).c_str())) {
-            result_array = env->NewObjectArray(current_size, clazz, nullptr);
-            if (env->ExceptionCheck()) {
-                return nullptr;
-            }
-            env->DeleteLocalRef(clazz);
-        }
-        else
-            return nullptr;
-
-        if (required_count == 1) {
-            return result_array;
-        }
-
-        for (jint i = 0; i < current_size; i++) {
-            jarray inner_array = create_multidim_array_value<sort>(env, count - 1, required_count - 1,
-                name, line, sizes, dim_index + 1);
-            if (env->ExceptionCheck()) {
-                env->DeleteLocalRef(result_array);
-                return nullptr;
-            }
-            env->SetObjectArrayElement(result_array, i, inner_array);
-            env->DeleteLocalRef(inner_array);
-            if (env->ExceptionCheck()) {
-                env->DeleteLocalRef(result_array);
-                return nullptr;
-            }
-        }
-        return result_array;
-    }
+    jarray create_multidim_array(JNIEnv *env, jobject classloader, const char *descriptor, int line,
+        std::initializer_list<jint> sizes);
 
 #ifdef USE_HOTSPOT
     jobject link_call_site(JNIEnv *env, jobject caller_obj, jobject bootstrap_method_obj,
@@ -132,7 +71,37 @@ namespace native_jvm::utils {
     void bastore(JNIEnv *env, jarray array, jint index, jint value);
     jbyte baload(JNIEnv *env, jarray array, jint index);
 
-    void clear_refs(JNIEnv *env, std::unordered_set<jobject> &refs);
+    class local_refs {
+        std::unordered_map<jobject, bool> tracked;
+
+    public:
+        void add(jobject ref) {
+            if (ref != nullptr) {
+                tracked.try_emplace(ref, false);
+            }
+        }
+
+        void keep_live(JNIEnv *env, std::initializer_list<jobject> live) {
+            if (tracked.empty()) {
+                return;
+            }
+            for (jobject ref : live) {
+                auto entry = tracked.find(ref);
+                if (entry != tracked.end()) {
+                    entry->second = true;
+                }
+            }
+            for (auto entry = tracked.begin(); entry != tracked.end();) {
+                if (entry->second) {
+                    entry->second = false;
+                    ++entry;
+                } else {
+                    env->DeleteLocalRef(entry->first);
+                    entry = tracked.erase(entry);
+                }
+            }
+        }
+    };
 
     jstring get_interned(JNIEnv *env, jstring value);
 }

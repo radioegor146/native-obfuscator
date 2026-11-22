@@ -9,7 +9,7 @@ public class LabelHandler implements InstructionTypeHandler<LabelNode> {
     public void accept(MethodContext context, LabelNode node) {
         context.enterLabel(node);
         context.output.append("    ").append(context.getLabelPool().getName(node.getLabel()))
-                .append(": ").append(context.getInlineExceptionCheck()).append('\n');
+                .append(":;\n");
     }
 
     @Override
